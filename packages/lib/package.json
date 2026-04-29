@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.5.5"
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
     "typescript": "^5"

@@ -41,7 +41,7 @@
     "bs58": "^6.0.0",
     "drizzle-orm": "^0.45.2",
     "ioredis": "^5.10.1",
-    "lucide-react": "^0.468.0",
+    "lucide-react": "^1.12.0",
     "nanoid": "^5.0.9",
     "next": "16.2.4",
     "next-themes": "^0.4.6",

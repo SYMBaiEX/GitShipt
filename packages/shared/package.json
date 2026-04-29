@@ -10,7 +10,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
-    "typescript": "^5"
+    "typescript": "^6"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit"

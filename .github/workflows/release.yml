@@ -62,7 +62,7 @@ jobs:
           echo "Build digest: sha256:${DIGEST}"
 
       - name: Upload bundled build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: gitshipt-build
           path: gitshipt-build.tar.gz

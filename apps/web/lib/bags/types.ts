@@ -128,7 +128,10 @@ export const LaunchIntentInputSchema = z.object({
   adminWallet: z.string().min(32).optional(),
   partner: z.string().min(32).optional(),
   partnerConfig: z.string().min(32).optional(),
-  refCode: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/).optional(),
+  refCode: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,64}$/)
+    .optional(),
   tokenizeEquity: z.boolean().optional(),
 });
 export type LaunchIntentInput = z.infer<typeof LaunchIntentInputSchema>;
@@ -229,7 +232,8 @@ export const TradeQuoteInputSchema = z
     slippageBps: z.number().int().min(0).max(10_000).optional(),
   })
   .refine(
-    (value) => value.slippageMode !== "manual" || value.slippageBps !== undefined,
+    (value) =>
+      value.slippageMode !== "manual" || value.slippageBps !== undefined,
     "manual slippage mode requires slippageBps.",
   );
 export type TradeQuoteInput = z.infer<typeof TradeQuoteInputSchema>;
@@ -444,4 +448,11 @@ export const LaunchTransactionResultSchema = z.object({
 });
 export type LaunchTransactionResult = z.infer<
   typeof LaunchTransactionResultSchema
+>;
+
+export const PreparedLaunchTransactionSchema = z.object({
+  transactionBase64: z.string().min(1),
+});
+export type PreparedLaunchTransaction = z.infer<
+  typeof PreparedLaunchTransactionSchema
 >;

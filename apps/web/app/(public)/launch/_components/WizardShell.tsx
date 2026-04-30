@@ -3,6 +3,8 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { Transaction, VersionedTransaction } from "@solana/web3.js";
 import {
   ArrowUpRight,
   BookmarkPlus,
@@ -24,7 +26,11 @@ import { LeaderboardConfigForm } from "./LeaderboardConfigForm";
 import { ReviewAndSign } from "./ReviewAndSign";
 import { DexscreenerOrderDialog } from "@/components/bags/DexscreenerOrderDialog";
 import { DEXSCREENER_PRICE_USDC } from "@repo/shared";
-import { createAndLaunchAction, saveDraftAction } from "../actions";
+import {
+  completeLaunchAction,
+  createAndLaunchAction,
+  saveDraftAction,
+} from "../actions";
 import {
   DEFAULT_SCORING_CONFIG,
   defaultTierWeights,
@@ -71,12 +77,20 @@ export interface WizardShellProps {
   signedIn: boolean;
   /** Server-rendered: true when BAGS_API_KEY is missing (stub mode). */
   isStubMode: boolean;
+  initialBuyLamports: number;
   /** Server-loaded draft to resume. Null for a fresh wizard run. */
   draft: DraftHydration | null;
 }
 
-export function WizardShell({ signedIn, isStubMode, draft }: WizardShellProps) {
+export function WizardShell({
+  signedIn,
+  isStubMode,
+  initialBuyLamports,
+  draft,
+}: WizardShellProps) {
   const router = useRouter();
+  const { connection } = useConnection();
+  const { publicKey, connected, sendTransaction } = useWallet();
   const [, startTransition] = useTransition();
   const [saveState, setSaveState] = useState<
     | { status: "idle" }
@@ -136,9 +150,31 @@ export function WizardShell({ signedIn, isStubMode, draft }: WizardShellProps) {
     });
   }, [draft, draftProjectId, hydrateFromDraft]);
 
+  async function simulatePreparedLaunchTransaction(
+    tx: Transaction | VersionedTransaction,
+  ) {
+    const result =
+      tx instanceof VersionedTransaction
+        ? await connection.simulateTransaction(tx, {
+            replaceRecentBlockhash: false,
+            sigVerify: false,
+          })
+        : await connection.simulateTransaction(tx, undefined, false);
+    if (result.value.err) {
+      throw new Error(
+        `Launch simulation failed: ${JSON.stringify(result.value.err)}`,
+      );
+    }
+  }
+
   async function handleLaunch() {
     if (!repo || !metadata) {
       failSubmit("Missing repo or token metadata. Restart the wizard.");
+      return;
+    }
+    const launchWalletAddress = publicKey?.toBase58() ?? null;
+    if (!isStubMode && (!connected || !launchWalletAddress)) {
+      failSubmit("Connect and link a Solana wallet before launching.");
       return;
     }
 
@@ -148,6 +184,7 @@ export function WizardShell({ signedIn, isStubMode, draft }: WizardShellProps) {
       ghRepoId: repo.id,
       ghOwner: repo.owner,
       ghRepo: repo.name,
+      launchWalletAddress: launchWalletAddress ?? undefined,
       name: metadata.name,
       symbol: metadata.symbol,
       description: metadata.description,
@@ -189,9 +226,58 @@ export function WizardShell({ signedIn, isStubMode, draft }: WizardShellProps) {
         if (!result.ok) {
           const message = formatActionError(result.error, result.message);
           failSubmit(message);
+          if (result.projectId) setDraftProjectId(result.projectId);
           // Inline FormError stays put for context, toast surfaces the
           // failure persistently in case the user scrolled.
           toast.error(message);
+          return;
+        }
+
+        if (result.requiresSignature) {
+          if (
+            !result.transactionBase64 ||
+            !result.launchWalletAddress ||
+            !publicKey ||
+            result.launchWalletAddress !== publicKey.toBase58()
+          ) {
+            const message =
+              "Launch transaction is missing wallet details. Reconnect the wallet shown in the launch manifest and try again.";
+            failSubmit(message);
+            toast.error(message);
+            return;
+          }
+
+          setDraftProjectId(result.projectId);
+          const tx = deserializeWalletTransaction(result.transactionBase64);
+          await simulatePreparedLaunchTransaction(tx);
+          const signature = await sendTransaction(tx, connection, {
+            maxRetries: 3,
+          });
+          const completed = await completeLaunchAction({
+            projectId: result.projectId,
+            signature,
+            launchWalletAddress: result.launchWalletAddress,
+          });
+          if (!completed.ok) {
+            const message = formatActionError(
+              completed.error,
+              completed.message,
+            );
+            failSubmit(message);
+            toast.error(message);
+            return;
+          }
+          succeedSubmit({
+            projectId: completed.projectId,
+            tokenMint: completed.tokenMint,
+            status: completed.status,
+            txSig: completed.txSig,
+            configKey: completed.configKey,
+            stub: completed.stub,
+            note: completed.note,
+            ghOwner: completed.ghOwner,
+            ghRepo: completed.ghRepo,
+          });
           return;
         }
 
@@ -319,11 +405,19 @@ export function WizardShell({ signedIn, isStubMode, draft }: WizardShellProps) {
         ) : step === 2 && repo ? (
           <>
             {errorMessage ? (
-              <FormError
-                message={errorMessage}
-                onDismiss={handleRetry}
-                className="mb-4"
-              />
+              <div className="mb-4 space-y-3">
+                <FormError message={errorMessage} onDismiss={handleRetry} />
+                {draftProjectId && errorMessage.includes("GitHub App") ? (
+                  <Button asChild variant="secondary" size="sm">
+                    <Link
+                      href={`/api/projects/${draftProjectId}/install-github`}
+                    >
+                      Install GitHub App
+                      <ArrowUpRight className="size-3.5" />
+                    </Link>
+                  </Button>
+                ) : null}
+              </div>
             ) : null}
             <TokenMetadataForm
               repo={repo}
@@ -361,6 +455,9 @@ export function WizardShell({ signedIn, isStubMode, draft }: WizardShellProps) {
               repo={repo}
               metadata={metadata}
               leaderboard={leaderboard}
+              launchWalletAddress={publicKey?.toBase58() ?? null}
+              walletConnected={connected}
+              initialBuyLamports={initialBuyLamports}
               onBack={() => goToStep(3)}
               onEditRepo={() => goToStep(1)}
               onEditToken={() => goToStep(2)}
@@ -412,6 +509,19 @@ function DraftResumeBanner({
       </div>
     </Card>
   );
+}
+
+function deserializeWalletTransaction(
+  transactionBase64: string,
+): Transaction | VersionedTransaction {
+  const bytes = Uint8Array.from(atob(transactionBase64), (char) =>
+    char.charCodeAt(0),
+  );
+  try {
+    return VersionedTransaction.deserialize(bytes);
+  } catch {
+    return Transaction.from(bytes);
+  }
 }
 
 function SaveDraftBar({
@@ -640,9 +750,7 @@ function DexscreenerUpsellRow({ result }: { result: LaunchSuccess }) {
           <Sparkles className="size-4" aria-hidden />
         </span>
         <div>
-          <p className="text-label-md text-fg">
-            Upgrade your DexScreener page
-          </p>
+          <p className="text-label-md text-fg">Upgrade your DexScreener page</p>
           <p className="text-caption text-fg-muted">
             <span className="text-mono-sm text-fg">
               ${DEXSCREENER_PRICE_USDC}
@@ -806,7 +914,9 @@ function SignedOutPrompt() {
     <div className="space-y-4">
       <h2 className="text-headline-sm">Sign in to continue</h2>
       <p className="text-body-md text-fg-secondary">
-        You need to be signed in with GitHub before you can launch a token.
+        Start with GitHub so GitShipt can verify repo admin access. Before the
+        final launch you will also install the GitShipt App and link a Solana
+        wallet for the initial buy signature.
       </p>
       <Button asChild>
         <Link href="/auth/signin?next=/launch">Sign in with GitHub</Link>
@@ -831,6 +941,12 @@ function formatActionError(code: string, message: string): string {
       return message;
     case "no_github_token":
       return "GitHub token expired. Sign out and sign back in.";
+    case "wallet_required":
+      return "Connect and link a Solana wallet before launching.";
+    case "wallet_not_linked":
+      return "Sign the wallet message first so GitShipt can verify this wallet belongs to your account.";
+    case "github_app_required":
+      return "Install the GitShipt GitHub App for this repo before the on-chain launch.";
     default:
       return message || "Launch failed.";
   }

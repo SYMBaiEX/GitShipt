@@ -14,7 +14,6 @@ export const metadata = {
     "Pick a GitHub repo, configure metadata and the leaderboard, and launch a Bags.fm token.",
 };
 
-
 interface LaunchPageProps {
   searchParams: Promise<{ draftId?: string }>;
 }
@@ -54,6 +53,7 @@ async function LaunchPageContent({ searchParams }: LaunchPageProps) {
     <WizardShell
       signedIn={signedIn}
       isStubMode={config.isStubMode}
+      initialBuyLamports={config.initialBuyLamports}
       draft={draft}
     />
   );

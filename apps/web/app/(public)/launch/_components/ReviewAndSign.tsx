@@ -2,7 +2,15 @@
 
 import type { ReactNode } from "react";
 import Image from "next/image";
-import { ArrowLeft, Pencil, Rocket, WalletCards } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  GitBranch,
+  Pencil,
+  Rocket,
+  ShieldCheck,
+  WalletCards,
+} from "lucide-react";
 import { cn } from "@repo/lib";
 import { Badge } from "@repo/ui";
 import { Button } from "@repo/ui";
@@ -13,11 +21,15 @@ import {
   type TokenMetadataInput,
 } from "@repo/shared";
 import type { LeaderboardConfig } from "@/lib/state/launch-wizard-store";
+import { SignInWithSolanaFlow } from "@/components/wallet/SignInWithSolanaFlow";
 
 export interface ReviewAndSignProps {
   repo: GithubRepo;
   metadata: TokenMetadataInput;
   leaderboard: LeaderboardConfig;
+  launchWalletAddress: string | null;
+  walletConnected: boolean;
+  initialBuyLamports: number;
   onBack: () => void;
   onEditRepo: () => void;
   onEditToken: () => void;
@@ -31,6 +43,9 @@ export function ReviewAndSign({
   repo,
   metadata,
   leaderboard,
+  launchWalletAddress,
+  walletConnected,
+  initialBuyLamports,
   onBack,
   onEditRepo,
   onEditToken,
@@ -50,6 +65,11 @@ export function ReviewAndSign({
   const contributorPoolPct = (100 - leaderboard.platformFeeBps / 100).toFixed(
     2,
   );
+  const launchCostLabel =
+    initialBuyLamports > 0
+      ? `${(initialBuyLamports / LAMPORTS_PER_SOL_NUMBER).toFixed(4)} SOL`
+      : "0.0000 SOL";
+  const canLaunch = isStubMode || (walletConnected && launchWalletAddress);
 
   return (
     <div className="space-y-5">
@@ -133,12 +153,74 @@ export function ReviewAndSign({
               value={<span className="text-mono-sm">{platformFeePct}%</span>}
             />
             <StatusLine
-              label="Launch cost"
-              value={<span className="text-mono-sm">~0.05 SOL</span>}
+              label="Initial buy"
+              value={<span className="text-mono-sm">{launchCostLabel}</span>}
             />
-            <StatusLine label="Fee claimer" value="Contributor pool wallet" />
+            <StatusLine
+              label="Launch signer"
+              value={
+                launchWalletAddress ? (
+                  <span className="text-mono-sm">
+                    {truncateWallet(launchWalletAddress)}
+                  </span>
+                ) : (
+                  "Wallet required"
+                )
+              }
+            />
           </div>
         </aside>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="rounded-lg border border-border-strong bg-surface-elevated p-4">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 size-5 text-primary-readable" />
+            <div className="min-w-0 space-y-3">
+              <div>
+                <h3 className="text-label-md text-fg">Launch manifest</h3>
+                <p className="mt-1 text-body-sm text-fg-secondary">
+                  GitShipt prepares Bags metadata and fee sharing on the server.
+                  Your linked wallet signs the final launch transaction and pays
+                  the initial buy shown by the wallet.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-3">
+                <ReadinessPill
+                  ready
+                  label="GitHub repo admin"
+                  icon={<GitBranch />}
+                />
+                <ReadinessPill
+                  ready={isStubMode || Boolean(launchWalletAddress)}
+                  label={isStubMode ? "Test wallet bypass" : "Wallet linked"}
+                  icon={<WalletCards />}
+                />
+                <ReadinessPill
+                  ready
+                  label="Fee split totals 100%"
+                  icon={<CheckCircle2 />}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-surface p-3">
+          {isStubMode || launchWalletAddress ? (
+            <div className="space-y-2">
+              <p className="text-label-md text-fg">
+                {isStubMode ? "Test launch mode" : "Wallet ready"}
+              </p>
+              <p className="text-body-sm text-fg-secondary">
+                {isStubMode
+                  ? "No real Bags transaction will be broadcast."
+                  : "You will review the launch transaction in your wallet before it is sent."}
+              </p>
+            </div>
+          ) : (
+            <SignInWithSolanaFlow continueHref={null} />
+          )}
+        </div>
       </section>
 
       <div className="grid gap-x-8 gap-y-4 lg:grid-cols-2">
@@ -185,7 +267,7 @@ export function ReviewAndSign({
           type="button"
           size="lg"
           onClick={onLaunch}
-          disabled={isPending}
+          disabled={isPending || !canLaunch}
           className="w-full sm:w-auto"
         >
           {isPending ? (
@@ -193,7 +275,7 @@ export function ReviewAndSign({
           ) : (
             <Rocket className="size-4" />
           )}
-          {isStubMode ? "Run test launch" : "Launch"}
+          {isStubMode ? "Run test launch" : "Review in wallet"}
         </Button>
       </div>
     </div>
@@ -218,6 +300,43 @@ function StatusLine({ label, value }: { label: string; value: ReactNode }) {
       </div>
     </div>
   );
+}
+
+function ReadinessPill({
+  ready,
+  label,
+  icon,
+}: {
+  ready: boolean;
+  label: string;
+  icon: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-11 items-center gap-2 rounded-md border px-3 py-2 text-body-sm",
+        ready
+          ? "border-success/30 bg-success-soft/30 text-fg"
+          : "border-warning/30 bg-warning-soft/30 text-fg",
+      )}
+    >
+      <span
+        className={cn(
+          "flex size-4 shrink-0 items-center justify-center [&>svg]:size-4",
+          ready ? "text-success" : "text-warning",
+        )}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 text-wrap">{label}</span>
+    </div>
+  );
+}
+
+function truncateWallet(address: string): string {
+  return address.length <= 12
+    ? address
+    : `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
 function ReviewSection({

@@ -111,6 +111,7 @@ export const CreateProjectBodySchema = z.object({
   ghRepo: z.string().min(1),
   ghRepoId: z.string().min(1),
   ghInstallationId: z.string().optional(),
+  launchWalletAddress: z.string().min(32).max(64).optional(),
   name: z.string().trim().min(1).max(32),
   symbol: z
     .string()
@@ -212,6 +213,10 @@ export const LaunchProjectResponseSchema = z.object({
   tokenMint: z.string(),
   status: z.enum(["launch_configured", "live", "simulated_live"]),
   stub: z.boolean().default(false),
+  requiresSignature: z.boolean().optional(),
+  transactionBase64: z.string().optional(),
+  launchWalletAddress: z.string().min(32).max(64).optional(),
+  initialBuyLamports: z.number().int().min(0).optional(),
   configKey: z.string().optional(),
   txSig: z.string().nullable().optional(),
   note: z.string().optional(),

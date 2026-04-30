@@ -41,6 +41,7 @@ import {
   SubmitTransactionResponseSchema,
   LaunchTransactionInputSchema,
   LaunchTransactionResultSchema,
+  PreparedLaunchTransactionSchema,
   type TokenInfoInput,
   type TokenInfoResponse,
   type FeeShareConfigInput,
@@ -73,6 +74,7 @@ import {
   type BagsProvider,
   type FeeClaimer,
   type LaunchTransactionResult,
+  type PreparedLaunchTransaction,
 } from "./types";
 import { stubBags } from "./__stubs";
 import { parseBagsRestEnvelope } from "./rest";
@@ -876,6 +878,49 @@ export const bags = {
     });
   },
 
+  async createLaunchTransactionForWallet(args: {
+    tokenMint: string;
+    metadataUrl: string;
+    configKey: string;
+    launchWallet: string;
+    initialBuyLamports?: number;
+  }): Promise<PreparedLaunchTransaction> {
+    const validated = LaunchTransactionInputSchema.parse(args);
+    const [{ PublicKey, Transaction, VersionedTransaction }, sdk] =
+      await Promise.all([import("@solana/web3.js"), getSdk()]);
+    const tx = await sdk.tokenLaunch.createLaunchTransaction({
+      metadataUrl: validated.metadataUrl,
+      tokenMint: new PublicKey(validated.tokenMint),
+      configKey: new PublicKey(validated.configKey),
+      launchWallet: new PublicKey(validated.launchWallet),
+      initialBuyLamports: validated.initialBuyLamports,
+    });
+    const normalized = await normalizeBagsTransaction(tx);
+    await assertBagsTransactionSafeToSign(
+      normalized,
+      new PublicKey(validated.launchWallet),
+      {
+        operation: "Bags launch transaction",
+        allowSignerSystemTransfer: true,
+      },
+    );
+    const bytes =
+      normalized instanceof VersionedTransaction
+        ? normalized.serialize()
+        : normalized instanceof Transaction
+          ? normalized.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false,
+            })
+          : null;
+    if (!bytes) {
+      throw new Error("Bags returned an unsupported launch transaction.");
+    }
+    return PreparedLaunchTransactionSchema.parse({
+      transactionBase64: Buffer.from(bytes).toString("base64"),
+    });
+  },
+
   /**
    * Resolve `provider` + `username` to a Bags-routed wallet address.
    * Used at launch (to know the platform-pool address) and during onboarding
@@ -890,11 +935,9 @@ export const bags = {
         stubBags.resolvedWallet(provider, username),
       );
     }
-    return bagsRest(
-      "token-launch/fee-share/wallet/v2",
-      ResolvedWalletSchema,
-      { query: { provider, username } },
-    );
+    return bagsRest("token-launch/fee-share/wallet/v2", ResolvedWalletSchema, {
+      query: { provider, username },
+    });
   },
 
   /** Read claimable lamports per token-mint position for a given wallet. */
@@ -912,9 +955,13 @@ export const bags = {
     const sdk = await tryGetSdk();
     const positions = sdk
       ? await sdk.fee.getAllClaimablePositions(new PublicKey(walletAddress))
-      : await bagsRest("token-launch/claimable-positions", z.array(z.unknown()), {
-          query: { wallet: walletAddress },
-        });
+      : await bagsRest(
+          "token-launch/claimable-positions",
+          z.array(z.unknown()),
+          {
+            query: { wallet: walletAddress },
+          },
+        );
     return ClaimablePositionsResponseSchema.parse({ positions });
   },
 
@@ -1060,7 +1107,9 @@ export const bags = {
       return ClaimEventsSchema.parse(localBagsStubs.claimEvents(tokenMint));
     }
     if (!Number.isInteger(fromUnix) || !Number.isInteger(toUnix)) {
-      throw new Error("fromUnix and toUnix must be integer Unix-second values.");
+      throw new Error(
+        "fromUnix and toUnix must be integer Unix-second values.",
+      );
     }
     if (toUnix < fromUnix) {
       throw new Error("toUnix must be >= fromUnix.");
@@ -1200,7 +1249,9 @@ export const bags = {
                 body: JSON.stringify({ feeClaimerVaults }),
               },
             )
-          ).poolConfigKeys.filter((poolKey): poolKey is string => poolKey !== null);
+          ).poolConfigKeys.filter(
+            (poolKey): poolKey is string => poolKey !== null,
+          );
       return PoolConfigKeysResponseSchema.parse({ poolConfigKeys });
     });
   },

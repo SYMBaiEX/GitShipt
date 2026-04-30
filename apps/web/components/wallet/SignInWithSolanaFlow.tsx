@@ -3,7 +3,13 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { CheckCircle2, AlertCircle, Loader2, PenLine, ArrowRight } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  PenLine,
+  ArrowRight,
+} from "lucide-react";
 import bs58 from "bs58";
 import { Button } from "@repo/ui";
 import { Card, CardContent } from "@repo/ui";
@@ -77,13 +83,20 @@ function serializeSiws(m: ReturnType<typeof buildSiwsMessage>): string {
   return lines.join("\n");
 }
 
-export function SignInWithSolanaFlow() {
+export function SignInWithSolanaFlow({
+  continueHref = "/dashboard",
+}: {
+  continueHref?: string | null;
+} = {}) {
   const { publicKey, connected, signMessage } = useWallet();
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
   const onSign = useCallback(async () => {
     if (!publicKey || !signMessage) {
-      setStatus({ kind: "error", reason: "Wallet does not support message signing." });
+      setStatus({
+        kind: "error",
+        reason: "Wallet does not support message signing.",
+      });
       return;
     }
 
@@ -183,18 +196,30 @@ export function SignInWithSolanaFlow() {
         <Card depth="raised" padding="default" className="border-success/40">
           <CardContent className="space-y-3">
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 size-5 text-success" aria-hidden />
+              <CheckCircle2
+                className="mt-0.5 size-5 text-success"
+                aria-hidden
+              />
               <div className="space-y-1">
                 <p className="text-label-md text-fg">Wallet linked</p>
-                <p className="text-mono-sm text-fg-secondary break-all">{status.address}</p>
+                <p className="text-mono-sm text-fg-secondary break-all">
+                  {status.address}
+                </p>
               </div>
             </div>
-            <Button asChild variant="primary" size="default" className="w-full">
-              <Link href="/dashboard">
-                Continue to dashboard
-                <ArrowRight className="size-4" aria-hidden />
-              </Link>
-            </Button>
+            {continueHref ? (
+              <Button
+                asChild
+                variant="primary"
+                size="default"
+                className="w-full"
+              >
+                <Link href={continueHref}>
+                  Continue to dashboard
+                  <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
       ) : status.kind === "error" ? (
@@ -204,7 +229,9 @@ export function SignInWithSolanaFlow() {
               <AlertCircle className="mt-0.5 size-5 text-danger" aria-hidden />
               <div className="space-y-1">
                 <p className="text-label-md text-fg">Could not link wallet</p>
-                <p className="text-mono-sm text-danger break-all">{status.reason}</p>
+                <p className="text-mono-sm text-danger break-all">
+                  {status.reason}
+                </p>
               </div>
             </div>
             <Button

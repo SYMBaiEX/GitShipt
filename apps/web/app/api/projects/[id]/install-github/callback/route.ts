@@ -11,11 +11,9 @@ import {
 } from "@/lib/auth/permissions";
 import { dbHttp } from "@/db";
 import { projects } from "@/db/schema";
-import { audit } from "@/lib/audit";
 import { hasCredentials, serverEnv } from "@/lib/env";
-import { revalidateProjectCaches } from "@/lib/cache";
-import { withIdempotency } from "@/lib/idempotency";
-
+import { resolveGitHubInstallationForRepo } from "@/lib/github/installations";
+import { bindProjectGitHubInstallation } from "@/lib/github/project-installation";
 
 /**
  * GET /api/projects/[id]/install-github/callback
@@ -101,7 +99,11 @@ export async function GET(
 
   // ---- Confirm project still exists --------------------------------------
   const [proj] = await dbHttp
-    .select({ id: projects.id })
+    .select({
+      id: projects.id,
+      ghOwner: projects.ghOwner,
+      ghRepo: projects.ghRepo,
+    })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
@@ -115,7 +117,39 @@ export async function GET(
   );
 
   // For request-only flows (org admin must approve), bail with a hint.
-  if (!installationIdRaw || setupAction === "request") {
+  if (setupAction === "request") {
+    dashboardBack.searchParams.set("installed", "pending");
+    return NextResponse.redirect(dashboardBack, 302);
+  }
+
+  if (!installationIdRaw) {
+    if (hasCredentials.githubApp()) {
+      try {
+        const resolved = await resolveGitHubInstallationForRepo({
+          owner: proj.ghOwner,
+          repo: proj.ghRepo,
+        });
+        if (resolved) {
+          await bindProjectGitHubInstallation({
+            projectId,
+            installationId: resolved.installationId,
+            actorUserId: session.user.id,
+            setupAction: setupAction || "existing",
+            request: req,
+            resolvedFromExistingInstall: true,
+          });
+          dashboardBack.searchParams.set("installed", "1");
+          dashboardBack.searchParams.set("source", "existing");
+          return NextResponse.redirect(dashboardBack, 302);
+        }
+      } catch (error) {
+        console.warn(
+          `[github-install:${projectId}] callback installation lookup failed`,
+          error,
+        );
+      }
+    }
+
     dashboardBack.searchParams.set("installed", "pending");
     return NextResponse.redirect(dashboardBack, 302);
   }
@@ -126,36 +160,13 @@ export async function GET(
   }
 
   // ---- Persist + audit ---------------------------------------------------
-  await withIdempotency(
-    `github-install:${projectId}:${installationIdRaw}:${setupAction}`,
-    async () => {
-      await dbHttp
-        .update(projects)
-        .set({
-          ghInstallationId: installationIdRaw,
-          updatedAt: new Date(),
-        })
-        .where(eq(projects.id, projectId));
-
-      await audit({
-        actorUserId: session.user.id,
-        action: "project.gh_app_install",
-        targetType: "project",
-        targetId: projectId,
-        metadata: {
-          installationId: installationIdRaw,
-          setupAction,
-        },
-        ip: req.headers.get("x-forwarded-for") ?? null,
-        userAgent: req.headers.get("user-agent") ?? null,
-      });
-
-      return { ok: true };
-    },
-    { scope: `project:github-install:${projectId}` },
-  );
-
-  await revalidateProjectCaches(projectId);
+  await bindProjectGitHubInstallation({
+    projectId,
+    installationId: installationIdRaw,
+    actorUserId: session.user.id,
+    setupAction,
+    request: req,
+  });
   dashboardBack.searchParams.set("installed", "1");
   return NextResponse.redirect(dashboardBack, 302);
 }

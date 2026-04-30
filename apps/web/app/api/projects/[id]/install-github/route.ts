@@ -10,7 +10,8 @@ import {
 } from "@/lib/auth/permissions";
 import { getProjectRecord } from "@/lib/queries/dashboard";
 import { hasCredentials, serverEnv } from "@/lib/env";
-
+import { resolveGitHubInstallationForRepo } from "@/lib/github/installations";
+import { bindProjectGitHubInstallation } from "@/lib/github/project-installation";
 
 /**
  * GET /api/projects/[id]/install-github
@@ -26,7 +27,7 @@ import { hasCredentials, serverEnv } from "@/lib/env";
  * 503.
  */
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   if (!hasCredentials.db()) {
@@ -85,6 +86,43 @@ export async function GET(
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
     throw e;
+  }
+
+  const dashboardBack = new URL(
+    `/dashboard/projects/${projectId}/repository`,
+    req.url,
+  );
+
+  if (project.ghInstallationId) {
+    dashboardBack.searchParams.set("installed", "1");
+    return NextResponse.redirect(dashboardBack, 302);
+  }
+
+  if (hasCredentials.githubApp()) {
+    try {
+      const resolved = await resolveGitHubInstallationForRepo({
+        owner: project.ghOwner,
+        repo: project.ghRepo,
+      });
+      if (resolved) {
+        await bindProjectGitHubInstallation({
+          projectId,
+          installationId: resolved.installationId,
+          actorUserId: session.user.id,
+          setupAction: "existing",
+          request: req,
+          resolvedFromExistingInstall: true,
+        });
+        dashboardBack.searchParams.set("installed", "1");
+        dashboardBack.searchParams.set("source", "existing");
+        return NextResponse.redirect(dashboardBack, 302);
+      }
+    } catch (error) {
+      console.warn(
+        `[github-install:${projectId}] existing installation lookup failed`,
+        error,
+      );
+    }
   }
 
   const sig = createHmac("sha256", env.BETTER_AUTH_SECRET)

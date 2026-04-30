@@ -221,6 +221,8 @@ function StatusBadge({
       return <Badge variant="danger">Killed</Badge>;
     case "tracked":
       return <Badge variant="default">Tracked</Badge>;
+    case "simulated_live":
+      return <Badge variant="default">Not Live</Badge>;
     default:
       return <Badge variant="default">Draft</Badge>;
   }

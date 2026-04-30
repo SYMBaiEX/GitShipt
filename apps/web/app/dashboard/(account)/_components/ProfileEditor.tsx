@@ -154,7 +154,6 @@ function PreviewAvatar({
         alt=""
         width={80}
         height={80}
-        unoptimized
         onError={() => setBrokenUrl(safeImage)}
         className="size-20 rounded-lg border border-border object-cover"
       />

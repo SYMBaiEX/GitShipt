@@ -73,7 +73,6 @@ function TopProjectCard({ project }: { project: LandingProject }) {
             width={40}
             height={40}
             className="size-10 shrink-0 rounded-lg bg-surface-elevated"
-            unoptimized
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
@@ -84,9 +83,15 @@ function TopProjectCard({ project }: { project: LandingProject }) {
                 variant="success"
                 size="sm"
                 dot
-                aria-label={`Status ${project.status}`}
+                aria-label={`Status ${
+                  project.status === "simulated_live"
+                    ? "Not Live"
+                    : project.status
+                }`}
               >
-                {project.status}
+                {project.status === "simulated_live"
+                  ? "Not Live"
+                  : project.status}
               </Badge>
             </div>
             <p className="truncate text-caption text-fg-muted">

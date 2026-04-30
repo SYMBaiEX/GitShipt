@@ -54,6 +54,7 @@ import { useSessionChrome } from "@/components/auth/SessionChromeProvider";
 import { resolveOrigin } from "@/lib/nav/origins";
 import { useAuthenticatedRouteStore } from "@/lib/state/authenticated-route-store";
 import { cn } from "@repo/lib";
+import logo from "../../public/logo.png";
 
 /**
  * Single sidebar component for every surface in the app.
@@ -707,10 +708,8 @@ function CollapsibleBrandLogo() {
   const { collapsed } = useSidebar();
   return (
     <Image
-      src="/logo.png"
+      src={logo}
       alt=""
-      width={28}
-      height={28}
       sizes="28px"
       className={cn("size-7 shrink-0 object-contain", collapsed && "lg:hidden")}
       loading="eager"

@@ -206,7 +206,6 @@ export function RepoPicker({ selectedId, onSelect }: RepoPickerProps) {
                         alt=""
                         width={32}
                         height={32}
-                        unoptimized
                         className="size-8 shrink-0 rounded-full bg-surface"
                       />
                       <div className="min-w-0">

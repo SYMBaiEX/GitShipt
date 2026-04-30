@@ -220,6 +220,8 @@ function PayoutRow({
         return { variant: "danger" as const, label: "Failed", dot: false };
       case "cancelled":
         return { variant: "default" as const, label: "Cancelled", dot: false };
+      case "simulated":
+        return { variant: "default" as const, label: "Not Live", dot: false };
       default:
         return {
           variant: "default" as const,

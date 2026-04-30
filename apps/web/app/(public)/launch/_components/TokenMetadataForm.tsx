@@ -237,7 +237,6 @@ export function TokenMetadataForm({
                 alt=""
                 width={48}
                 height={48}
-                unoptimized
                 className="size-10 shrink-0 rounded-lg bg-surface object-cover"
               />
               <div className="min-w-0">

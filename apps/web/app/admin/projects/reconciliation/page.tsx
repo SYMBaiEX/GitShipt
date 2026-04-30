@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { desc, isNotNull } from "drizzle-orm";
 import {
   AlertTriangle,
@@ -314,7 +315,7 @@ function DbStatusBadge({ status }: { status: DbProjectStatus }) {
     case "simulated_live":
       return (
         <Badge variant="info" size="sm">
-          simulated_live
+          Not Live
         </Badge>
       );
     case "paused":
@@ -422,10 +423,12 @@ function MismatchedCard({ rows }: { rows: MismatchedRow[] }) {
                         className="flex min-w-0 items-center gap-2"
                       >
                         {r.bags.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <Image
                             src={r.bags.image}
                             alt=""
+                            width={24}
+                            height={24}
+                            sizes="24px"
                             className="size-6 shrink-0 rounded-md"
                           />
                         ) : (

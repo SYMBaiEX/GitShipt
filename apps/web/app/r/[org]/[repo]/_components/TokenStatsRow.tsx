@@ -43,7 +43,7 @@ export function TokenStatsRow({ stats }: { stats: TokenStats | null }) {
           Token market data
         </span>
         <Badge variant={stats.isStub ? "warning" : "info"} size="sm">
-          {stats.isStub ? "Simulated" : "Estimated"}
+          {stats.isStub ? "Not Live" : "Estimated"}
         </Badge>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">

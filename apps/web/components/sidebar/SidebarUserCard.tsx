@@ -246,7 +246,6 @@ function Avatar({
         alt={alt}
         width={28}
         height={28}
-        unoptimized
         className="size-7 shrink-0 rounded-md border border-border/50 object-cover"
       />
     );

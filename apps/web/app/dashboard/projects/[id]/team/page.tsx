@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Image from "next/image";
 import { Sparkles, Users } from "lucide-react";
 import { hasCredentials } from "@/lib/env";
 import { getProjectMembers } from "@/lib/queries/dashboard";
@@ -92,10 +93,12 @@ async function TeamPageContent({
                   className="grid grid-cols-[40px_minmax(0,1fr)_auto_auto_auto] items-center gap-3 px-6 py-3"
                 >
                   {m.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <Image
                       src={m.image}
                       alt={m.name}
+                      width={40}
+                      height={40}
+                      sizes="40px"
                       className="size-10 rounded-full border border-border object-cover"
                     />
                   ) : (

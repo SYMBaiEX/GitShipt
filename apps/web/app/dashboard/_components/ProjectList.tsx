@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ExternalLink } from "lucide-react";
 import { Badge } from "@repo/ui";
 import { formatSol } from "@repo/lib";
@@ -58,10 +59,12 @@ function Avatar({ src, alt }: { src: string | null; alt: string }) {
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <Image
       src={src}
       alt={alt}
+      width={40}
+      height={40}
+      sizes="40px"
       className="size-10 rounded-full border border-border object-cover"
     />
   );
@@ -90,7 +93,7 @@ export function StatusBadge({
     killed: { variant: "danger" as const, label: "Killed", dot: false },
     simulated_live: {
       variant: "default" as const,
-      label: "Simulated",
+      label: "Not Live",
       dot: false,
     },
   } as const;

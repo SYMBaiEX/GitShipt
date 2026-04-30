@@ -1,5 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { FileSearch } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@repo/ui";
 import { Pill } from "@repo/ui";
@@ -165,10 +166,12 @@ function AuditRowEl({ row }: { row: AuditRow }) {
       <td className="px-2 py-2">
         <div className="flex items-center gap-2">
           {row.actorAvatar ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={row.actorAvatar}
               alt=""
+              width={20}
+              height={20}
+              sizes="20px"
               className="size-5 shrink-0 rounded-full"
             />
           ) : (

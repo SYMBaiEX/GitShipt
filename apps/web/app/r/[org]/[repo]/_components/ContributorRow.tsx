@@ -51,7 +51,6 @@ export function ContributorRow({
             fill
             sizes="32px"
             className="object-cover"
-            unoptimized
           />
         </span>
         <div className="min-w-0">

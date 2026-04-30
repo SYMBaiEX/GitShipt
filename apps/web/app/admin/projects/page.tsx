@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Layers } from "lucide-react";
 import { requireAdminPage } from "@/lib/auth/page-guards";
 import { Card, CardHeader, CardTitle, CardDescription } from "@repo/ui";
@@ -14,7 +15,7 @@ const STATUS_FILTERS = [
   { key: "draft", label: "Draft" },
   { key: "launch_configured", label: "Configured" },
   { key: "live", label: "Live" },
-  { key: "simulated_live", label: "Simulated" },
+  { key: "simulated_live", label: "Not Live" },
   { key: "tracked", label: "Tracked" },
   { key: "paused", label: "Paused" },
   { key: "killed", label: "Killed" },
@@ -124,10 +125,12 @@ async function AdminProjectsPageContent({
                         className="flex min-w-0 items-center gap-2"
                       >
                         {p.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <Image
                             src={p.imageUrl}
                             alt=""
+                            width={24}
+                            height={24}
+                            sizes="24px"
                             className="size-6 shrink-0 rounded-md"
                           />
                         ) : (
@@ -206,6 +209,12 @@ function StatusBadge({
       return (
         <Badge variant="default" size="sm">
           Tracked
+        </Badge>
+      );
+    case "simulated_live":
+      return (
+        <Badge variant="default" size="sm">
+          Not Live
         </Badge>
       );
     default:

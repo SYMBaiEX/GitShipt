@@ -387,6 +387,8 @@ export async function createAndLaunchAction(
 
         if (project.status !== "draft") {
           if (project.tokenMint) {
+            const statusLabel =
+              project.status === "simulated_live" ? "Not Live" : project.status;
             return {
               ok: true,
               projectId,
@@ -398,12 +400,14 @@ export async function createAndLaunchAction(
               txSig: null,
               ghOwner: validated.ghOwner,
               ghRepo: validated.ghRepo,
-              note: `Project status is ${project.status}; returning persisted token mint.`,
+              note: `Project status is ${statusLabel}; returning persisted token mint.`,
             } satisfies LaunchActionResult;
           }
+          const statusLabel =
+            project.status === "simulated_live" ? "Not Live" : project.status;
           throw new ActionError(
             "bad_status",
-            `Project is in ${project.status} status; cannot launch.`,
+            `Project is in ${statusLabel} status; cannot launch.`,
             409,
           );
         }

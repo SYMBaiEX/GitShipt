@@ -281,6 +281,8 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
           // Already launched (or paused/killed) — return the existing token mint
           // so the wizard can navigate to /r/{org}/{repo} idempotently.
           if (project.tokenMint) {
+            const statusLabel =
+              project.status === "simulated_live" ? "Not Live" : project.status;
             return LaunchProjectResponseSchema.parse({
               projectId,
               tokenMint: project.tokenMint,
@@ -289,12 +291,14 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
               stub: project.status === "simulated_live",
               configKey: project.bagsConfigKey ?? undefined,
               txSig: null,
-              note: `Project status is ${project.status}; returning persisted token mint.`,
+              note: `Project status is ${statusLabel}; returning persisted token mint.`,
             });
           }
+          const statusLabel =
+            project.status === "simulated_live" ? "Not Live" : project.status;
           throw new LaunchError(
             "bad_status",
-            `Project is in ${project.status} status; cannot launch.`,
+            `Project is in ${statusLabel} status; cannot launch.`,
             409,
           );
         }

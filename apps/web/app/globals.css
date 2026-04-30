@@ -1618,6 +1618,28 @@ body {
   --hero-art-soft-shadow: rgb(0 0 0 / 0.24);
   --hero-art-tight-shadow: rgb(0 0 0 / 0.32);
   --hero-art-rim-light: rgb(255 255 255 / 0.22);
+  --hero-art-gold-rim: color-mix(in oklab, var(--primary) 28%, transparent);
+  --hero-stage-aura:
+    radial-gradient(
+      ellipse at 64% 52%,
+      color-mix(in oklab, var(--primary) 3%, transparent) 0 24%,
+      transparent 68%
+    ),
+    radial-gradient(
+      ellipse at 45% 76%,
+      color-mix(in oklab, var(--success) 1.5%, transparent) 0 16%,
+      transparent 58%
+    );
+  --hero-stage-aura-opacity: 0.08;
+  --hero-stage-floor-shadow: rgb(0 0 0 / 0.58);
+  --hero-stage-floor-glow: color-mix(in oklab, var(--primary) 10%, transparent);
+  --hero-stage-floor-opacity: 0.28;
+  --hero-flag-contact-shadow: rgb(0 0 0 / 0.34);
+  --hero-flag-soft-shadow: rgb(0 0 0 / 0.2);
+  --hero-flag-contact-opacity: 0.42;
+  --hero-ship-contact-shadow: rgb(0 0 0 / 0.48);
+  --hero-ship-soft-shadow: rgb(0 0 0 / 0.28);
+  --hero-ship-contact-opacity: 0.5;
   --hero-logo-contact-shadow: rgb(0 0 0 / 0.48);
   --hero-logo-soft-shadow: rgb(0 0 0 / 0.28);
   --hero-logo-tight-shadow: rgb(0 0 0 / 0.42);
@@ -1626,10 +1648,32 @@ body {
 }
 
 [data-theme="light"] {
-  --hero-art-contact-shadow: rgb(15 15 20 / 0.2);
-  --hero-art-soft-shadow: rgb(15 15 20 / 0.12);
-  --hero-art-tight-shadow: rgb(15 15 20 / 0.16);
+  --hero-art-contact-shadow: rgb(72 54 34 / 0.15);
+  --hero-art-soft-shadow: rgb(72 54 34 / 0.1);
+  --hero-art-tight-shadow: rgb(72 54 34 / 0.12);
   --hero-art-rim-light: rgb(255 255 255 / 0.62);
+  --hero-art-gold-rim: color-mix(in oklab, var(--primary-readable) 18%, transparent);
+  --hero-stage-aura:
+    radial-gradient(
+      ellipse at 64% 52%,
+      color-mix(in oklab, var(--primary) 28%, transparent) 0 24%,
+      transparent 66%
+    ),
+    radial-gradient(
+      ellipse at 46% 76%,
+      color-mix(in oklab, var(--primary-readable) 8%, transparent) 0 20%,
+      transparent 60%
+    );
+  --hero-stage-aura-opacity: 0.38;
+  --hero-stage-floor-shadow: rgb(72 54 34 / 0.14);
+  --hero-stage-floor-glow: color-mix(in oklab, var(--primary) 24%, transparent);
+  --hero-stage-floor-opacity: 0.4;
+  --hero-flag-contact-shadow: rgb(72 54 34 / 0.18);
+  --hero-flag-soft-shadow: rgb(72 54 34 / 0.1);
+  --hero-flag-contact-opacity: 0.4;
+  --hero-ship-contact-shadow: rgb(72 54 34 / 0.16);
+  --hero-ship-soft-shadow: rgb(72 54 34 / 0.1);
+  --hero-ship-contact-opacity: 0.5;
   --hero-logo-contact-shadow: rgb(15 15 20 / 0.28);
   --hero-logo-soft-shadow: rgb(15 15 20 / 0.16);
   --hero-logo-tight-shadow: rgb(15 15 20 / 0.24);
@@ -1637,8 +1681,47 @@ body {
   --hero-logo-edge-light: color-mix(in oklab, var(--success) 10%, transparent);
 }
 
+.gitshipt-landing-page {
+  overflow: visible;
+}
+
+.gitshipt-theme-image-dark {
+  display: none;
+}
+
+.gitshipt-theme-image-light {
+  display: block;
+}
+
+[data-theme="dark"] .gitshipt-theme-image-light {
+  display: none;
+}
+
+[data-theme="dark"] .gitshipt-theme-image-dark {
+  display: block;
+}
+
+[data-theme="light"] .gitshipt-theme-image-light {
+  display: block;
+}
+
+[data-theme="light"] .gitshipt-theme-image-dark {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) .gitshipt-theme-image-light {
+    display: none;
+  }
+
+  html:not([data-theme]) .gitshipt-theme-image-dark {
+    display: block;
+  }
+}
+
 .gitshipt-mia-stage {
   isolation: isolate;
+  overflow: visible;
 }
 
 .gitshipt-mia-stage::before {
@@ -1651,31 +1734,67 @@ body {
   border-radius: var(--radius-full);
   background: var(--hero-art-contact-shadow);
   content: "";
-  filter: blur(22px);
-  opacity: 0.44;
-  transform: translate3d(4%, 6%, 0) scaleX(0.82) scaleY(0.36);
+  filter: blur(28px);
+  opacity: var(--hero-stage-floor-opacity);
+  transform: translate3d(3%, 8%, 0) scaleX(0.9) scaleY(0.42);
   transform-origin: center bottom;
 }
 
+.gitshipt-mia-stage::after {
+  position: absolute;
+  z-index: 0;
+  inset: -1% 3% 3% -5%;
+  background: var(--hero-stage-aura);
+  content: "";
+  filter: blur(20px);
+  opacity: var(--hero-stage-aura-opacity);
+  pointer-events: none;
+  transform: translate3d(1%, 3%, 0);
+}
+
 .gitshipt-mia-art {
-  filter: saturate(1.025) contrast(1.015)
-    drop-shadow(0 30px 22px var(--hero-art-soft-shadow))
-    drop-shadow(0 14px 10px var(--hero-art-contact-shadow))
-    drop-shadow(0 4px 3px var(--hero-art-tight-shadow))
-    drop-shadow(0 -1px 0 var(--hero-art-rim-light));
+  filter: saturate(1.045) contrast(1.025)
+    drop-shadow(0 42px 34px var(--hero-art-soft-shadow))
+    drop-shadow(0 20px 14px var(--hero-art-contact-shadow))
+    drop-shadow(0 7px 5px var(--hero-art-tight-shadow))
+    drop-shadow(0 -1px 0 var(--hero-art-rim-light))
+    drop-shadow(-8px -10px 18px var(--hero-art-gold-rim));
 }
 
 .gitshipt-ship-float {
   animation: gitshipt-ship-bob 5.6s ease-in-out infinite;
+  isolation: isolate;
+  overflow: visible;
   transform-origin: center bottom;
   will-change: transform;
 }
 
+.gitshipt-ship-float::before {
+  position: absolute;
+  z-index: 0;
+  right: 8%;
+  bottom: 2%;
+  left: 11%;
+  height: 24%;
+  border-radius: var(--radius-full);
+  background:
+    radial-gradient(ellipse at center, var(--hero-ship-contact-shadow), transparent 72%),
+    radial-gradient(ellipse at center, var(--hero-stage-floor-glow), transparent 74%);
+  content: "";
+  filter: blur(8px);
+  opacity: var(--hero-ship-contact-opacity);
+  transform: translate3d(3%, 22%, 0) scaleX(0.86) scaleY(0.32);
+  transform-origin: center;
+}
+
 .gitshipt-ship-art {
+  position: relative;
+  z-index: 1;
   filter: saturate(1.04) contrast(1.02)
-    drop-shadow(0 20px 16px var(--hero-art-soft-shadow))
-    drop-shadow(0 8px 6px var(--hero-art-contact-shadow))
-    drop-shadow(0 2px 2px var(--hero-art-tight-shadow));
+    drop-shadow(0 26px 20px var(--hero-ship-soft-shadow))
+    drop-shadow(0 11px 8px var(--hero-ship-contact-shadow))
+    drop-shadow(0 3px 2px var(--hero-art-tight-shadow))
+    drop-shadow(0 -1px 0 var(--hero-art-rim-light));
 }
 
 @keyframes gitshipt-ship-bob {
@@ -1693,43 +1812,126 @@ body {
 }
 
 .gitshipt-flag-wave {
+  isolation: isolate;
+  overflow: visible;
   transform-origin: left center;
+  filter: saturate(1.055) contrast(1.045)
+    drop-shadow(0 24px 18px var(--hero-flag-soft-shadow))
+    drop-shadow(0 10px 8px var(--hero-flag-contact-shadow))
+    drop-shadow(0 3px 2px var(--hero-art-tight-shadow))
+    drop-shadow(0 -1px 0 var(--hero-art-rim-light));
   will-change: transform;
-  animation: gitshipt-flag-wave 4.2s ease-in-out infinite;
+  animation: gitshipt-flag-anchor-sway 8.4s cubic-bezier(0.25, 1, 0.5, 1)
+    infinite;
+  perspective: 360px;
+}
+
+.gitshipt-flag-wave::before {
+  position: absolute;
+  z-index: 0;
+  inset: 18% 4% 15% 10%;
+  border-radius: var(--radius-full);
+  background:
+    radial-gradient(ellipse at 58% 56%, var(--hero-flag-contact-shadow), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, var(--hero-stage-floor-glow), transparent 76%);
+  content: "";
+  filter: blur(9px);
+  opacity: var(--hero-flag-contact-opacity);
+  transform: translate3d(6%, 12%, 0) scaleX(0.9) scaleY(0.45);
 }
 
 .gitshipt-flag-art {
-  filter: saturate(1.04) contrast(1.04)
-    drop-shadow(0 14px 12px var(--hero-art-soft-shadow))
-    drop-shadow(0 6px 4px var(--hero-art-contact-shadow))
-    drop-shadow(0 2px 2px var(--hero-art-tight-shadow));
+  position: relative;
+  z-index: 1;
+  filter: none;
+  transform-origin: 18% 52%;
+  animation: gitshipt-flag-cloth 7.8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  will-change: transform;
 }
 
-@keyframes gitshipt-flag-wave {
+.gitshipt-token-carousel {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 5%,
+    black 95%,
+    transparent 100%
+  );
+}
+
+.gitshipt-token-carousel-track {
+  animation: gitshipt-token-carousel-scroll 36s linear infinite;
+  will-change: transform;
+}
+
+.gitshipt-token-carousel:hover .gitshipt-token-carousel-track {
+  animation-play-state: paused;
+}
+
+@keyframes gitshipt-token-carousel-scroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+@keyframes gitshipt-flag-anchor-sway {
   0% {
-    transform: rotate(-1.5deg) skewY(-1deg) scaleX(1);
+    transform: rotate(-0.18deg) translate3d(0, 0, 0);
   }
 
   25% {
-    transform: rotate(0.6deg) skewY(1.2deg) scaleX(1.015);
+    transform: rotate(0.08deg) translate3d(0, -0.15px, 0);
   }
 
   50% {
-    transform: rotate(1.6deg) skewY(0.4deg) scaleX(0.985);
+    transform: rotate(0.16deg) translate3d(0, 0.15px, 0);
   }
 
   75% {
-    transform: rotate(0.4deg) skewY(-1deg) scaleX(1.01);
+    transform: rotate(-0.04deg) translate3d(0, -0.08px, 0);
   }
 
   100% {
-    transform: rotate(-1.5deg) skewY(-1deg) scaleX(1);
+    transform: rotate(-0.18deg) translate3d(0, 0, 0);
+  }
+}
+
+@keyframes gitshipt-flag-cloth {
+  0% {
+    transform: translate3d(0, 0, 0) rotateZ(-0.12deg) skewY(-0.18deg)
+      scaleX(1);
+  }
+
+  24% {
+    transform: translate3d(0.25px, -0.7px, 0) rotateZ(0.12deg)
+      skewY(0.2deg) scaleX(1.004);
+  }
+
+  52% {
+    transform: translate3d(0, 0.55px, 0) rotateZ(0.06deg) skewY(-0.24deg)
+      scaleX(0.998);
+  }
+
+  76% {
+    transform: translate3d(0.18px, -0.35px, 0) rotateZ(-0.04deg)
+      skewY(0.16deg) scaleX(1.002);
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0) rotateZ(-0.12deg) skewY(-0.18deg)
+      scaleX(1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .gitshipt-ship-float,
-  .gitshipt-flag-wave {
+  .gitshipt-flag-wave,
+  .gitshipt-flag-art,
+  .gitshipt-token-carousel-track {
     animation: none;
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -98,10 +99,12 @@ function Avatar({ src, alt }: { src: string | null; alt: string }) {
     );
   }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <Image
       src={src}
       alt={alt}
+      width={40}
+      height={40}
+      sizes="40px"
       className="size-10 rounded-full border border-border object-cover"
     />
   );

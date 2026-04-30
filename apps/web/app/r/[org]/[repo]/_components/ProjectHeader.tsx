@@ -27,7 +27,6 @@ export function ProjectHeader({ header }: { header: ProjectHeaderType }) {
           fill
           sizes="(max-width: 640px) 80px, (max-width: 1024px) 96px, 112px"
           className="object-cover"
-          unoptimized
         />
       </span>
       <div className="min-w-0 flex-1">

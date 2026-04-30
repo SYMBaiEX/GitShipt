@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Image from "next/image";
 import { Users } from "lucide-react";
 import { requireAdminPage } from "@/lib/auth/page-guards";
 import { Card, CardHeader, CardTitle, CardDescription } from "@repo/ui";
@@ -65,10 +66,12 @@ async function AdminUsersPageContent() {
                   <td className="px-4 py-2">
                     <div className="flex min-w-0 items-center gap-2">
                       {u.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <Image
                           src={u.image}
                           alt=""
+                          width={24}
+                          height={24}
+                          sizes="24px"
                           className="size-6 shrink-0 rounded-full"
                         />
                       ) : (

@@ -63,7 +63,6 @@ export function ReviewAndSign({
               alt=""
               width={44}
               height={44}
-              unoptimized
               className="size-11 shrink-0 rounded-lg bg-surface"
             />
             <div className="min-w-0 flex-1">

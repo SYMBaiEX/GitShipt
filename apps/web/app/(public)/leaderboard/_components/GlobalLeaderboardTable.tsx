@@ -111,7 +111,6 @@ function ContributorList({ rows }: { rows: GlobalLeaderboardEntry[] }) {
                   width={32}
                   height={32}
                   className="size-8 shrink-0 rounded-lg bg-surface-elevated"
-                  unoptimized
                 />
                 <div className="min-w-0">
                   <div className="truncate text-body-md text-fg">
@@ -206,7 +205,6 @@ function ProjectList({ rows }: { rows: GlobalProjectEntry[] }) {
                     width={32}
                     height={32}
                     className="size-8 shrink-0 rounded-lg bg-surface-elevated"
-                    unoptimized
                   />
                   <div className="min-w-0">
                     <div className="truncate text-body-md text-fg">

@@ -190,6 +190,12 @@ function PayoutStatusBadge({ status }: { status: string }) {
           pending
         </Badge>
       );
+    case "simulated":
+      return (
+        <Badge variant="default" size="sm">
+          Not Live
+        </Badge>
+      );
     case "claiming":
     case "distributing":
       return (

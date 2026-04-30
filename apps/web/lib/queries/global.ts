@@ -24,6 +24,11 @@ import { z } from "zod";
  * badge per ProjectCard.
  */
 const PUBLIC_LIVE_STATUSES = ["live", "simulated_live"] as const;
+const PUBLIC_LAUNCH_CAROUSEL_STATUSES = [
+  "live",
+  "simulated_live",
+  "tracked",
+] as const;
 
 /**
  * Public marketing data layer. Powers the landing hero ticker, the Top
@@ -56,6 +61,20 @@ export interface LandingProject {
   dailyFeeLamports: bigint;
 }
 
+export interface LandingLaunchToken {
+  id: string;
+  slug: string;
+  ghOwner: string;
+  ghRepo: string;
+  name: string;
+  symbol: string | null;
+  imageUrl: string | null;
+  status: LandingProject["status"];
+  tokenMint: string | null;
+  createdAt: Date;
+  lifetimeFeesLamports: bigint;
+}
+
 export type LandingVolumeSource = "bags" | "unavailable";
 
 export interface LandingTicker {
@@ -76,6 +95,7 @@ export interface LandingTicker {
 
 export interface LandingData {
   topProjects: LandingProject[];
+  latestLaunches: LandingLaunchToken[];
   ticker: LandingTicker;
 }
 
@@ -135,6 +155,7 @@ function dailyFromLifetime(lifetimeLamports: bigint, createdAt: Date): bigint {
  */
 const EMPTY_LANDING: LandingData = {
   topProjects: [],
+  latestLaunches: [],
   ticker: {
     volume24hUsd: null,
     volumeSource: "unavailable",
@@ -200,6 +221,40 @@ async function getLandingDataUncached(): Promise<LandingData> {
     };
   });
 
+  const launchRows = await dbHttp
+    .select({
+      id: projects.id,
+      ghOwner: projects.ghOwner,
+      ghRepo: projects.ghRepo,
+      name: projects.name,
+      symbol: projects.symbol,
+      imageUrl: projects.imageUrl,
+      status: projects.status,
+      tokenMint: projects.tokenMint,
+      createdAt: projects.createdAt,
+      lifetimeFeesLamports: sql<string>`COALESCE(SUM(${payouts.totalAmountLamports}) FILTER (WHERE ${payouts.status} = 'completed'), 0)::text`,
+    })
+    .from(projects)
+    .leftJoin(payouts, eq(payouts.projectId, projects.id))
+    .where(inArray(projects.status, PUBLIC_LAUNCH_CAROUSEL_STATUSES))
+    .groupBy(projects.id)
+    .orderBy(desc(projects.createdAt), sql`random()`)
+    .limit(12);
+
+  const latestLaunches: LandingLaunchToken[] = launchRows.map((r) => ({
+    id: r.id,
+    slug: `${r.ghOwner}/${r.ghRepo}`,
+    ghOwner: r.ghOwner,
+    ghRepo: r.ghRepo,
+    name: r.name,
+    symbol: r.symbol,
+    imageUrl: r.imageUrl,
+    status: r.status,
+    tokenMint: r.tokenMint,
+    createdAt: r.createdAt,
+    lifetimeFeesLamports: BigInt(r.lifetimeFeesLamports),
+  }));
+
   // Ticker aggregates — three small queries in parallel.
   const [feesRows, activeRows, earningRows] = await Promise.all([
     dbHttp
@@ -231,6 +286,7 @@ async function getLandingDataUncached(): Promise<LandingData> {
 
   return {
     topProjects,
+    latestLaunches,
     ticker: cached ?? {
       volume24hUsd: null,
       volumeSource: "unavailable",

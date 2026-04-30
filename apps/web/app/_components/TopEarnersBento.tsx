@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Trophy, ArrowUpRight } from "lucide-react";
 import { Card } from "@repo/ui";
 import { formatSol } from "@repo/lib";
@@ -59,10 +60,12 @@ export function TopEarnersBento({
                   {entry.rank}
                 </span>
                 <div className="flex min-w-0 items-center gap-2">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     src={entry.avatarUrl}
                     alt=""
+                    width={28}
+                    height={28}
+                    sizes="28px"
                     className="size-7 shrink-0 rounded-lg border border-border bg-surface-elevated object-cover"
                   />
                   <div className="min-w-0">

@@ -21,7 +21,7 @@ export function PoolOverviewCard({
   const sparklineData = lamportsSeriesToSol(pool.sparkline);
   const feeSharePct = (pool.feeShareBps / 100).toFixed(0);
   const isSimulated = pool.isStub || projectStatus === "simulated_live";
-  const stateLabel = isSimulated ? "Simulated" : "Live fees";
+  const stateLabel = isSimulated ? "Not Live" : "Live fees";
   const stateDescription = isSimulated
     ? "Bags credentials are not live here; amounts are deterministic estimates."
     : "Fetched from Bags fee data; daily pool is a lifetime average.";

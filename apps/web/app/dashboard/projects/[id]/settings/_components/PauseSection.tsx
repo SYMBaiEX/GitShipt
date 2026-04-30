@@ -58,7 +58,9 @@ export function PauseSection({
     <div className="space-y-3">
       <div className="flex items-center gap-3">
         <span className="text-label-sm text-fg-secondary">Current status:</span>
-        {isPaused ? (
+        {status === "simulated_live" ? (
+          <Badge variant="default" size="sm">Not Live</Badge>
+        ) : isPaused ? (
           <Badge variant="warning" size="sm">Paused</Badge>
         ) : (
           <Badge variant="success" dot size="sm">Live</Badge>

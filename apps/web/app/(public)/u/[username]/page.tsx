@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowRight, Building2, Calendar, Coins, ExternalLink, Globe, GitFork, MapPin, Users, Wallet } from "lucide-react";
 import { Badge, Button } from "@repo/ui";
@@ -81,13 +82,13 @@ async function ContributorProfilePageContent({
     <div className="flex flex-col gap-8 lg:gap-10">
       <header className="flex flex-col gap-6">
         <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-start">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={avatar}
             alt=""
-            className="size-28 shrink-0 rounded-2xl border border-border/60 object-cover shadow-card-elevated"
             width={112}
             height={112}
+            sizes="112px"
+            className="size-28 shrink-0 rounded-2xl border border-border/60 object-cover shadow-card-elevated"
           />
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-3">

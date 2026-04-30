@@ -106,7 +106,6 @@ function Avatar({
           alt=""
           fill
           sizes="56px"
-          unoptimized
           className="object-cover"
         />
       </span>
@@ -154,7 +153,7 @@ function StatusBadge({ status }: { status: PublicProjectRow["status"] }) {
   if (status === "simulated_live") {
     return (
       <Badge variant="warning" size="sm">
-        Simulated
+        Not Live
       </Badge>
     );
   }

@@ -108,7 +108,6 @@ export function PeriodDigestCard({
                     width={28}
                     height={28}
                     className="size-7 shrink-0 rounded-md bg-surface-elevated"
-                    unoptimized
                   />
                   <span className="truncate text-body-md text-fg">
                     @{c.ghUsername}

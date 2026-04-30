@@ -188,10 +188,20 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@repo/lib", "@repo/shared", "@repo/ui"],
 
   images: {
+    formats: ["image/webp"],
+    qualities: [50, 75],
+    minimumCacheTTL: 14_400,
+    maximumRedirects: 1,
+    dangerouslyAllowSVG: false,
+    contentSecurityPolicy: "script-src 'none'; frame-src 'none'; sandbox;",
+    contentDispositionType: "inline",
     remotePatterns: [
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
       { protocol: "https", hostname: "github.com" },
       { protocol: "https", hostname: "opengraph.githubassets.com" },
+      { protocol: "https", hostname: "*.githubusercontent.com" },
+      { protocol: "https", hostname: "*.bags.fm" },
+      { protocol: "https", hostname: "*.solana.com" },
       { protocol: "https", hostname: "ipfs.io" },
       { protocol: "https", hostname: "*.ipfscdn.io" },
       { protocol: "https", hostname: "shdw-drive.genesysgo.net" },

@@ -168,7 +168,6 @@ function Avatar({ image, name }: { image: string | null; name: string }) {
         alt=""
         width={64}
         height={64}
-        unoptimized
         className="size-16 rounded-lg border border-border object-cover"
       />
     );

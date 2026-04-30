@@ -167,7 +167,7 @@ async function AdminFeesPageContent() {
             ["Configured projects", summary.feeShareConfiguredProjects],
             ["Launched tokens", summary.launchedProjects],
             ["Live launched", summary.liveLaunchedProjects],
-            ["Simulated launches", summary.simulatedProjects],
+            ["Not Live launches", summary.simulatedProjects],
             ["Missing pool claimer", summary.missingPoolClaimerProjects],
           ]}
           footer={

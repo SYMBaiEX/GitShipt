@@ -174,8 +174,23 @@ export function clientEnv(): ClientEnv {
   return cachedClient;
 }
 
+function isNeonHost(url: string): boolean {
+  try {
+    return new URL(url).hostname.endsWith(".neon.tech");
+  } catch {
+    return false;
+  }
+}
+
 export const hasCredentials = {
-  db: () => Boolean(databaseUrl()),
+  // The runtime db client refuses non-Neon URLs (Workflow DevKit dropped the
+  // postgres-js path), so a configured-but-non-Neon URL behaves like an
+  // unconfigured one for every callsite that uses this guard. Reflect that
+  // here so prerender-time fallbacks render instead of throwing.
+  db: () => {
+    const url = databaseUrl();
+    return Boolean(url) && isNeonHost(url!);
+  },
   redis: () => Boolean(redisUrl()),
   github: () =>
     Boolean(serverEnv().GITHUB_CLIENT_ID && serverEnv().GITHUB_CLIENT_SECRET),

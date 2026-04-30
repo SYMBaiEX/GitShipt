@@ -1453,7 +1453,7 @@ export const bags = {
   async checkDexscreenerOrderAvailability(
     tokenAddress: string,
   ): Promise<DexscreenerAvailability> {
-    if (!hasCredentials.bags()) return { available: false };
+    if (!hasCredentials.bags()) return stubBags.dexscreenerAvailability();
     const { PublicKey } = await import("@solana/web3.js");
     const sdk = await tryGetSdk();
     const raw = sdk
@@ -1471,10 +1471,8 @@ export const bags = {
   async createDexscreenerOrder(
     input: DexscreenerOrderInput,
   ): Promise<DexscreenerOrder> {
-    if (!hasCredentials.bags()) {
-      throw new Error("BAGS_API_KEY is required for Dexscreener orders.");
-    }
     const validated = DexscreenerOrderInputSchema.parse(input);
+    if (!hasCredentials.bags()) return stubBags.dexscreenerOrder();
     const { PublicKey } = await import("@solana/web3.js");
     const sdk = await tryGetSdk();
     const raw = sdk
@@ -1499,7 +1497,7 @@ export const bags = {
     paymentSignature: string;
   }): Promise<string> {
     if (!hasCredentials.bags()) {
-      throw new Error("BAGS_API_KEY is required for Dexscreener payments.");
+      return stubBags.dexscreenerSubmitPayment(args.orderUUID);
     }
     const sdk = await tryGetSdk();
     return sdk

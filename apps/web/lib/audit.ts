@@ -42,7 +42,10 @@ export type AuditAction =
   | "fees.update"
   | "kill_switch.toggle"
   | "user.role_grant"
-  | "admin.access";
+  | "admin.access"
+  | "dexscreener.order_create"
+  | "dexscreener.order_paid"
+  | "dexscreener.order_failed";
 
 export interface AuditEntry {
   actorUserId: string | null;

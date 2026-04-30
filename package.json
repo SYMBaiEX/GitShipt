@@ -12,6 +12,7 @@
     "packages/*"
   ],
   "overrides": {
+    "@neondatabase/serverless": "^1.1.0",
     "axios": "^1.15.2",
     "devalue": "^5.7.1",
     "diff": "^5.2.2",

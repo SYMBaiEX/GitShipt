@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   FlaskConical,
   Rocket,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@repo/lib";
@@ -21,6 +22,8 @@ import { RepoPicker } from "./RepoPicker";
 import { TokenMetadataForm } from "./TokenMetadataForm";
 import { LeaderboardConfigForm } from "./LeaderboardConfigForm";
 import { ReviewAndSign } from "./ReviewAndSign";
+import { DexscreenerOrderDialog } from "@/components/bags/DexscreenerOrderDialog";
+import { DEXSCREENER_PRICE_USDC } from "@repo/shared";
 import { createAndLaunchAction, saveDraftAction } from "../actions";
 import {
   DEFAULT_SCORING_CONFIG,
@@ -605,6 +608,8 @@ function LaunchResult({
         ) : null}
       </dl>
 
+      <DexscreenerUpsellRow result={result} />
+
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
         {!result.stub && solscanUrl ? (
           <Button asChild variant="secondary">
@@ -620,6 +625,42 @@ function LaunchResult({
         </Button>
       </div>
     </Card>
+  );
+}
+
+function DexscreenerUpsellRow({ result }: { result: LaunchSuccess }) {
+  // The upsell is shown for every successful launch, including stub mode,
+  // so QA can walk the dialog → server-action path end-to-end without a
+  // real Bags key. The dialog itself short-circuits to stub_paid when the
+  // server action returns { stub: true }.
+  return (
+    <div className="flex flex-col items-start justify-between gap-3 rounded-md border border-border bg-surface-elevated/40 px-4 py-3 sm:flex-row sm:items-center">
+      <div className="flex items-start gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-primary-soft text-primary-readable">
+          <Sparkles className="size-4" aria-hidden />
+        </span>
+        <div>
+          <p className="text-label-md text-fg">
+            Upgrade your DexScreener page
+          </p>
+          <p className="text-caption text-fg-muted">
+            <span className="text-mono-sm text-fg">
+              ${DEXSCREENER_PRICE_USDC}
+            </span>{" "}
+            pay-once · SOL or USDC · Bags collects
+          </p>
+        </div>
+      </div>
+      <DexscreenerOrderDialog
+        projectId={result.projectId}
+        tokenMint={result.tokenMint}
+        trigger={
+          <Button variant="secondary" size="sm">
+            Upgrade now
+          </Button>
+        }
+      />
+    </div>
   );
 }
 

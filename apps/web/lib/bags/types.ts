@@ -296,39 +296,24 @@ export type FeeShareAdminUpdateConfigInput = z.infer<
   typeof FeeShareAdminUpdateConfigInputSchema
 >;
 
-export const DexscreenerOrderLinkSchema = z.object({
-  url: z.string().url(),
-  label: z.string().min(1).optional(),
-});
-
-export const DexscreenerAvailabilitySchema = z.object({
-  available: z.boolean(),
-});
-export type DexscreenerAvailability = z.infer<
-  typeof DexscreenerAvailabilitySchema
->;
-
-export const DexscreenerOrderInputSchema = z.object({
-  tokenAddress: SolanaAddressSchema,
-  description: z.string().min(1).max(5000),
-  iconImageUrl: z.string().url(),
-  headerImageUrl: z.string().url(),
-  payerWallet: SolanaAddressSchema,
-  links: z.array(DexscreenerOrderLinkSchema).optional(),
-  payWithSol: z.boolean().optional(),
-});
-export type DexscreenerOrderInput = z.infer<
-  typeof DexscreenerOrderInputSchema
->;
-
-export const DexscreenerOrderSchema = z.object({
-  orderUUID: z.string().min(1),
-  recipientWallet: SolanaAddressSchema,
-  priceUSDC: z.number(),
-  transaction: z.unknown(),
-  lastValidBlockHeight: z.number().int().positive(),
-});
-export type DexscreenerOrder = z.infer<typeof DexscreenerOrderSchema>;
+// Dexscreener schemas live in `@repo/shared` so Server Actions and other
+// packages can import them without crossing the apps/web boundary. We
+// re-export the runtime values + types here so existing imports continue
+// to resolve.
+export {
+  DexscreenerOrderLinkSchema,
+  DexscreenerAvailabilitySchema,
+  DexscreenerOrderInputSchema,
+  DexscreenerOrderSchema,
+  DEXSCREENER_STUB_TX_SENTINEL,
+  DEXSCREENER_PRICE_USDC,
+} from "@repo/shared";
+export type {
+  DexscreenerAvailability,
+  DexscreenerOrderInput,
+  DexscreenerOrder,
+  DexscreenerOrderLink,
+} from "@repo/shared";
 
 export const IncorporationCategorySchema = z.enum([
   "RWA",

@@ -25,6 +25,8 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { StartIncorporationButton } from "./_components/StartIncorporationButton";
 import { IncorporationStatusCard } from "@/components/bags/IncorporationStatusCard";
+import { DexscreenerUpsellCard } from "@/components/bags/DexscreenerUpsellCard";
+import { getActiveDexscreenerOrderForProject } from "@/lib/queries/dexscreener-orders";
 import { solscanTokenUrl, solscanTxUrl } from "@/lib/solana/explorer";
 
 
@@ -56,6 +58,7 @@ async function TokenPageContent({
     project.tokenMint && hasCredentials.bags()
       ? await bags.getIncorporationDetails(project.tokenMint).catch(() => null)
       : null;
+  const dexscreenerOrder = await getActiveDexscreenerOrderForProject(id);
 
   return (
     <div className="mx-auto flex w-full max-w-content flex-col gap-4">
@@ -158,6 +161,12 @@ async function TokenPageContent({
             }
           />
         }
+      />
+
+      <DexscreenerUpsellCard
+        projectId={id}
+        tokenMint={project.tokenMint}
+        order={dexscreenerOrder}
       />
 
       <Card depth="flat" padding="none">

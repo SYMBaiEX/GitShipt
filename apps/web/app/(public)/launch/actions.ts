@@ -874,6 +874,44 @@ export async function completeLaunchAction(input: {
   }
 }
 
+export async function checkLaunchWalletLinkedAction(
+  walletAddress: string,
+): Promise<{ ok: true; linked: boolean } | LaunchActionError> {
+  if (!hasCredentials.db()) {
+    return {
+      ok: false,
+      error: "db_unavailable",
+      message: "DB not configured.",
+      status: 503,
+    };
+  }
+
+  const session = await auth().api.getSession({ headers: await headers() });
+  if (!session?.user?.id) {
+    return {
+      ok: false,
+      error: "unauthorized",
+      message: "Sign in with GitHub to verify your wallet.",
+      status: 401,
+    };
+  }
+
+  const address = walletAddress.trim();
+  if (address.length < 32 || address.length > 64) {
+    return {
+      ok: false,
+      error: "invalid_wallet",
+      message: "Connected wallet address is invalid.",
+      status: 400,
+    };
+  }
+
+  return {
+    ok: true,
+    linked: await isWalletBoundToUser(session.user.id, address),
+  };
+}
+
 class ActionError extends Error {
   constructor(
     public readonly code: string,

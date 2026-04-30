@@ -27,6 +27,7 @@ import { ReviewAndSign } from "./ReviewAndSign";
 import { DexscreenerOrderDialog } from "@/components/bags/DexscreenerOrderDialog";
 import { DEXSCREENER_PRICE_USDC } from "@repo/shared";
 import {
+  checkLaunchWalletLinkedAction,
   completeLaunchAction,
   createAndLaunchAction,
   saveDraftAction,
@@ -91,6 +92,13 @@ export function WizardShell({
   const router = useRouter();
   const { connection } = useConnection();
   const { publicKey, connected, sendTransaction } = useWallet();
+  const [newlyLinkedWallets, setNewlyLinkedWallets] = useState<string[]>([]);
+  const [walletLinkCheck, setWalletLinkCheck] = useState<
+    | { status: "idle" }
+    | { status: "linked"; address: string }
+    | { status: "unlinked"; address: string }
+    | { status: "error"; address: string; message: string }
+  >({ status: "idle" });
   const [, startTransition] = useTransition();
   const [saveState, setSaveState] = useState<
     | { status: "idle" }
@@ -121,6 +129,47 @@ export function WizardShell({
   );
   const clearError = useLaunchWizardStore((state) => state.clearError);
   const reset = useLaunchWizardStore((state) => state.reset);
+  const launchWalletAddress = publicKey?.toBase58() ?? null;
+  const walletWasLinkedThisSession = launchWalletAddress
+    ? newlyLinkedWallets.includes(launchWalletAddress)
+    : false;
+  const checkedWalletAddress =
+    "address" in walletLinkCheck ? walletLinkCheck.address : null;
+  const launchWalletLinked =
+    Boolean(launchWalletAddress) &&
+    (walletWasLinkedThisSession ||
+      (walletLinkCheck.status === "linked" &&
+        walletLinkCheck.address === launchWalletAddress));
+  const walletLinkChecking =
+    Boolean(launchWalletAddress) &&
+    !walletWasLinkedThisSession &&
+    checkedWalletAddress !== launchWalletAddress;
+
+  useEffect(() => {
+    if (!launchWalletAddress) return;
+    if (newlyLinkedWallets.includes(launchWalletAddress)) return;
+
+    let cancelled = false;
+    void checkLaunchWalletLinkedAction(launchWalletAddress).then((result) => {
+      if (cancelled) return;
+      if (!result.ok) {
+        setWalletLinkCheck({
+          status: "error",
+          address: launchWalletAddress,
+          message: result.message,
+        });
+        return;
+      }
+      setWalletLinkCheck({
+        status: result.linked ? "linked" : "unlinked",
+        address: launchWalletAddress,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [launchWalletAddress, newlyLinkedWallets]);
 
   useEffect(() => {
     if (!signedIn) reset();
@@ -172,8 +221,13 @@ export function WizardShell({
       failSubmit("Missing repo or token metadata. Restart the wizard.");
       return;
     }
-    const launchWalletAddress = publicKey?.toBase58() ?? null;
-    if (!isStubMode && (!connected || !launchWalletAddress)) {
+    if (
+      !isStubMode &&
+      (!connected ||
+        !launchWalletAddress ||
+        !launchWalletLinked ||
+        walletLinkChecking)
+    ) {
       failSubmit("Connect and link a Solana wallet before launching.");
       return;
     }
@@ -455,8 +509,22 @@ export function WizardShell({
               repo={repo}
               metadata={metadata}
               leaderboard={leaderboard}
-              launchWalletAddress={publicKey?.toBase58() ?? null}
+              launchWalletAddress={launchWalletAddress}
               walletConnected={connected}
+              walletLinked={launchWalletLinked}
+              walletLinkChecking={walletLinkChecking}
+              walletLinkError={
+                walletLinkCheck.status === "error" &&
+                walletLinkCheck.address === launchWalletAddress
+                  ? walletLinkCheck.message
+                  : null
+              }
+              onWalletLinked={(address) => {
+                setNewlyLinkedWallets((current) =>
+                  current.includes(address) ? current : [...current, address],
+                );
+                clearError();
+              }}
               initialBuyLamports={initialBuyLamports}
               onBack={() => goToStep(3)}
               onEditRepo={() => goToStep(1)}

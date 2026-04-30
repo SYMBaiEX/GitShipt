@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import {
@@ -84,12 +84,18 @@ function serializeSiws(m: ReturnType<typeof buildSiwsMessage>): string {
 }
 
 export function SignInWithSolanaFlow({
+  autoRequest = false,
   continueHref = "/dashboard",
+  onLinked,
 }: {
+  autoRequest?: boolean;
   continueHref?: string | null;
+  onLinked?: (address: string) => void;
 } = {}) {
   const { publicKey, connected, signMessage } = useWallet();
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const autoRequestedAddressRef = useRef<string | null>(null);
+  const address = publicKey?.toBase58() ?? null;
 
   const onSign = useCallback(async () => {
     if (!publicKey || !signMessage) {
@@ -160,12 +166,23 @@ export function SignInWithSolanaFlow({
         throw new Error(reason ?? `verify_${verifyRes.status}`);
       }
 
-      setStatus({ kind: "success", address: body.data.address ?? address });
+      const linkedAddress = body.data.address ?? address;
+      setStatus({ kind: "success", address: linkedAddress });
+      onLinked?.(linkedAddress);
     } catch (err) {
       const reason = err instanceof Error ? err.message : "unknown_error";
       setStatus({ kind: "error", reason });
     }
-  }, [publicKey, signMessage]);
+  }, [onLinked, publicKey, signMessage]);
+
+  useEffect(() => {
+    if (!autoRequest || !connected || !publicKey || !address) return;
+    if (status.kind !== "idle") return;
+
+    if (autoRequestedAddressRef.current === address) return;
+    autoRequestedAddressRef.current = address;
+    void onSign();
+  }, [address, autoRequest, connected, onSign, publicKey, status.kind]);
 
   // Disconnected state.
   if (!connected || !publicKey) {
@@ -180,7 +197,7 @@ export function SignInWithSolanaFlow({
   }
 
   // Connected — show address pill + action.
-  const address = publicKey.toBase58();
+  const displayAddress = publicKey.toBase58();
   const isBusy = status.kind === "signing" || status.kind === "verifying";
 
   return (
@@ -277,7 +294,7 @@ export function SignInWithSolanaFlow({
       <p className="text-caption text-fg-muted">
         Signing the message proves you control{" "}
         <span className="text-mono-sm text-fg-secondary">
-          {address.slice(0, 4)}…{address.slice(-4)}
+          {displayAddress.slice(0, 4)}…{displayAddress.slice(-4)}
         </span>
         . The signature is single-use and never spends SOL.
       </p>

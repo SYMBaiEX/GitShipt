@@ -29,6 +29,10 @@ export interface ReviewAndSignProps {
   leaderboard: LeaderboardConfig;
   launchWalletAddress: string | null;
   walletConnected: boolean;
+  walletLinked: boolean;
+  walletLinkChecking: boolean;
+  walletLinkError: string | null;
+  onWalletLinked: (address: string) => void;
   initialBuyLamports: number;
   onBack: () => void;
   onEditRepo: () => void;
@@ -45,6 +49,10 @@ export function ReviewAndSign({
   leaderboard,
   launchWalletAddress,
   walletConnected,
+  walletLinked,
+  walletLinkChecking,
+  walletLinkError,
+  onWalletLinked,
   initialBuyLamports,
   onBack,
   onEditRepo,
@@ -69,7 +77,12 @@ export function ReviewAndSign({
     initialBuyLamports > 0
       ? `${(initialBuyLamports / LAMPORTS_PER_SOL_NUMBER).toFixed(4)} SOL`
       : "0.0000 SOL";
-  const canLaunch = isStubMode || (walletConnected && launchWalletAddress);
+  const canLaunch =
+    isStubMode ||
+    (walletConnected &&
+      launchWalletAddress &&
+      walletLinked &&
+      !walletLinkChecking);
 
   return (
     <div className="space-y-5">
@@ -192,8 +205,16 @@ export function ReviewAndSign({
                   icon={<GitBranch />}
                 />
                 <ReadinessPill
-                  ready={isStubMode || Boolean(launchWalletAddress)}
-                  label={isStubMode ? "Test wallet bypass" : "Wallet linked"}
+                  ready={isStubMode || walletLinked}
+                  label={
+                    isStubMode
+                      ? "Test wallet bypass"
+                      : walletLinked
+                        ? "Wallet linked"
+                        : walletLinkChecking
+                          ? "Checking wallet"
+                          : "Wallet signature needed"
+                  }
                   icon={<WalletCards />}
                 />
                 <ReadinessPill
@@ -206,7 +227,7 @@ export function ReviewAndSign({
           </div>
         </div>
         <div className="rounded-lg border border-border bg-surface p-3">
-          {isStubMode || launchWalletAddress ? (
+          {isStubMode || (launchWalletAddress && walletLinked) ? (
             <div className="space-y-2">
               <p className="text-label-md text-fg">
                 {isStubMode ? "Test launch mode" : "Wallet ready"}
@@ -218,7 +239,23 @@ export function ReviewAndSign({
               </p>
             </div>
           ) : (
-            <SignInWithSolanaFlow continueHref={null} />
+            <div className="space-y-3">
+              {walletLinkChecking ? (
+                <p className="text-body-sm text-fg-secondary">
+                  Checking whether this wallet is already linked...
+                </p>
+              ) : walletLinkError ? (
+                <p className="rounded-md bg-danger-soft/50 px-3 py-2 text-body-sm text-danger">
+                  {walletLinkError}
+                </p>
+              ) : null}
+              <SignInWithSolanaFlow
+                key={launchWalletAddress ?? "disconnected-wallet"}
+                autoRequest={walletConnected && !walletLinkChecking}
+                continueHref={null}
+                onLinked={onWalletLinked}
+              />
+            </div>
           )}
         </div>
       </section>

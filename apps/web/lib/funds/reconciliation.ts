@@ -235,18 +235,20 @@ async function promoteRecipientFinality(): Promise<number> {
     )
     .limit(SIGNATURE_BATCH_SIZE);
   const finalized = await finalizedSignatures(
-    rows.map((row) => row.txSignature).filter((sig): sig is string => Boolean(sig)),
+    rows
+      .map((row) => row.txSignature)
+      .filter((sig): sig is string => Boolean(sig)),
   );
-  let count = 0;
-  for (const row of rows) {
-    if (!row.txSignature || !finalized.has(row.txSignature)) continue;
+  const idsToUpdate = rows
+    .filter((row) => row.txSignature && finalized.has(row.txSignature))
+    .map((row) => row.id);
+  if (idsToUpdate.length > 0) {
     await dbHttp
       .update(payoutRecipients)
       .set({ finalizedAt: new Date() })
-      .where(eq(payoutRecipients.id, row.id));
-    count++;
+      .where(inArray(payoutRecipients.id, idsToUpdate));
   }
-  return count;
+  return idsToUpdate.length;
 }
 
 async function promoteEscrowFinality(): Promise<number> {
@@ -268,16 +270,16 @@ async function promoteEscrowFinality(): Promise<number> {
       .map((row) => row.drainSignature)
       .filter((sig): sig is string => Boolean(sig)),
   );
-  let count = 0;
-  for (const row of rows) {
-    if (!row.drainSignature || !finalized.has(row.drainSignature)) continue;
+  const idsToUpdate = rows
+    .filter((row) => row.drainSignature && finalized.has(row.drainSignature))
+    .map((row) => row.id);
+  if (idsToUpdate.length > 0) {
     await dbHttp
       .update(escrowHoldings)
       .set({ drainFinalizedAt: new Date() })
-      .where(eq(escrowHoldings.id, row.id));
-    count++;
+      .where(inArray(escrowHoldings.id, idsToUpdate));
   }
-  return count;
+  return idsToUpdate.length;
 }
 
 async function promotePayoutClaimFinality(): Promise<number> {
@@ -286,19 +288,26 @@ async function promotePayoutClaimFinality(): Promise<number> {
     .from(payouts)
     .where(and(isNotNull(payouts.claimSignature), isNull(payouts.claimFinalizedAt)))
     .limit(SIGNATURE_BATCH_SIZE);
-  let count = 0;
-  for (const row of rows) {
-    const sigs = splitSignatures(row.claimSignature);
-    if (sigs.length === 0) continue;
-    const finalized = await finalizedSignatures(sigs);
-    if (!sigs.every((sig) => finalized.has(sig))) continue;
+  const allSignatures = Array.from(
+    new Set(rows.flatMap((row) => splitSignatures(row.claimSignature))),
+  );
+  if (allSignatures.length === 0) return 0;
+
+  const finalized = await finalizedSignatures(allSignatures);
+  const idsToUpdate = rows
+    .filter((row) => {
+      const sigs = splitSignatures(row.claimSignature);
+      return sigs.length > 0 && sigs.every((sig) => finalized.has(sig));
+    })
+    .map((row) => row.id);
+
+  if (idsToUpdate.length > 0) {
     await dbHttp
       .update(payouts)
       .set({ claimFinalizedAt: new Date() })
-      .where(eq(payouts.id, row.id));
-    count++;
+      .where(inArray(payouts.id, idsToUpdate));
   }
-  return count;
+  return idsToUpdate.length;
 }
 
 async function promoteFeeShareUpdateFinality(): Promise<number> {
@@ -315,18 +324,26 @@ async function promoteFeeShareUpdateFinality(): Promise<number> {
       ),
     )
     .limit(SIGNATURE_BATCH_SIZE);
-  let count = 0;
-  for (const row of rows) {
-    if (row.signatures.length === 0) continue;
-    const finalized = await finalizedSignatures(row.signatures);
-    if (!row.signatures.every((sig) => finalized.has(sig))) continue;
+  const allSignatures = Array.from(new Set(rows.flatMap((row) => row.signatures)));
+  if (allSignatures.length === 0) return 0;
+
+  const finalized = await finalizedSignatures(allSignatures);
+  const idsToUpdate = rows
+    .filter((row) => {
+      return (
+        row.signatures.length > 0 &&
+        row.signatures.every((sig) => finalized.has(sig))
+      );
+    })
+    .map((row) => row.id);
+
+  if (idsToUpdate.length > 0) {
     await dbHttp
       .update(feeShareUpdateAttempts)
       .set({ finalizedAt: new Date() })
-      .where(eq(feeShareUpdateAttempts.id, row.id));
-    count++;
+      .where(inArray(feeShareUpdateAttempts.id, idsToUpdate));
   }
-  return count;
+  return idsToUpdate.length;
 }
 
 async function promotePartnerClaimFinality(): Promise<number> {
@@ -343,18 +360,26 @@ async function promotePartnerClaimFinality(): Promise<number> {
       ),
     )
     .limit(SIGNATURE_BATCH_SIZE);
-  let count = 0;
-  for (const row of rows) {
-    if (row.signatures.length === 0) continue;
-    const finalized = await finalizedSignatures(row.signatures);
-    if (!row.signatures.every((sig) => finalized.has(sig))) continue;
+  const allSignatures = Array.from(new Set(rows.flatMap((row) => row.signatures)));
+  if (allSignatures.length === 0) return 0;
+
+  const finalized = await finalizedSignatures(allSignatures);
+  const idsToUpdate = rows
+    .filter((row) => {
+      return (
+        row.signatures.length > 0 &&
+        row.signatures.every((sig) => finalized.has(sig))
+      );
+    })
+    .map((row) => row.id);
+
+  if (idsToUpdate.length > 0) {
     await dbHttp
       .update(partnerFeeClaimAttempts)
       .set({ finalizedAt: new Date() })
-      .where(eq(partnerFeeClaimAttempts.id, row.id));
-    count++;
+      .where(inArray(partnerFeeClaimAttempts.id, idsToUpdate));
   }
-  return count;
+  return idsToUpdate.length;
 }
 
 function splitSignatures(value: string | null): string[] {

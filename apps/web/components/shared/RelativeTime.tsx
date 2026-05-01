@@ -26,7 +26,8 @@ export function RelativeTime({
 }: RelativeTimeProps) {
   // Floor at 1s. setInterval(fn, 0) busy-loops; floats < 1 round to 0 in some
   // engines. Caller intent for sub-second is almost certainly a bug.
-  const safeIntervalMs = Math.max(1000, Math.floor(intervalSec) * 1000);
+  const interval = Number.isFinite(intervalSec) ? intervalSec : 30;
+  const safeIntervalMs = Math.max(1000, Math.floor(interval) * 1000);
   // We don't read the tick — it just forces a re-render so formatRelativeTime
   // computes against a fresh Date.now().
   const [, setTick] = useState(0);

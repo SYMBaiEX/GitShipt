@@ -3,11 +3,7 @@ import Link from "next/link";
 import { Coins, Sparkles, Wallet } from "lucide-react";
 import { hasCredentials } from "@/lib/env";
 import { requireAuthSession } from "@/lib/auth/session";
-import {
-  getMyEarnings,
-  getMyLinkedWallets,
-  getProjectIdsBySlug,
-} from "@/lib/queries/dashboard";
+import { getMyEarnings, getMyLinkedWallets } from "@/lib/queries/dashboard";
 import { formatSol } from "@repo/lib";
 import { StatTile } from "@/components/shared/StatTile";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -21,7 +17,6 @@ import {
 import { Button } from "@repo/ui";
 import { ClaimEscrowButton } from "./_components/ClaimEscrowButton";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-
 
 export default function EarningsPage() {
   return (
@@ -51,12 +46,6 @@ async function EarningsPageContent() {
     getMyLinkedWallets(session.user.id),
   ]);
   const walletLinked = linkedWallets.length > 0;
-
-  // Resolve projectId per slug so the per-row Claim button can pass it to
-  // the API (the earnings query returns slugs only).
-  const slugs = earnings.byProject.map((p) => p.projectSlug);
-  const rows = await getProjectIdsBySlug(slugs);
-  const projectIdBySlug = new Map(rows.map((row) => [row.slug, row.projectId]));
 
   return (
     <div className="mx-auto flex w-full max-w-content flex-col gap-4">
@@ -135,7 +124,7 @@ async function EarningsPageContent() {
               </thead>
               <tbody className="divide-y divide-border">
                 {earnings.byProject.map((p) => {
-                  const projectId = projectIdBySlug.get(p.projectSlug);
+                  const projectId = p.projectId;
                   return (
                     <tr
                       key={p.projectSlug}

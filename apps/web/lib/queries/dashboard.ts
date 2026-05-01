@@ -317,6 +317,7 @@ export interface MyEarnings {
   totalLifetimeLamports: bigint;
   pendingEscrowLamports: bigint;
   byProject: Array<{
+    projectId: string;
     projectSlug: string;
     lifetimeLamports: bigint;
     escrowLamports: bigint;
@@ -347,6 +348,7 @@ async function getMyEarningsUncached(userId: string): Promise<MyEarnings> {
   // Per-contributor lifetime sent + escrow + project slug.
   const lifetimeRows = await dbHttp
     .select({
+      projectId: projects.id,
       projectSlug: sql<string>`${projects.ghOwner} || '/' || ${projects.ghRepo}`,
       lifetime: sql<string>`coalesce(sum(${payoutRecipients.amountLamports}) filter (where ${payoutRecipients.status} in ('sent','confirmed')), 0)::text`,
     })
@@ -361,6 +363,7 @@ async function getMyEarningsUncached(userId: string): Promise<MyEarnings> {
 
   const escrowAggRows = await dbHttp
     .select({
+      projectId: projects.id,
       projectSlug: sql<string>`${projects.ghOwner} || '/' || ${projects.ghRepo}`,
       escrow: sql<string>`coalesce(sum(${escrowHoldings.amountLamports}) filter (where ${escrowHoldings.drainedAt} is null), 0)::text`,
     })
@@ -371,10 +374,16 @@ async function getMyEarningsUncached(userId: string): Promise<MyEarnings> {
     .groupBy(projects.id, projects.ghOwner, projects.ghRepo);
 
   const escrowBySlug = new Map(
-    escrowAggRows.map((r) => [r.projectSlug, BigInt(r.escrow ?? "0")]),
+    escrowAggRows.map((r) => [
+      r.projectSlug,
+      { escrow: BigInt(r.escrow ?? "0"), projectId: r.projectId },
+    ]),
   );
   const lifetimeBySlug = new Map(
-    lifetimeRows.map((r) => [r.projectSlug, BigInt(r.lifetime ?? "0")]),
+    lifetimeRows.map((r) => [
+      r.projectSlug,
+      { lifetime: BigInt(r.lifetime ?? "0"), projectId: r.projectId },
+    ]),
   );
 
   const slugSet = new Set<string>([
@@ -382,11 +391,17 @@ async function getMyEarningsUncached(userId: string): Promise<MyEarnings> {
     ...escrowBySlug.keys(),
   ]);
 
-  const byProject = Array.from(slugSet).map((slug) => ({
-    projectSlug: slug,
-    lifetimeLamports: lifetimeBySlug.get(slug) ?? 0n,
-    escrowLamports: escrowBySlug.get(slug) ?? 0n,
-  }));
+  const byProject = Array.from(slugSet).map((slug) => {
+    const lifetimeData = lifetimeBySlug.get(slug);
+    const escrowData = escrowBySlug.get(slug);
+    const projectId = lifetimeData?.projectId ?? escrowData?.projectId ?? "";
+    return {
+      projectId,
+      projectSlug: slug,
+      lifetimeLamports: lifetimeData?.lifetime ?? 0n,
+      escrowLamports: escrowData?.escrow ?? 0n,
+    };
+  });
 
   let total = 0n;
   let escrow = 0n;
@@ -409,48 +424,6 @@ export async function getMyEarnings(userId: string): Promise<MyEarnings> {
   cacheTag(cacheTags.user(userId));
   cacheTag(cacheTags.dashboardUser(userId));
   return await getMyEarningsUncached(userId);
-}
-
-async function getProjectIdsBySlugUncached(
-  slugs: string[],
-): Promise<Array<{ slug: string; projectId: string }>> {
-  if (slugs.length === 0) return [];
-
-  const slugLiterals = sql.join(
-    slugs.map((slug) => sql`${slug}`),
-    sql`, `,
-  );
-  const rows = await dbHttp
-    .select({
-      projectId: projects.id,
-      slug: sql<string>`${projects.ghOwner} || '/' || ${projects.ghRepo}`,
-    })
-    .from(projects)
-    .where(
-      sql`(${projects.ghOwner} || '/' || ${projects.ghRepo}) in (${slugLiterals})`,
-    );
-
-  return rows;
-}
-
-export async function getProjectIdsBySlug(
-  slugs: string[],
-): Promise<Array<{ slug: string; projectId: string }>> {
-  const normalized = [...new Set(slugs.map((slug) => slug.trim()))]
-    .filter(Boolean)
-    .sort();
-
-  if (normalized.length === 0) return [];
-  return getProjectIdsBySlugCached(normalized);
-}
-
-async function getProjectIdsBySlugCached(
-  normalized: string[],
-): Promise<Array<{ slug: string; projectId: string }>> {
-  "use cache";
-  cacheLife("auth");
-  cacheTag(cacheTags.dashboard);
-  return await getProjectIdsBySlugUncached(normalized);
 }
 
 export interface LinkedWallet {
@@ -716,7 +689,10 @@ export async function getFailedPayoutsForProject(
   cacheTag(cacheTags.dashboardProject(projectId));
   cacheTag(cacheTags.project(projectId));
   cacheTag(cacheTags.projectPayouts(projectId));
-  return await getFailedPayoutsForProjectUncached(projectId, safeLimit(limit, 5));
+  return await getFailedPayoutsForProjectUncached(
+    projectId,
+    safeLimit(limit, 5),
+  );
 }
 
 export interface ProjectMemberRow {

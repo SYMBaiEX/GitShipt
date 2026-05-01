@@ -129,15 +129,6 @@ const reportOnlyEmbedHeader = isDev
       },
     ];
 
-/**
- * Embed CSP — same as strict but allows the page to be framed anywhere.
- * frame-ancestors * is required so third-party sites can embed
- * /embed/r/{org}/{repo} via <iframe>.
- */
-const cspEmbed = cspStrict
-  .replace("frame-ancestors 'none'", "frame-ancestors *")
-  .concat("");
-
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,

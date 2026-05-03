@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { redis } from "@/lib/redis";
 import { serverEnv } from "@/lib/env";
 
@@ -70,7 +71,7 @@ export async function check(
   const now = Date.now();
   const windowMs = cfg.windowSeconds * 1000;
   const windowStart = now - windowMs;
-  const member = `${now}-${Math.random().toString(36).slice(2, 10)}`;
+  const member = `${now}-${randomUUID()}`;
 
   const pipe = r.pipeline();
   pipe.zremrangebyscore(key, 0, windowStart);

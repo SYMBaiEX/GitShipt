@@ -1,0 +1,3 @@
+## 2024-05-01 - Avoid duplicate db calls by updating return types
+**Learning:** `getMyEarningsUncached` does not include `projectId` in its `byProject` return object. Because of this, `apps/web/app/dashboard/(account)/earnings/page.tsx` makes a second query to `getProjectIdsBySlug` to map the slugs back to `projectId`s. Since the first query already joins the `projects` table (which has the `id`), this second query is an unnecessary extra database call.
+**Action:** Include `projectId` in the `byProject` array returned by `getMyEarnings` and remove `getProjectIdsBySlug` entirely to reduce database round-trips.

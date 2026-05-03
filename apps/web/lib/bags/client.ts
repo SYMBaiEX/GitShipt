@@ -873,7 +873,6 @@ export const bags = {
     return LaunchTransactionResultSchema.parse({
       signature: await signAndSubmitViaBags(tx, {
         operation: "Bags launch transaction",
-        allowSignerSystemTransfer: true,
       }),
     });
   },

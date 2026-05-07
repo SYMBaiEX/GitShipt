@@ -24,6 +24,7 @@ import { RepoPicker } from "./RepoPicker";
 import { TokenMetadataForm } from "./TokenMetadataForm";
 import { LeaderboardConfigForm } from "./LeaderboardConfigForm";
 import { ReviewAndSign } from "./ReviewAndSign";
+import { ManagerDelegationStep } from "./ManagerDelegationStep";
 import { DexscreenerOrderDialog } from "@/components/bags/DexscreenerOrderDialog";
 import { DEXSCREENER_PRICE_USDC } from "@repo/shared";
 import {
@@ -430,10 +431,17 @@ export function WizardShell({
   // ============================================================
 
   if (success) {
+    const cluster = process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet";
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 py-4 sm:px-6 lg:py-6">
+      <div className="mx-auto w-full max-w-4xl px-4 py-4 sm:px-6 lg:py-6 space-y-4">
         <h1 className="sr-only">Launch a repo token</h1>
         <LaunchResult result={success} onViewProject={handleViewProject} />
+        {!success.stub && success.status === "live" ? (
+          <ManagerDelegationStep
+            projectId={success.projectId}
+            cluster={cluster}
+          />
+        ) : null}
       </div>
     );
   }

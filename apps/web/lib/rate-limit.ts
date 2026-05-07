@@ -19,7 +19,7 @@ type LimiterKind =
 const SLIDING: Record<LimiterKind, { limit: number; windowSeconds: number }> = {
   auth: { limit: 5, windowSeconds: 60 },
   "siws-verify": { limit: 10, windowSeconds: 60 },
-  "project-create": { limit: 3, windowSeconds: 60 * 60 },
+  "project-create": { limit: 30, windowSeconds: 60 * 60 },
   // Per-user mutations on owned projects: launch, transfer, reindex, etc.
   "project-mutate": { limit: 12, windowSeconds: 60 },
   "force-snapshot": { limit: 1, windowSeconds: 60 * 60 },

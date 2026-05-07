@@ -18,12 +18,11 @@ import {
 import { applyDbRlsContext } from "@/lib/db-rls";
 import { isProjectsGhRepoUniqueViolation } from "@/lib/db-errors";
 
-
 /**
  * POST /api/projects — create a draft project.
  *
  * Steps:
- *   1. Rate limit (project-create: 3/hour/user, fall back to IP).
+ *   1. Rate limit (project-create: 30/hour/user, fall back to IP).
  *   2. Authenticate via better-auth.
  *   3. Verify the requester is an admin of the GitHub repo via Octokit
  *      user-context. Skipped in stub mode (no GitHub credentials).
@@ -57,7 +56,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json(
       {
         error: "rate_limited",
-        message: "Project-create limit reached (3/hour). Try again later.",
+        message: "Project-create limit reached (30/hour). Try again later.",
       },
       { status: 429 },
     );

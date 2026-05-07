@@ -118,7 +118,7 @@ export async function createAndLaunchAction(
     return {
       ok: false,
       error: "rate_limited",
-      message: "Project-create limit reached (3/hour).",
+      message: "Project-create limit reached (30/hour).",
       status: 429,
     };
   }

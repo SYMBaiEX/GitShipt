@@ -31,12 +31,13 @@ import {
 type JsonSchema = Record<string, unknown>;
 
 function schema(s: z.ZodType): JsonSchema {
-  return z.toJSONSchema(s, { target: "draft-2020-12" }) as unknown as JsonSchema;
+  return z.toJSONSchema(s, {
+    target: "draft-2020-12",
+  }) as unknown as JsonSchema;
 }
 
 const ErrorResponse = schema(ApiErrorResponseSchema);
-const SOLANA_ADDRESS_HINT =
-  "Base58-encoded Solana public key (32–44 chars).";
+const SOLANA_ADDRESS_HINT = "Base58-encoded Solana public key (32–44 chars).";
 
 const NOT_AUTHENTICATED = {
   description: "Missing or invalid better-auth session.",
@@ -104,7 +105,10 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
                     properties: {
                       ok: { type: "boolean" },
                       status: { type: "object", additionalProperties: true },
-                      production: { type: "object", additionalProperties: true },
+                      production: {
+                        type: "object",
+                        additionalProperties: true,
+                      },
                       overrides: { type: "object", additionalProperties: true },
                       stubMode: { type: "object", additionalProperties: true },
                       at: { type: "string", format: "date-time" },
@@ -208,7 +212,7 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
         post: {
           summary: "Create a project draft",
           description:
-            "Creates a `draft` project linked to a GitHub repo the caller owns. Requires `Idempotency-Key`. Per-user rate limit: 3/hour.",
+            "Creates a `draft` project linked to a GitHub repo the caller owns. Requires `Idempotency-Key`. Per-user rate limit: 30/hour.",
           security: [{ session: [] }],
           parameters: [
             {
@@ -234,7 +238,8 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
       "/api/projects/{id}/leaderboard": {
         get: {
           summary: "Project contributor leaderboard",
-          description: "Latest snapshot leaderboard for the project, ranked by score.",
+          description:
+            "Latest snapshot leaderboard for the project, ranked by score.",
           parameters: [
             {
               in: "path",
@@ -297,7 +302,7 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
         post: {
           summary: "Transfer project ownership",
           description:
-            "Destructive admin action: requires `requirePermission(\"project.transfer\")`, a typed-name confirmation, a fresh MFA, and a min-20-char reason recorded to the audit log. Per-user/project rate limit: 12/min.",
+            'Destructive admin action: requires `requirePermission("project.transfer")`, a typed-name confirmation, a fresh MFA, and a min-20-char reason recorded to the audit log. Per-user/project rate limit: 12/min.',
           security: [{ session: [] }],
           parameters: [
             {

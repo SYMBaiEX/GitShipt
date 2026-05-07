@@ -1000,7 +1000,7 @@ function SignedOutPrompt() {
 function formatActionError(code: string, message: string): string {
   switch (code) {
     case "rate_limited":
-      return "Too many launches. Wait an hour and try again.";
+      return "Too many launch attempts. Give it a minute and try again.";
     case "unauthorized":
       return "You're signed out. Refresh and sign in again.";
     case "not_admin":

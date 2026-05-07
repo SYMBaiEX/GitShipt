@@ -45,7 +45,12 @@ export type AuditAction =
   | "admin.access"
   | "dexscreener.order_create"
   | "dexscreener.order_paid"
-  | "dexscreener.order_failed";
+  | "dexscreener.order_failed"
+  | "bags.manager_delegated"
+  | "bags.rebalance_attempted"
+  | "bags.rebalance_succeeded"
+  | "bags.rebalance_failed"
+  | "bags.manager_revoked";
 
 export interface AuditEntry {
   actorUserId: string | null;

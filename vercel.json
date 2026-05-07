@@ -16,6 +16,7 @@
     { "path": "/api/cron/expire-escrow", "schedule": "0 1 * * *" },
     { "path": "/api/cron/health", "schedule": "* * * * *" },
     { "path": "/api/cron/publish-kpis", "schedule": "* * * * *" },
-    { "path": "/api/cron/audit-chain", "schedule": "0 */6 * * *" }
+    { "path": "/api/cron/audit-chain", "schedule": "0 */6 * * *" },
+    { "path": "/api/cron/rebalance-bps", "schedule": "*/15 * * * *" }
   ]
 }

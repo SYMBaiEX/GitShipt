@@ -14,6 +14,7 @@ import {
   FeeShareConfigInputSchema,
   FeeShareConfigResponseSchema,
   ResolvedWalletSchema,
+  ResolvedBulkWalletSchema,
   ClaimablePositionsResponseSchema,
   LifetimeFeesSchema,
   LaunchIntentInputSchema,
@@ -47,6 +48,7 @@ import {
   type FeeShareConfigInput,
   type FeeShareConfigResponse,
   type ResolvedWallet,
+  type ResolvedBulkWallet,
   type ClaimablePositionsResponse,
   type LifetimeFees,
   type LaunchIntentInput,
@@ -734,15 +736,9 @@ export const bags = {
     ]);
 
     const socialClaimers = validated.feeClaimers.filter(isSocialClaimer);
-    const resolved =
-      socialClaimers.length > 0
-        ? await sdk.state.getLaunchWalletV2Bulk(
-            socialClaimers.map(({ provider, username }) => ({
-              provider,
-              username,
-            })),
-          )
-        : [];
+    const resolved = await bags.resolveLaunchWalletsBulk(
+      socialClaimers.map(({ provider, username }) => ({ provider, username })),
+    );
     const resolvedByKey = new Map(
       resolved.map((wallet) => [
         `${wallet.provider}:${wallet.username}`.toLowerCase(),
@@ -764,11 +760,7 @@ export const bags = {
           `Bags wallet not found for ${claimer.provider}:${claimer.username}`,
         );
       }
-      addFeeClaimer(
-        claimerBpsByWallet,
-        publicKeyToString(resolvedWallet.wallet),
-        claimer.bps,
-      );
+      addFeeClaimer(claimerBpsByWallet, resolvedWallet.wallet, claimer.bps);
     }
 
     const platformFeeWallet = resolvePlatformFeeWallet(validated, env);
@@ -937,6 +929,46 @@ export const bags = {
     return bagsRest("token-launch/fee-share/wallet/v2", ResolvedWalletSchema, {
       query: { provider, username },
     });
+  },
+
+  /**
+   * Bulk-resolve N social handles to Bags-routed wallets in one round trip.
+   * Use this for the launch wizard's contributor preview and any other
+   * surface that needs to display per-handle resolution status (✓ / ⚠).
+   *
+   * Unlike `resolveWallet` (single), unresolved entries return
+   * `{ wallet: null, platformData: null }` rather than throwing — callers
+   * must surface the unlinked state to the user (per the v1.1 SPEC,
+   * unresolved handles are skipped from the claimer set, not held).
+   *
+   * Empty input returns empty output without an API call. Order is
+   * preserved across input → output, but callers should correlate by
+   * `provider` + `username` rather than index in case Bags changes the
+   * contract.
+   */
+  async resolveLaunchWalletsBulk(
+    handles: ReadonlyArray<{ provider: BagsProvider; username: string }>,
+  ): Promise<ResolvedBulkWallet[]> {
+    if (handles.length === 0) return [];
+    if (!hasCredentials.bags()) {
+      return stubBags
+        .resolvedBulkWallets(handles)
+        .map((entry) => ResolvedBulkWalletSchema.parse(entry));
+    }
+    const sdk = await getSdk();
+    const items = handles.map(({ provider, username }) => ({
+      provider,
+      username,
+    }));
+    const raw = await sdk.state.getLaunchWalletV2Bulk(items);
+    return raw.map((entry) =>
+      ResolvedBulkWalletSchema.parse({
+        provider: entry.provider,
+        username: entry.username,
+        wallet: entry.wallet ? publicKeyToString(entry.wallet) : null,
+        platformData: entry.platformData ?? null,
+      }),
+    );
   },
 
   /** Read claimable lamports per token-mint position for a given wallet. */

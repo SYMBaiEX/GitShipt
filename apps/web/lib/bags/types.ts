@@ -91,6 +91,30 @@ export const ResolvedWalletSchema = z.object({
 });
 export type ResolvedWallet = z.infer<typeof ResolvedWalletSchema>;
 
+/**
+ * Bulk-resolve result. Unlike `ResolvedWalletSchema`, both `wallet` and
+ * `platformData` may be null when the social handle has no Bags account yet
+ * (the underlying `state.getLaunchWalletV2Bulk` call returns null per
+ * unresolved entry rather than 404ing the whole batch). The `username`
+ * field is always echoed back so callers can correlate input → output by
+ * key without relying on array order.
+ */
+export const ResolvedBulkWalletSchema = z.object({
+  provider: BagsProviderSchema,
+  username: z.string().min(1),
+  wallet: z.string().min(32).nullable(),
+  platformData: z
+    .object({
+      id: z.string(),
+      username: z.string(),
+      display_name: z.string().nullable().optional(),
+      avatar_url: z.string().url().nullable().optional(),
+    })
+    .nullable(),
+  __stub: z.boolean().optional(),
+});
+export type ResolvedBulkWallet = z.infer<typeof ResolvedBulkWalletSchema>;
+
 export const ClaimablePositionSchema = z.object({
   baseMint: z.string().min(32),
   totalClaimableLamportsUserShare: z.coerce.bigint(),

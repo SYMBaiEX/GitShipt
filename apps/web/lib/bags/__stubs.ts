@@ -2,6 +2,7 @@ import type {
   TokenInfoResponse,
   FeeShareConfigResponse,
   ResolvedWallet,
+  ResolvedBulkWallet,
   ClaimablePositionsResponse,
   LifetimeFees,
   DexscreenerAvailability,
@@ -54,6 +55,23 @@ export const stubBags = {
       wallet: FAKE_PUBKEY,
       __stub: true,
     };
+  },
+
+  resolvedBulkWallets(
+    handles: ReadonlyArray<{ provider: string; username: string }>,
+  ): ResolvedBulkWallet[] {
+    return handles.map(({ provider, username }) => ({
+      provider: provider as ResolvedBulkWallet["provider"],
+      username,
+      platformData: {
+        id: `stub-${username}`,
+        username,
+        display_name: username,
+        avatar_url: null,
+      },
+      wallet: FAKE_PUBKEY,
+      __stub: true,
+    }));
   },
 
   claimablePositions(tokenMint: string): ClaimablePositionsResponse {

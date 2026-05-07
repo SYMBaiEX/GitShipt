@@ -11,16 +11,21 @@ let _managerSigner: Keypair | null = null;
  * SECURITY NOTES:
  *  - The keypair env var must be marked Sensitive in Vercel (post-April-2026
  *    incident).
- *  - This keypair holds the on-chain fee-share-config admin role per project.
- *    On-chain authority is bounded to BPS rebalance via `update_fee_config`,
- *    plus secondary admin operations the IDL exposes (set/transfer admin,
- *    set partner). It CANNOT drain funds, replace claimer pubkeys
- *    (impossible per IDL), force-claim user funds (program-config-admin only),
- *    or call any custodial instruction.
- *  - Keep this distinct from `SOLANA_PAYOUT_KEYPAIR` even though they could
- *    technically share a value. The separation makes the v1.1 cutover and
- *    Phase 6 deletion of the dispatch keypair cleaner, and lets the manager
- *    key live with a tighter rotation schedule than the legacy payout key.
+ *  - This keypair holds the on-chain fee-share-v2 MANAGER role per project,
+ *    delegated by the project owner (admin) via `update_fee_config_manager`
+ *    immediately after launch. The role is structurally bounded by the IDL:
+ *    it can call `manager_update_fee_config` (BPS rebalance),
+ *    `manager_transfer_fee_config` (rotate to a new manager keypair), and
+ *    `manager_waive_fee_config` (return the role to the admin). It CANNOT
+ *    drain funds, replace claimer pubkeys, set partner config, reassign
+ *    admin, or call any custodial / force-claim instruction.
+ *  - Compromise recovery: the project owner (admin) can revoke this manager
+ *    via a single `update_fee_config_manager` call to a fresh keypair. The
+ *    worst case during the compromise window is BPS manipulation among
+ *    existing claimers — never theft. See docs/adr/0001-bags-native-payout.md.
+ *  - Keep distinct from `SOLANA_PAYOUT_KEYPAIR` (legacy v1.0; deleted in
+ *    Phase 6). The separation lets the manager key live with a tighter
+ *    rotation schedule and bounds the v1.1 architecture's blast radius.
  */
 export function managerSigner(): Keypair {
   if (_managerSigner) return _managerSigner;

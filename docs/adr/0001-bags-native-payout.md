@@ -44,19 +44,26 @@ without product benefit.
 
 Migrate to a **Bags-native payout architecture**:
 
-1. **GitShipt is the on-chain admin** of each project's fee-share config,
-   transferred from the launching wallet via the existing
-   `getTransferAdminTransaction` (`fee-share/admin/transfer-tx`) endpoint
-   shortly after launch. Authority is bounded in practice to BPS
-   rebalancing within the existing claimer set, since the on-chain program
-   does not expose claimer-replacement at any role and we never call the
-   secondary admin operations (set partner, extend pre-finalize). The
-   "manager" naming used elsewhere (env var `SOLANA_MANAGER_KEYPAIR`,
-   `lib/solana/manager-signer.ts`) reflects the conceptual role; the
-   on-chain implementation is the admin role because Bags does not expose
-   a REST endpoint for `update_fee_config_manager` and we are not building
-   a direct Anchor client just to call it. See the implementation note in
-   `lib/solana/manager-signer.ts`.
+1. **GitShipt holds the on-chain manager role** of each project's
+   fee-share config — strictly distinct from the admin role. The launching
+   wallet (project owner) remains admin throughout the token's lifetime and
+   delegates the manager role to GitShipt's `SOLANA_MANAGER_KEYPAIR`
+   immediately after launch via `update_fee_config_manager`. Manager
+   authority is structurally bounded by the IDL: it can call
+   `manager_update_fee_config` (BPS rebalance), `manager_transfer_fee_config`
+   (rotate the manager keypair), and `manager_waive_fee_config` (return
+   the role to the admin), and **nothing else**. It cannot drain funds,
+   replace claimer pubkeys, set the partner config, or reassign admin.
+
+   Bags' HTTP API does not expose `update_fee_config_manager` — only the
+   admin-equivalents are wrapped in `bags-cli` and the public REST endpoints.
+   GitShipt builds these manager-role instructions directly via Anchor in
+   `apps/web/lib/bags/program-client.ts`, using the IDL bundled with
+   `@bagsfm/bags-sdk`. Principle of least privilege required this — if the
+   manager keypair is ever compromised, the project owner (admin) revokes
+   it via a single `update_fee_config_manager` call to a fresh keypair, and
+   the worst case during the compromise window is BPS manipulation, never
+   theft.
 
 2. **Daily snapshot → manager-keypair BPS rebalance** on a per-project
    configurable cadence (24h initial → 3d second → 3/5/7d configurable

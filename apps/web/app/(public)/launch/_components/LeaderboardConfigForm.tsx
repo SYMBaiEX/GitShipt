@@ -6,8 +6,13 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { cn } from "@repo/lib";
 import { Button } from "@repo/ui";
 import { FormField } from "@/components/shared/FormField";
-import { defaultTierWeights, LAMPORTS_PER_SOL_NUMBER } from "@repo/shared";
+import {
+  defaultTierWeights,
+  LAMPORTS_PER_SOL_NUMBER,
+  type SteadyStateCadenceHours,
+} from "@repo/shared";
 import type { LeaderboardConfig } from "@/lib/state/launch-wizard-store";
+import { CadenceSelector } from "./CadenceSelector";
 
 const TOP_N_MIN = 3; // server-side Zod minimum (PayoutConfigSchema.topN)
 const TOP_N_MAX = 50;
@@ -34,6 +39,9 @@ export function LeaderboardConfigForm({
     initial.claimThresholdLamports / LAMPORTS_PER_SOL_NUMBER,
   );
   const [platformFeeBps, setPlatformFeeBps] = useState(initial.platformFeeBps);
+  const [steadyStateCadenceHours, setSteadyStateCadenceHours] =
+    useState<SteadyStateCadenceHours>(initial.steadyStateCadenceHours);
+  const [maxClaimers, setMaxClaimers] = useState(initial.maxClaimers);
 
   const tierSum = useMemo(
     () => tierWeights.reduce((a, b) => a + b, 0),
@@ -89,6 +97,8 @@ export function LeaderboardConfigForm({
       tierWeights,
       claimThresholdLamports,
       platformFeeBps,
+      steadyStateCadenceHours,
+      maxClaimers,
     });
   }
 
@@ -250,6 +260,31 @@ export function LeaderboardConfigForm({
           </div>
         </aside>
       </div>
+
+      <section className="space-y-3 border-t border-border pt-5">
+        <CadenceSelector
+          value={steadyStateCadenceHours}
+          onChange={setSteadyStateCadenceHours}
+        />
+        <FormField
+          label={`Maximum contributor slots: ${maxClaimers}`}
+          hint="At launch we resolve up to this many top contributors. Bags caps the on-chain slot list at 100."
+        >
+          <input
+            type="number"
+            min={1}
+            max={100}
+            value={maxClaimers}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v)) {
+                setMaxClaimers(Math.max(1, Math.min(100, Math.round(v))));
+              }
+            }}
+            className={cn(inputClass, "text-mono-md")}
+          />
+        </FormField>
+      </section>
 
       <div className="flex items-center justify-between gap-3">
         <Button type="button" variant="secondary" onClick={onBack}>

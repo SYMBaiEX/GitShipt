@@ -66,11 +66,34 @@ export const ScoringConfigSchema = z.object({
 });
 export type ScoringConfigInput = z.infer<typeof ScoringConfigSchema>;
 
+/**
+ * v1.1 — allowed steady-state cadence options for BPS rebalancing.
+ * The 24h initial → 3d second ramp-up is hard-coded in the workflow;
+ * only the post-ramp cadence is configurable per project.
+ */
+export const STEADY_STATE_CADENCE_OPTIONS = [72, 120, 168] as const;
+export type SteadyStateCadenceHours =
+  (typeof STEADY_STATE_CADENCE_OPTIONS)[number];
+
 export const PayoutConfigSchema = z
   .object({
     topN: z.number().int().min(3).max(50),
     tierWeights: z.array(z.number().min(0).max(1)).min(3).max(50),
     claimThresholdLamports: z.number().int().min(0),
+    /**
+     * v1.1 cadence — hours between BPS rebalances after the initial 24h /
+     * 3d ramp-up. Optional during transition; required by Phase 6 when
+     * the legacy fields above are dropped.
+     */
+    steadyStateCadenceHours: z
+      .union([z.literal(72), z.literal(120), z.literal(168)])
+      .optional(),
+    /**
+     * v1.1 max contributor claimer slots at launch. Defaults to 50; can
+     * go up to 100 (Bags fee-share-v2 program ceiling). Optional during
+     * transition.
+     */
+    maxClaimers: z.number().int().min(1).max(100).optional(),
   })
   .refine((v) => v.tierWeights.length === v.topN, {
     message: "tierWeights length must equal topN",
@@ -277,6 +300,12 @@ export const DEFAULT_WINDOW_DAYS = 30;
 export const DEFAULT_PLATFORM_FEE_BPS = 500; // 5%
 export const DEFAULT_CLAIM_THRESHOLD_LAMPORTS = 100_000_000; // 0.1 SOL
 export const LAMPORTS_PER_SOL_NUMBER = 1_000_000_000;
+
+/** v1.1 default — 3 days between BPS rebalances after the initial ramp-up. */
+export const DEFAULT_STEADY_STATE_CADENCE_HOURS: SteadyStateCadenceHours = 72;
+/** v1.1 default — at most 50 contributor slots filled at launch (capped at 100). */
+export const DEFAULT_MAX_CLAIMERS = 50;
+export const MAX_CLAIMERS = 100;
 
 /**
  * Default tier weights for an arbitrary topN. Top 1=30%, Top 2=20%, Top 3=15%,

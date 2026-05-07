@@ -33,7 +33,9 @@ import {
   saveDraftAction,
 } from "../actions";
 import {
+  DEFAULT_MAX_CLAIMERS,
   DEFAULT_SCORING_CONFIG,
+  DEFAULT_STEADY_STATE_CADENCE_HOURS,
   defaultTierWeights,
   type CreateProjectBody,
   type ScoringConfigInput,
@@ -682,6 +684,9 @@ function leaderboardFromConfig(
     tierWeights,
     claimThresholdLamports: payout.claimThresholdLamports,
     platformFeeBps,
+    steadyStateCadenceHours:
+      payout.steadyStateCadenceHours ?? DEFAULT_STEADY_STATE_CADENCE_HOURS,
+    maxClaimers: payout.maxClaimers ?? DEFAULT_MAX_CLAIMERS,
   };
 }
 

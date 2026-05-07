@@ -14,11 +14,31 @@ the product model.
 - **SOL-only payouts.** No SPL token logic, no multi-token branches, no
   token-type abstractions. Payouts are SOL via `@solana/web3.js@^1.98.x`.
 - **All launches are community launches.** There is exactly one launch type.
-- **Bags handles Incorporation.** We do not re-implement, mirror, or wrap it.
-- **No grace windows. No claim windows.** Snapshots are daily, payouts dispatch
-  on the same cadence. The product flow is: GitHub activity → ranked contributors
-  → daily snapshot → Bags fee claim → SOL payout by rank. Do not add
-  intermediate windows.
+- **Bags handles Incorporation, custody, and contributor claims.** We do not
+  re-implement, mirror, or wrap any of it. Contributors claim fees through
+  Bags' GitHub-OAuth UI, signing transactions with their own wallet. GitShipt
+  never holds, dispatches, or routes contributor SOL.
+- **Bags-native payouts via manager-keypair BPS rebalance.** GitShipt is the
+  on-chain manager (delegated by Bags admin via `update_fee_config_manager`
+  immediately after launch). Manager authority is bounded to BPS rebalance
+  within the existing claimer set — never custody, never dispatch SOL to
+  recipients, never replace claimer pubkeys (impossible per `fee-share-v2`
+  IDL). The product flow is: GitHub activity → ranked contributors → daily
+  snapshot → manager BPS rebalance.
+- **Cadence is per-project, configurable.** 24h initial → 3d second → 3/5/7d
+  configurable thereafter. Stored in `payout_schedules` per project. The
+  leaderboard UI updates daily regardless; the on-chain rebalance follows
+  the configured cadence.
+- **No grace windows. No off-chain claim windows. No off-chain custody.**
+  Contributors who haven't onboarded to Bags at launch time are skipped from
+  the claimer set, not held in escrow. Project owners are responsible for
+  outreach. There is exactly one place SOL can be claimed: through Bags
+  itself.
+- **Contributor wallet linking is on Bags, not on GitShipt.** GitShipt never
+  asks contributors for wallet addresses, never runs SIWS for contributor
+  identity, never custodies a "claimable balance" for them. The only wallet
+  identity GitShipt holds is project-owner attestation for launch-time
+  signing.
 - **Stub-safe by default.** External clients (Bags, Helius, payout keypair)
   must keep deterministic stub fallbacks based on env-var presence. Never
   invent secrets to make a flow "work" — stop and name the missing env var.
@@ -42,8 +62,27 @@ the product model.
 
 ## Explicit non-goals (do not build)
 
+- An off-chain SOL dispatch loop that sends fees from a GitShipt-controlled
+  wallet to contributor wallets. (Was the original v1.0 architecture, deleted
+  in the v1.1 Bags-native migration. Bags' on-chain vaults custody fees;
+  contributors claim them directly via Bags' UI.)
+- An `escrow_holdings` table or any GitShipt-side custody of contributor
+  funds. (Same. Deleted in v1.1.)
+- A SIWS-based contributor wallet-linking flow on GitShipt. Contributors link
+  GitHub to Bags directly through Bags' OAuth. (Same. Deleted in v1.1.)
+- A `processClaim` workflow or `/api/claims/*` route on GitShipt's side.
+  (Same. Deleted in v1.1.)
+- Daily token re-launches per project, or any "rotate token" model. Bags
+  `fee-share-v2` makes claimer pubkeys immutable post-finalize; we live within
+  that constraint by rebalancing BPS rather than rotating claimers.
+- Pre-allocating fee-share slots to GitHub handles that haven't onboarded to
+  Bags. The Bags resolve endpoint 404s for unlinked handles and the wallet
+  PDA is custodial-keyed, not derivable. Unlinked contributors are skipped at
+  launch, not reserved.
 - A 7-day or N-day grace/claim window for contributors who haven't linked a
-  wallet. (Specifically forbidden — invented in a past session, reverted.)
+  wallet. (Specifically forbidden — invented in a past session, reverted.
+  Subsumed by the no-off-chain-custody invariant above; listed explicitly to
+  prevent regression.)
 - A 14-day or N-day migration window for existing projects to install
   shipshape. (Same principle. v0 → v1 promotion happens in one cut-over via
   a single SQL backfill per shipshape design §11; no grace.)

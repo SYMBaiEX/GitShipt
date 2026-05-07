@@ -101,10 +101,10 @@ class ReadonlyWallet {
   constructor(publicKey: PublicKey) {
     this.publicKey = publicKey;
   }
-  async signTransaction<T>(_tx: T): Promise<T> {
+  async signTransaction<T>(): Promise<T> {
     throw new Error("ReadonlyWallet cannot sign transactions");
   }
-  async signAllTransactions<T>(_txs: T[]): Promise<T[]> {
+  async signAllTransactions<T>(): Promise<T[]> {
     throw new Error("ReadonlyWallet cannot sign transactions");
   }
 }

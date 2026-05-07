@@ -112,8 +112,8 @@ export function allocateBpsByScore(
     index: i,
     frac: v - Math.floor(v),
   }));
-  let allocated = floors.reduce((a, b) => a + b, 0);
-  let remainder = 10_000 - allocated;
+  const allocated = floors.reduce((a, b) => a + b, 0);
+  const remainder = 10_000 - allocated;
 
   // Distribute the remainder by largest fractional residue, ties broken
   // by lower slot index (deterministic).

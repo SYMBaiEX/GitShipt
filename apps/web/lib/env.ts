@@ -79,6 +79,13 @@ const serverEnvSchema = z.object({
 
   // Solana
   HELIUS_RPC_URL: optionalUrl,
+  /**
+   * Bearer token Helius enhanced webhooks send in the Authorization header
+   * when delivering on-chain events to /api/webhooks/helius/bags-events.
+   * Generate with: openssl rand -base64 32. Configured in the Helius
+   * dashboard alongside the program-id watch (FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK).
+   */
+  HELIUS_WEBHOOK_AUTH_TOKEN: optionalString,
   SOLANA_PAYOUT_KEYPAIR: optionalString,
   /**
    * Bags-native v1.1: separate keypair that holds the on-chain
@@ -217,6 +224,7 @@ export const hasCredentials = {
   solana: () => Boolean(serverEnv().HELIUS_RPC_URL),
   payoutKey: () => Boolean(serverEnv().SOLANA_PAYOUT_KEYPAIR),
   managerKey: () => Boolean(serverEnv().SOLANA_MANAGER_KEYPAIR),
+  heliusWebhook: () => Boolean(serverEnv().HELIUS_WEBHOOK_AUTH_TOKEN),
   cron: () => Boolean(serverEnv().CRON_SECRET),
 };
 
@@ -366,6 +374,7 @@ export function productionReadiness(): ProductionReadiness {
     ["HELIUS_RPC_URL", env.HELIUS_RPC_URL],
     ["SOLANA_PAYOUT_KEYPAIR", env.SOLANA_PAYOUT_KEYPAIR],
     ["SOLANA_MANAGER_KEYPAIR", env.SOLANA_MANAGER_KEYPAIR],
+    ["HELIUS_WEBHOOK_AUTH_TOKEN", env.HELIUS_WEBHOOK_AUTH_TOKEN],
     ["CRON_SECRET", env.CRON_SECRET],
     ["IDEMPOTENCY_KEY_SECRET", env.IDEMPOTENCY_KEY_SECRET],
   ];

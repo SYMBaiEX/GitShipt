@@ -28,7 +28,7 @@
  * after every Bags SDK upgrade.
  */
 
-import { AnchorProvider, BN, Program, type Idl } from "@coral-xyz/anchor";
+import { AnchorProvider, BN, Program } from "@coral-xyz/anchor";
 import {
   Connection,
   Keypair,
@@ -36,6 +36,7 @@ import {
   type TransactionInstruction,
 } from "@solana/web3.js";
 import idlJson from "@bagsfm/bags-sdk/dist/idl/fee-share-v2/idl.json";
+import type { BagsFeeShare } from "@bagsfm/bags-sdk/dist/idl/fee-share-v2/idl";
 
 const FEE_SHARE_V2_PROGRAM_ID = new PublicKey(
   (idlJson as { address: string }).address,
@@ -108,25 +109,28 @@ class ReadonlyWallet {
   }
 }
 
-let _program: Program | null = null;
+let _program: Program<BagsFeeShare> | null = null;
 let _programConnection: Connection | null = null;
 
 /**
  * Lazily construct the Anchor `Program` instance for fee-share-v2.
- * The instance is memoized per (connection identity) so repeated calls
- * with the same connection return the same Program. Pass a fresh
- * connection to invalidate.
+ * Typed against the SDK's bundled `BagsFeeShare` IDL type so that
+ * `program.methods.<ix>` is fully narrowed (no `Record<string, fn | undefined>`).
+ *
+ * Memoized per (connection identity) — pass a fresh connection to invalidate.
  */
-export function getFeeShareV2Program(connection: Connection): Program {
+export function getFeeShareV2Program(
+  connection: Connection,
+): Program<BagsFeeShare> {
   if (_program && _programConnection === connection) return _program;
   const wallet = new ReadonlyWallet(Keypair.generate().publicKey);
   const provider = new AnchorProvider(connection, wallet as never, {
     commitment: connection.commitment ?? "processed",
   });
-  // Anchor's Program constructor signature varies subtly across versions;
-  // the IDL JSON shape we deep-import is from anchor 0.30+ which is what
-  // the SDK pins. Cast through `unknown` to dodge a too-strict generic.
-  _program = new Program(idlJson as unknown as Idl, provider);
+  _program = new Program<BagsFeeShare>(
+    idlJson as unknown as BagsFeeShare,
+    provider,
+  );
   _programConnection = connection;
   return _program;
 }

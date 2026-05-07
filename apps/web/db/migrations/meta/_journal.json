@@ -155,6 +155,13 @@
       "when": 1777567200000,
       "tag": "0021_dexscreener_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1778123533119,
+      "tag": "0022_bags_native_infra",
+      "breakpoints": true
     }
   ]
 }

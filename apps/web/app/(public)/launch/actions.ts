@@ -25,7 +25,14 @@ import {
   stubsAllowed,
 } from "@/lib/env";
 import { bags } from "@/lib/bags/client";
+import {
+  mirrorLaunchToV11Tables,
+  prepareManagerDelegationTransaction,
+  confirmManagerDelegation,
+  type MirrorClaimerInput,
+} from "@/lib/bags/v11-launch-integration";
 import { payoutSignerPublicKey } from "@/lib/solana/signer";
+import { captureException } from "@/lib/observability";
 import { requirePermission, PermissionError } from "@/lib/auth/permissions";
 import { updateProjectCaches, updateUserCaches } from "@/lib/cache-actions";
 import {
@@ -822,6 +829,34 @@ export async function completeLaunchAction(input: {
       },
     });
 
+    // v1.1 mirror — populate the Bags-native tables so the rebalance cron
+    // and the per-contributor claim feed have data to work with. Defensive:
+    // mirror failures must NOT fail the launch (the legacy v1.0 path
+    // succeeded; the project is live; we'll backfill the mirror in Phase 5
+    // cutover if this fails).
+    try {
+      const claimers = buildLaunchClaimerSet(project);
+      if (claimers && updated.tokenMint) {
+        await mirrorLaunchToV11Tables({
+          projectId,
+          baseMint: updated.tokenMint,
+          adminPubkey: launchWalletAddress,
+          claimers,
+          steadyStateCadenceHours:
+            project.payoutConfig?.steadyStateCadenceHours ?? 72,
+        });
+      }
+    } catch (mirrorError) {
+      // Surface to observability but never throw — the legacy launch
+      // succeeded and we don't want to leave the user staring at an
+      // error screen for a non-blocking mirror gap.
+      captureException(mirrorError, {
+        area: "launch.mirror_v11",
+        severity: "warning",
+        tags: { projectId },
+      });
+    }
+
     revalidatePath(`/r/${updated.ghOwner}/${updated.ghRepo}`);
     await updateProjectCaches(
       projectId,
@@ -870,6 +905,166 @@ export async function completeLaunchAction(input: {
       message,
       status: 500,
       projectId,
+    };
+  }
+}
+
+/**
+ * Build the v1.1 mirror claimers array from a project's legacy launch
+ * state. Currently the legacy flow creates a single contributor-pool
+ * claimer + an optional treasury claimer (the platform-fee cut). The
+ * mirror records both as 'wallet'-provider slots so the rebalance
+ * workflow can manipulate their BPS later.
+ *
+ * Returns null if the project is missing fields needed to build a valid
+ * mirror — caller must defensively skip the mirror in that case.
+ */
+function buildLaunchClaimerSet(project: {
+  bagsPoolClaimerWallet: string | null;
+  payoutConfig: { platformFeeBps?: number } | null;
+}): MirrorClaimerInput[] | null {
+  const pool = project.bagsPoolClaimerWallet?.trim();
+  if (!pool) return null;
+  const platformFeeBps = project.payoutConfig?.platformFeeBps ?? 0;
+  const treasury = serverEnv().SOLANA_TREASURY_ADDRESS?.trim();
+  const claimers: MirrorClaimerInput[] = [
+    {
+      slotIndex: 0,
+      claimerPubkey: pool,
+      provider: "wallet",
+      socialHandle: null,
+      contributorId: null,
+      initialBps: 10_000 - platformFeeBps,
+    },
+  ];
+  if (platformFeeBps > 0 && treasury && treasury !== pool) {
+    claimers.push({
+      slotIndex: 1,
+      claimerPubkey: treasury,
+      provider: "wallet",
+      socialHandle: null,
+      contributorId: null,
+      initialBps: platformFeeBps,
+    });
+  } else if (platformFeeBps > 0) {
+    // Treasury missing or collides with pool — fold into the pool slot
+    // so the bps still sums to 10000. Surfaces as an audit warning.
+    claimers[0]!.initialBps = 10_000;
+  }
+  return claimers;
+}
+
+/**
+ * v1.1 — prepare an unsigned `update_fee_config_manager` v0 transaction
+ * for the project owner to sign in their browser wallet. Called from the
+ * post-launch ManagerDelegationStep component.
+ */
+export async function prepareManagerDelegationAction(
+  projectId: string,
+): Promise<
+  | { ok: true; transactionBase64: string; managerPubkey: string }
+  | LaunchActionError
+> {
+  const session = await auth().api.getSession({ headers: await headers() });
+  if (!session?.user?.id) {
+    return {
+      ok: false,
+      error: "unauthorized",
+      message: "Sign in with GitHub to delegate the manager role.",
+      status: 401,
+      projectId,
+    };
+  }
+  try {
+    await requirePermission("project.update", {
+      userId: session.user.id,
+      projectId,
+    });
+    const prepared = await prepareManagerDelegationTransaction(projectId);
+    return {
+      ok: true,
+      transactionBase64: prepared.transactionBase64,
+      managerPubkey: prepared.managerPubkey,
+    };
+  } catch (e) {
+    if (e instanceof PermissionError) {
+      return {
+        ok: false,
+        error: "forbidden",
+        message: e.message,
+        status: 403,
+        projectId,
+      };
+    }
+    const message =
+      e instanceof Error ? e.message : "Failed to prepare delegation tx.";
+    captureException(e, {
+      area: "launch.prepare_manager_delegation",
+      severity: "warning",
+      tags: { projectId },
+    });
+    return {
+      ok: false,
+      error: "delegation_prepare_failed",
+      message,
+      status: 500,
+      projectId,
+    };
+  }
+}
+
+/**
+ * v1.1 — after the project owner broadcasts the signed delegation tx,
+ * verify on-chain that the manager pubkey matches our keypair, then
+ * record the delegation on the bags_fee_share_configs row.
+ */
+export async function confirmManagerDelegationAction(input: {
+  projectId: string;
+  txSignature: string;
+}): Promise<
+  | { ok: true; managerPubkey: string }
+  | LaunchActionError
+> {
+  const session = await auth().api.getSession({ headers: await headers() });
+  if (!session?.user?.id) {
+    return {
+      ok: false,
+      error: "unauthorized",
+      message: "Sign in with GitHub to confirm the manager delegation.",
+      status: 401,
+      projectId: input.projectId,
+    };
+  }
+  try {
+    await requirePermission("project.update", {
+      userId: session.user.id,
+      projectId: input.projectId,
+    });
+    const confirmed = await confirmManagerDelegation(input);
+    return { ok: true, managerPubkey: confirmed.managerPubkey };
+  } catch (e) {
+    if (e instanceof PermissionError) {
+      return {
+        ok: false,
+        error: "forbidden",
+        message: e.message,
+        status: 403,
+        projectId: input.projectId,
+      };
+    }
+    const message =
+      e instanceof Error ? e.message : "Failed to confirm delegation.";
+    captureException(e, {
+      area: "launch.confirm_manager_delegation",
+      severity: "error",
+      tags: { projectId: input.projectId, txSignature: input.txSignature },
+    });
+    return {
+      ok: false,
+      error: "delegation_confirm_failed",
+      message,
+      status: 500,
+      projectId: input.projectId,
     };
   }
 }

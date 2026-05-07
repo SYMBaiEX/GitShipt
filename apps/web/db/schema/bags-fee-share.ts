@@ -15,7 +15,7 @@ import { snapshots } from "./snapshots";
 import { createId } from "@repo/lib";
 
 /**
- * v1.1 — On-chain fee-share-v2 config mirror, claimer slots, and rebalance
+ * On-chain fee-share-v2 config mirror, claimer slots, and rebalance
  * attempt ledger.
  *
  * Architecture: GitShipt holds the on-chain MANAGER role per project,
@@ -217,7 +217,8 @@ export interface BagsRebalancePlanJson {
   /** Slot range [fromIdx, toIdx] passed to manager_update_fee_config. */
   fromIdx: number;
   toIdx: number;
-  /** Always false in v1.1 — finalizing locks rebalancing forever. */
+  /** Always false in our flow — `finalize_update=true` would lock
+   *  rebalancing forever and we never want that. */
   finalizeUpdate: boolean;
   /** Whether the plan crossed the LUT threshold (>15 claimers). */
   requiresLookupTables: boolean;

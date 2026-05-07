@@ -12,7 +12,7 @@ import { getMfaConfirmedAt } from "./mfa";
  *
  * Per PRD § "Critical action gates" + "Admin & permissions":
  *  - Reason string (min 20 chars) recorded with the audit entry.
- *  - MFA reverify within last 5 minutes (v0: timestamp-only stub; v1.1
+ *  - MFA reverify within last 5 minutes (v0: timestamp-only stub; 
  *    enforces TOTP reverify on every call).
  *  - Confirmation modal: caller surfaces a typed-target check; we re-validate
  *    here so server cannot be bypassed by a manipulated client.

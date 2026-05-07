@@ -5,8 +5,8 @@ import { serverEnv, hasCredentials } from "@/lib/env";
 let _managerSigner: Keypair | null = null;
 
 /**
- * Lazily decode the v1.1 manager keypair from env. Throws if absent —
- * callers must guard with `hasCredentials.managerKey()` for stubbed dev.
+ * Lazily decode the manager keypair from env. Throws if absent — callers
+ * must guard with `hasCredentials.managerKey()` for stubbed dev.
  *
  * SECURITY NOTES:
  *  - The keypair env var must be marked Sensitive in Vercel (post-April-2026
@@ -23,9 +23,9 @@ let _managerSigner: Keypair | null = null;
  *    via a single `update_fee_config_manager` call to a fresh keypair. The
  *    worst case during the compromise window is BPS manipulation among
  *    existing claimers — never theft. See docs/adr/0001-bags-native-payout.md.
- *  - Keep distinct from `SOLANA_PAYOUT_KEYPAIR` (legacy v1.0; deleted in
- *    Phase 6). The separation lets the manager key live with a tighter
- *    rotation schedule and bounds the v1.1 architecture's blast radius.
+ *  - This keypair is the only Solana signer GitShipt operates. Tighter
+ *    rotation schedule + smaller blast radius than a custodial signer
+ *    would have, since the on-chain authority is bounded to BPS rebalance.
  */
 export function managerSigner(): Keypair {
   if (_managerSigner) return _managerSigner;

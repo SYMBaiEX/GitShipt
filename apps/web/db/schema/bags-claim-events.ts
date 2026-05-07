@@ -13,7 +13,7 @@ import { contributors } from "./contributors";
 import { createId } from "@repo/lib";
 
 /**
- * v1.1 — Append-only ledger of on-chain Bags claim events.
+ * Append-only ledger of on-chain Bags claim events.
  *
  * Source of truth: `BagsFeeShareUserClaimV2Event` and
  * `BagsFeeShareUserVaultClaimEvent` emitted by the fee-share-v2 program.

@@ -1,5 +1,5 @@
 /**
- * Step helpers for the v1.1 BPS rebalance workflow.
+ * Step helpers for the BPS rebalance workflow.
  *
  * Architecture: cadence cron picks up payout_schedules whose next_run_at
  * is due → per-schedule child workflow loads (config, slots, latest

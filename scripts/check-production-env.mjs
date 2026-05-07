@@ -127,7 +127,7 @@ const REQUIRED = [
     name: "SOLANA_MANAGER_KEYPAIR",
     scope: "Solana",
     sensitive: true,
-    note: "Base58 keypair holding the on-chain fee-share-config admin role per project. v1.1 manager — BPS-rebalance authority only.",
+    note: "Base58 keypair holding the on-chain fee-share-config admin role per project. manager — BPS-rebalance authority only.",
   },
   {
     name: "SOLANA_TREASURY_ADDRESS",

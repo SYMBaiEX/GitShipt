@@ -12,7 +12,7 @@ import { projects } from "./projects";
 import { createId } from "@repo/lib";
 
 /**
- * v1.1 — Per-project cadence state for the Bags-native rebalance workflow.
+ * Per-project cadence state for the Bags-native rebalance workflow.
  *
  * Cadence sequence per project:
  *   - Run 1: scheduled for `launchedAt + 24h` (gives early gratification)

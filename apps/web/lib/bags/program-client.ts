@@ -12,7 +12,7 @@
  * The on-chain program nevertheless implements a proper manager role
  * with strictly narrower authority (BPS rebalance only — cannot drain
  * funds, cannot replace claimer pubkeys, cannot set partner, cannot
- * reassign admin). Per the v1.1 SPEC's principle-of-least-privilege
+ * reassign admin). Per the SPEC's principle-of-least-privilege
  * stance and docs/adr/0001-bags-native-payout.md, GitShipt holds the
  * manager role, NOT the admin role. The launch wallet (project owner)
  * remains admin and can revoke manager via `update_fee_config_manager`

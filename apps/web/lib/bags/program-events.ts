@@ -5,7 +5,7 @@
  * we subscribe to program logs (via Helius enhanced webhooks or
  * `connection.onLogs(programId)`) and parse the Anchor `emit!()`-style
  * events they contain. This module turns raw `Program data: <base64>`
- * lines into typed events for the v1.1 reconciliation surface.
+ * lines into typed events for the reconciliation surface.
  *
  * IDL is deep-imported from the Bags SDK package — the path is not part
  * of the SDK's documented public surface, but it has been stable across
@@ -40,7 +40,7 @@ function decode(log: string): { name: string; data: unknown } | null {
   return getCoder().decode(log);
 }
 
-/** Discriminated union of v1.1-relevant fee-share-v2 events. */
+/** Discriminated union of relevant fee-share-v2 events. */
 export type BagsProgramEvent =
   | { type: "user_claim_v2"; data: BagsFeeShareUserClaimV2EventData }
   | { type: "user_vault_claim"; data: BagsFeeShareUserVaultClaimEventData }
@@ -104,7 +104,7 @@ export interface FeeConfigSnapshotV2EventData {
 }
 
 /**
- * Parse all v1.1-relevant Bags fee-share-v2 events out of a transaction's
+ * Parse all relevant Bags fee-share-v2 events out of a transaction's
  * program log lines. Lines that aren't `Program data: <base64>` or that
  * decode to event types we don't track are silently skipped.
  *

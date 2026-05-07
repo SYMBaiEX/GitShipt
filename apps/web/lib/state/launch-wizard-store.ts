@@ -24,13 +24,13 @@ export interface LeaderboardConfig {
   claimThresholdLamports: number;
   platformFeeBps: number;
   /**
-   * v1.1 — hours between on-chain BPS rebalances after the 24h-then-3d
+   * hours between on-chain BPS rebalances after the 24h-then-3d
    * ramp-up. The wizard's CadenceSelector writes 72/120/168 here; the
    * launch action persists it onto payout_schedules.steadyStateCadenceHours.
    */
   steadyStateCadenceHours: SteadyStateCadenceHours;
   /**
-   * v1.1 — maximum contributor claimer slots filled at launch. Bags
+   * maximum contributor claimer slots filled at launch. Bags
    * fee-share-v2 caps this at 100; we default to 50 to keep BPS
    * allocations meaningful.
    */

@@ -30,8 +30,8 @@ type DelegationState =
   | { kind: "error"; managerPubkey: string | null; message: string };
 
 /**
- * v1.1 — post-launch step where the project owner delegates the on-chain
- * manager role to GitShipt's keypair via `update_fee_config_manager`.
+ * Post-launch step where the project owner delegates the on-chain manager
+ * role to GitShipt's keypair via `update_fee_config_manager`.
  *
  * After this step, the cadence cron will start signing BPS rebalances on
  * the configured schedule (24h initial → 3d second → steady-state). The

@@ -938,7 +938,7 @@ export const bags = {
    *
    * Unlike `resolveWallet` (single), unresolved entries return
    * `{ wallet: null, platformData: null }` rather than throwing — callers
-   * must surface the unlinked state to the user (per the v1.1 SPEC,
+   * must surface the unlinked state to the user (per the SPEC,
    * unresolved handles are skipped from the claimer set, not held).
    *
    * Empty input returns empty output without an API call. Order is

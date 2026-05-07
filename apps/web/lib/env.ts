@@ -88,7 +88,7 @@ const serverEnvSchema = z.object({
   HELIUS_WEBHOOK_AUTH_TOKEN: optionalString,
   SOLANA_PAYOUT_KEYPAIR: optionalString,
   /**
-   * Bags-native v1.1: separate keypair that holds the on-chain
+   * Bags-native: keypair that holds the on-chain
    * fee-share-config admin role per project. Authority is bounded to BPS
    * rebalance (`update_fee_config` ix) — cannot drain funds, cannot
    * replace claimer pubkeys (impossible per IDL), cannot extend the

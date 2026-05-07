@@ -26,11 +26,11 @@ import {
 } from "@/lib/env";
 import { bags } from "@/lib/bags/client";
 import {
-  mirrorLaunchToV11Tables,
+  recordLaunch,
   prepareManagerDelegationTransaction,
   confirmManagerDelegation,
-  type MirrorClaimerInput,
-} from "@/lib/bags/v11-launch-integration";
+  type LaunchClaimerInput,
+} from "@/lib/bags/launch-integration";
 import { payoutSignerPublicKey } from "@/lib/solana/signer";
 import { captureException } from "@/lib/observability";
 import { requirePermission, PermissionError } from "@/lib/auth/permissions";
@@ -829,33 +829,35 @@ export async function completeLaunchAction(input: {
       },
     });
 
-    // v1.1 mirror — populate the Bags-native tables so the rebalance cron
-    // and the per-contributor claim feed have data to work with. Defensive:
-    // mirror failures must NOT fail the launch (the legacy v1.0 path
-    // succeeded; the project is live; we'll backfill the mirror in Phase 5
-    // cutover if this fails).
-    try {
-      const claimers = buildLaunchClaimerSet(project);
-      if (claimers && updated.tokenMint) {
-        await mirrorLaunchToV11Tables({
-          projectId,
-          baseMint: updated.tokenMint,
-          adminPubkey: launchWalletAddress,
-          claimers,
-          steadyStateCadenceHours:
-            project.payoutConfig?.steadyStateCadenceHours ?? 72,
-        });
-      }
-    } catch (mirrorError) {
-      // Surface to observability but never throw — the legacy launch
-      // succeeded and we don't want to leave the user staring at an
-      // error screen for a non-blocking mirror gap.
-      captureException(mirrorError, {
-        area: "launch.mirror_v11",
-        severity: "warning",
-        tags: { projectId },
-      });
+    // Record the launch in the Bags-native data layer. Failure here is a
+    // hard failure — the on-chain launch succeeded but our DB doesn't
+    // know about the fee-share config, which means the rebalance cron
+    // can't run and the claim feed can't render. Surface it.
+    const claimers = buildLaunchClaimerSet(project);
+    if (!claimers) {
+      throw new ActionError(
+        "launch_record_missing_claimers",
+        "Launch succeeded on-chain but GitShipt could not derive the claimer set to record. Manual reconciliation required.",
+        500,
+        projectId,
+      );
     }
+    if (!updated.tokenMint) {
+      throw new ActionError(
+        "launch_record_missing_mint",
+        "Launch succeeded but tokenMint is missing from the persisted project row. Manual reconciliation required.",
+        500,
+        projectId,
+      );
+    }
+    await recordLaunch({
+      projectId,
+      baseMint: updated.tokenMint,
+      adminPubkey: launchWalletAddress,
+      claimers,
+      steadyStateCadenceHours:
+        project.payoutConfig?.steadyStateCadenceHours ?? 72,
+    });
 
     revalidatePath(`/r/${updated.ghOwner}/${updated.ghRepo}`);
     await updateProjectCaches(
@@ -910,24 +912,25 @@ export async function completeLaunchAction(input: {
 }
 
 /**
- * Build the v1.1 mirror claimers array from a project's legacy launch
- * state. Currently the legacy flow creates a single contributor-pool
- * claimer + an optional treasury claimer (the platform-fee cut). The
- * mirror records both as 'wallet'-provider slots so the rebalance
- * workflow can manipulate their BPS later.
+ * Build the launch claimers array from a successfully-launched project's
+ * persisted state. The current launch flow creates a single contributor-
+ * pool claimer + an optional treasury claimer (the platform-fee cut),
+ * both recorded as 'wallet'-provider slots so the rebalance workflow can
+ * manipulate their BPS later.
  *
  * Returns null if the project is missing fields needed to build a valid
- * mirror — caller must defensively skip the mirror in that case.
+ * claimer set; the caller throws in that case rather than recording a
+ * partial launch.
  */
 function buildLaunchClaimerSet(project: {
   bagsPoolClaimerWallet: string | null;
   payoutConfig: { platformFeeBps?: number } | null;
-}): MirrorClaimerInput[] | null {
+}): LaunchClaimerInput[] | null {
   const pool = project.bagsPoolClaimerWallet?.trim();
   if (!pool) return null;
   const platformFeeBps = project.payoutConfig?.platformFeeBps ?? 0;
   const treasury = serverEnv().SOLANA_TREASURY_ADDRESS?.trim();
-  const claimers: MirrorClaimerInput[] = [
+  const claimers: LaunchClaimerInput[] = [
     {
       slotIndex: 0,
       claimerPubkey: pool,
@@ -955,8 +958,8 @@ function buildLaunchClaimerSet(project: {
 }
 
 /**
- * v1.1 — prepare an unsigned `update_fee_config_manager` v0 transaction
- * for the project owner to sign in their browser wallet. Called from the
+ * Prepare an unsigned `update_fee_config_manager` v0 transaction for the
+ * project owner to sign in their browser wallet. Called from the
  * post-launch ManagerDelegationStep component.
  */
 export async function prepareManagerDelegationAction(
@@ -1014,9 +1017,9 @@ export async function prepareManagerDelegationAction(
 }
 
 /**
- * v1.1 — after the project owner broadcasts the signed delegation tx,
- * verify on-chain that the manager pubkey matches our keypair, then
- * record the delegation on the bags_fee_share_configs row.
+ * After the project owner broadcasts the signed delegation tx, verify
+ * on-chain that the manager pubkey matches our keypair, then record the
+ * delegation on the bags_fee_share_configs row.
  */
 export async function confirmManagerDelegationAction(input: {
   projectId: string;

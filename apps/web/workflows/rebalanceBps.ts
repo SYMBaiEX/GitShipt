@@ -1,5 +1,5 @@
 /**
- * v1.1 — BPS rebalance workflow.
+ * BPS rebalance workflow.
  *
  * Driven by the cadence cron (`/api/cron/rebalance-bps`). For each project
  * whose payout schedule is due, builds a new BPS plan from the latest

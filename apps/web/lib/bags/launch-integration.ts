@@ -1,27 +1,26 @@
 /**
- * v1.1 launch integration helpers.
+ * Launch integration helpers — bridges a successful Bags launch into the
+ * GitShipt data layer + drives the manager-role delegation hand-off.
  *
- * Two concerns, three public functions:
+ * Three public functions:
  *
- *  1. `mirrorLaunchToV11Tables` — given a successful v1.0-style Bags launch
- *     (the legacy `executePayout`-shaped flow that currently runs in
- *     `app/(public)/launch/actions.ts`), populate the v1.1 mirror tables:
- *     bags_fee_share_configs, bags_claimer_slots, payout_schedules. Idempotent
- *     on (project_id) — re-running for the same project is a no-op.
+ *  1. `recordLaunch` — given a successful Bags launch (token mint + admin
+ *     pubkey + the resolved claimer set), populate the
+ *     bags_fee_share_configs, bags_claimer_slots, and payout_schedules
+ *     rows. Throws if a config already exists for the project — there is
+ *     no replay path; the launch wizard owns the single attempt.
  *
  *  2. `prepareManagerDelegationTransaction` — builds the unsigned
- *     `update_fee_config_manager` instruction for the project owner (admin)
- *     to sign in their browser wallet. Sets the GitShipt manager keypair as
- *     the on-chain manager. Returns base64-serialized v0 tx + the manager
- *     pubkey expected to land in `bags_fee_share_configs.manager_pubkey`.
+ *     `update_fee_config_manager` instruction for the project owner
+ *     (admin) to sign in their browser wallet. Sets the GitShipt manager
+ *     keypair as the on-chain manager. Returns base64-serialized v0 tx
+ *     + the manager pubkey expected to land in
+ *     `bags_fee_share_configs.manager_pubkey`.
  *
- *  3. `confirmManagerDelegation` — after the project owner broadcasts the
- *     signed tx, verifies on-chain that the config's manager now matches the
- *     manager keypair, then updates the config row + writes the audit entry.
- *
- * Shared between two callers:
- *   - The launch wizard's post-confirmation server action (going forward).
- *   - The Phase 5 cutover script (existing live projects).
+ *  3. `confirmManagerDelegation` — after the project owner broadcasts
+ *     the signed tx, verifies on-chain that the config's manager now
+ *     matches the manager keypair, then updates the config row + writes
+ *     the audit entry.
  */
 
 import {
@@ -54,7 +53,7 @@ const RAMP_UP_FIRST_RUN_HOURS = 24; // Initial payout window after launch.
 
 // ---------------------------------------------------------------------------
 
-export interface MirrorClaimerInput {
+export interface LaunchClaimerInput {
   /** 0..N-1 in the order the claimers appear in the on-chain claimers[]. */
   slotIndex: number;
   /** The on-chain claimer pubkey (Bags-managed PDA for social handles, or
@@ -67,26 +66,24 @@ export interface MirrorClaimerInput {
   initialBps: number;
 }
 
-export interface MirrorLaunchInput {
+export interface RecordLaunchInput {
   projectId: string;
   baseMint: string;
   /** Project owner / launching wallet (initial on-chain admin). */
   adminPubkey: string;
-  claimers: MirrorClaimerInput[];
-  /** 72 (3d) | 120 (5d) | 168 (7d). v1.1 default is 72. */
+  claimers: LaunchClaimerInput[];
+  /** 72 (3d) | 120 (5d) | 168 (7d). Default is 72. */
   steadyStateCadenceHours: 72 | 120 | 168;
 }
 
-export interface MirrorLaunchResult {
+export interface RecordLaunchResult {
   feeShareConfigId: string;
   payoutScheduleId: string;
   feeShareConfigPda: string;
-  /** True if a row already existed and was returned unchanged. */
-  alreadyMirrored: boolean;
 }
 
 /**
- * Populate the v1.1 mirror tables for a successfully-launched project.
+ * Populate the launch tables for a successfully-launched project.
  *
  * Validates that:
  *  - claimers.length is 1..100
@@ -96,17 +93,16 @@ export interface MirrorLaunchResult {
  *
  * Computes the on-chain PDAs (fee_share_config, fee_share_authority) from
  * the IDL-derived seed scheme — same derivation Bags' on-chain program
- * uses. Sets payout_schedules.next_run_at to now + 24h (the v1.1 first-run
- * gratification window per the cadence ramp-up).
+ * uses. Sets payout_schedules.next_run_at to now + 24h (the cadence
+ * ramp-up's first-run window).
  *
- * Idempotency: if a bags_fee_share_configs row already exists for this
- * project, returns its IDs unchanged. Use `confirmManagerDelegation` to
- * record the manager-set step separately.
+ * Throws if a bags_fee_share_configs row already exists for this project.
+ * The launch wizard owns the single attempt; there is no replay path.
  */
-export async function mirrorLaunchToV11Tables(
-  input: MirrorLaunchInput,
-): Promise<MirrorLaunchResult> {
-  validateMirrorInput(input);
+export async function recordLaunch(
+  input: RecordLaunchInput,
+): Promise<RecordLaunchResult> {
+  validateLaunchInput(input);
 
   const existing = await dbHttp
     .select()
@@ -114,18 +110,9 @@ export async function mirrorLaunchToV11Tables(
     .where(eq(bagsFeeShareConfigs.projectId, input.projectId))
     .limit(1);
   if (existing[0]) {
-    const cfg = existing[0];
-    const sched = await dbHttp
-      .select({ id: payoutSchedules.id })
-      .from(payoutSchedules)
-      .where(eq(payoutSchedules.projectId, input.projectId))
-      .limit(1);
-    return {
-      feeShareConfigId: cfg.id,
-      payoutScheduleId: sched[0]?.id ?? "",
-      feeShareConfigPda: cfg.feeShareConfigPda,
-      alreadyMirrored: true,
-    };
+    throw new Error(
+      `recordLaunch: a bags_fee_share_configs row already exists for project ${input.projectId} — refusing to overwrite. Manual cleanup required.`,
+    );
   }
 
   const baseMintPk = new PublicKey(input.baseMint);
@@ -153,7 +140,7 @@ export async function mirrorLaunchToV11Tables(
     .returning({ id: bagsFeeShareConfigs.id });
   if (!insertedConfig) {
     throw new Error(
-      "mirrorLaunchToV11Tables: failed to insert bags_fee_share_configs row",
+      "recordLaunch: failed to insert bags_fee_share_configs row",
     );
   }
   const feeShareConfigId = insertedConfig.id;
@@ -186,7 +173,7 @@ export async function mirrorLaunchToV11Tables(
     .returning({ id: payoutSchedules.id });
   if (!insertedSchedule) {
     throw new Error(
-      "mirrorLaunchToV11Tables: failed to insert payout_schedules row",
+      "recordLaunch: failed to insert payout_schedules row",
     );
   }
 
@@ -196,7 +183,6 @@ export async function mirrorLaunchToV11Tables(
     targetType: "project",
     targetId: input.projectId,
     metadata: {
-      v11_mirror: true,
       feeShareConfigId,
       feeShareConfigPda: feeShareConfigPda.toBase58(),
       claimerCount: input.claimers.length,
@@ -209,11 +195,10 @@ export async function mirrorLaunchToV11Tables(
     feeShareConfigId,
     payoutScheduleId: insertedSchedule.id,
     feeShareConfigPda: feeShareConfigPda.toBase58(),
-    alreadyMirrored: false,
   };
 }
 
-function validateMirrorInput(input: MirrorLaunchInput): void {
+function validateLaunchInput(input: RecordLaunchInput): void {
   if (input.claimers.length === 0 || input.claimers.length > 100) {
     throw new Error(
       `claimers.length must be 1..100; got ${input.claimers.length}`,
@@ -275,7 +260,7 @@ export interface PreparedManagerDelegation {
  * Throws if:
  *  - hasCredentials.solana() / hasCredentials.managerKey() are false
  *    (we cannot offer a manager pubkey to set)
- *  - The project doesn't have a v1.1 mirror row (mirror first)
+ *  - The project doesn't have a bags_fee_share_configs row (record launch first)
  *  - The mirror row already has a manager_pubkey (already delegated)
  */
 export async function prepareManagerDelegationTransaction(
@@ -346,7 +331,7 @@ export interface ConfirmManagerDelegationInput {
 
 /**
  * After the project owner broadcasts the signed delegation tx, confirm it
- * on-chain and update the v1.1 mirror.
+ * on-chain and update the config row.
  *
  * Verification: confirms the tx is finalized AND the on-chain config's
  * manager field now matches our managerSigner().publicKey (read via the

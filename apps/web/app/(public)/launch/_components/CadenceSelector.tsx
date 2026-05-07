@@ -20,7 +20,7 @@ export interface CadenceSelectorProps {
 }
 
 /**
- * v1.1 cadence picker — chooses how often the BPS rebalance runs after
+ * Cadence picker — chooses how often the BPS rebalance runs after
  * the fixed 24h-then-3d ramp-up. Three options: 3 / 5 / 7 days.
  *
  * Why fixed ramp-up: the first payout window (24h) gives early

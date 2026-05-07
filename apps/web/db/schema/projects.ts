@@ -145,17 +145,17 @@ export interface PayoutConfig {
    *  this value, paid normally. Off by default. */
   communityVerifiedThresholdLamports?: number;
   /**
-   * v1.1 — hours between BPS rebalances after the 24h-then-3d ramp-up.
+   * hours between BPS rebalances after the 24h-then-3d ramp-up.
    * Optional during transition; written from the launch wizard's
    * CadenceSelector. Mirrored onto payout_schedules.steadyStateCadenceHours.
    */
   steadyStateCadenceHours?: 72 | 120 | 168;
   /**
-   * v1.1 — maximum contributor claimer slots filled at launch.
+   * maximum contributor claimer slots filled at launch.
    */
   maxClaimers?: number;
   /**
-   * v1.1 — platform fee in BPS (mirrored from the wizard onto
+   * platform fee in BPS (mirrored from the wizard onto
    * `bags_fee_share_configs.adminPubkey` config). Optional during
    * transition; null in legacy v1.0 rows.
    */

@@ -6,25 +6,23 @@
 
 ---
 
-## v1.1 architecture migration in flight (2026-05-06)
+## Architecture pointer (2026-05-07)
 
-The v1.0 architecture below describes an off-chain SOL dispatch + escrow_holdings
-+ processClaim model. **That model is being deleted.** Inspection of the Bags
-`fee-share-v2` IDL revealed claimer pubkeys are immutable post-finalize, which
-makes the off-chain dispatch surface structurally redundant.
-
-The v1.1 model is **Bags-native**: GitShipt is the on-chain manager of each
-project's fee-share config, signs `update_fee_config` BPS rebalances on a
-configurable cadence (24h initial → 3d second → 3/5/7d configurable), and
-contributors claim directly through Bags' GitHub-OAuth UI. We never custody.
+The architecture sections below this pointer were written against an
+earlier scaffold that assumed off-chain SOL dispatch + escrow + processClaim.
+The current architecture is **Bags-native**: GitShipt holds the on-chain
+manager role per project, signs `manager_update_fee_config` BPS rebalances
+on a configurable cadence (24h initial → 3d second → 3/5/7d), and
+contributors claim directly through Bags' GitHub-OAuth UI. GitShipt never
+custodies SOL.
 
 - Decision record: [`docs/adr/0001-bags-native-payout.md`](docs/adr/0001-bags-native-payout.md)
-- Implementation plan: [`docs/architecture/bags-native/PLAN.md`](docs/architecture/bags-native/PLAN.md)
+- Research backing: [`docs/architecture/bags-native/RESEARCH.md`](docs/architecture/bags-native/RESEARCH.md)
 - IDL inspection: `bun run scripts/inspect-bags-program.ts inspect-program`
 
-When the migration completes, this PRD's architecture section will be rewritten.
-Until then, **trust SPEC.md and the ADR over this PRD's architecture text** for
-any decision touching payouts, escrow, claims, or wallet linking.
+For any decision touching payouts, escrow, claims, or wallet linking,
+trust SPEC.md + the ADR over this PRD's architecture text until the PRD
+itself is rewritten.
 
 ---
 

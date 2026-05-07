@@ -63,15 +63,13 @@ the product model.
 ## Explicit non-goals (do not build)
 
 - An off-chain SOL dispatch loop that sends fees from a GitShipt-controlled
-  wallet to contributor wallets. (Was the original v1.0 architecture, deleted
-  in the v1.1 Bags-native migration. Bags' on-chain vaults custody fees;
-  contributors claim them directly via Bags' UI.)
+  wallet to contributor wallets. Bags' on-chain vaults custody fees;
+  contributors claim them directly via Bags' UI.
 - An `escrow_holdings` table or any GitShipt-side custody of contributor
-  funds. (Same. Deleted in v1.1.)
+  funds.
 - A SIWS-based contributor wallet-linking flow on GitShipt. Contributors link
-  GitHub to Bags directly through Bags' OAuth. (Same. Deleted in v1.1.)
+  GitHub to Bags directly through Bags' OAuth.
 - A `processClaim` workflow or `/api/claims/*` route on GitShipt's side.
-  (Same. Deleted in v1.1.)
 - Daily token re-launches per project, or any "rotate token" model. Bags
   `fee-share-v2` makes claimer pubkeys immutable post-finalize; we live within
   that constraint by rebalancing BPS rather than rotating claimers.
@@ -80,12 +78,8 @@ the product model.
   PDA is custodial-keyed, not derivable. Unlinked contributors are skipped at
   launch, not reserved.
 - A 7-day or N-day grace/claim window for contributors who haven't linked a
-  wallet. (Specifically forbidden — invented in a past session, reverted.
-  Subsumed by the no-off-chain-custody invariant above; listed explicitly to
-  prevent regression.)
-- A 14-day or N-day migration window for existing projects to install
-  shipshape. (Same principle. v0 → v1 promotion happens in one cut-over via
-  a single SQL backfill per shipshape design §11; no grace.)
+  wallet. Subsumed by the no-off-chain-custody invariant above; listed
+  explicitly because past sessions kept inventing it.
 - A custom Incorporation feature, signing flow, or KYC layer. Bags owns this.
 - SPL token support, "future-proofing" for non-SOL payouts, or generic
   multi-asset abstractions.

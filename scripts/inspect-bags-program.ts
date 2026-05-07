@@ -344,11 +344,11 @@ function decodeFeeShareConfigHeader(data: Buffer): FeeShareConfigHeader | null {
   };
 }
 
-// --- experiment (Phase 3 stub) --------------------------------------------
+// --- experiment (live, gated, stubbed) -----------------------------------
 
 function experiment(): void {
   if (process.env.LIVE !== "1") {
-    console.log(bold("\n=== Phase 3 experiment plan (DRY) ===\n"));
+    console.log(bold("\n=== Mainnet experiment plan (DRY) ===\n"));
     console.log("This phase is GATED behind LIVE=1 and is NOT yet implemented.");
     console.log("Run with LIVE=1 to see the (currently stubbed) plan invocation.\n");
     console.log("Steps the live experiment would perform:");
@@ -368,7 +368,7 @@ function experiment(): void {
     console.log("  9. Print pass/fail conclusion + cleanup instructions.");
     console.log("");
     console.log("Implement when you're ready to spend ~0.05 SOL on a definitive answer.");
-    console.log("The IDL inspection in Phase 1 already gives high confidence — Phase 3 is belt-and-suspenders.");
+    console.log("The IDL inspection (`inspect-program`) already gives high confidence — this experiment is belt-and-suspenders.");
     return;
   }
   console.error(
@@ -401,9 +401,9 @@ function help(): void {
 Spike: Bags fee-share rotation behavior.
 
 Subcommands:
-  inspect-program          Phase 1 — IDL inspection (free, deterministic).
-  probe-live [--limit=N]   Phase 2 — Read live FeeShareConfig accounts. Requires HELIUS_RPC_URL + BAGS_API_KEY.
-  experiment               Phase 3 — Mainnet rotation experiment. Stubbed; gated behind LIVE=1.
+  inspect-program          IDL inspection (free, deterministic).
+  probe-live [--limit=N]   Read live FeeShareConfig accounts. Requires HELIUS_RPC_URL + BAGS_API_KEY.
+  experiment               Mainnet rotation experiment. Stubbed; gated behind LIVE=1.
 
 See docs/architecture/bags-native/RESEARCH.md for the question this answers.
 `);

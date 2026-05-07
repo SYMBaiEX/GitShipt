@@ -121,7 +121,13 @@ const REQUIRED = [
     name: "SOLANA_PAYOUT_KEYPAIR",
     scope: "Solana",
     sensitive: true,
-    note: "Base58 hot payout keypair. Never use the cold treasury key.",
+    note: "Base58 hot payout keypair. Never use the cold treasury key. (legacy v1.0; deleted in Phase 6)",
+  },
+  {
+    name: "SOLANA_MANAGER_KEYPAIR",
+    scope: "Solana",
+    sensitive: true,
+    note: "Base58 keypair holding the on-chain fee-share-config admin role per project. v1.1 manager — BPS-rebalance authority only.",
   },
   {
     name: "SOLANA_TREASURY_ADDRESS",

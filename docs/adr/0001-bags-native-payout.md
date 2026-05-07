@@ -44,10 +44,19 @@ without product benefit.
 
 Migrate to a **Bags-native payout architecture**:
 
-1. **GitShipt is the on-chain manager** of each project's fee-share config,
-   delegated by Bags admin via `update_fee_config_manager` immediately after
-   launch. Manager authority is bounded to BPS rebalancing within the
-   existing claimer set.
+1. **GitShipt is the on-chain admin** of each project's fee-share config,
+   transferred from the launching wallet via the existing
+   `getTransferAdminTransaction` (`fee-share/admin/transfer-tx`) endpoint
+   shortly after launch. Authority is bounded in practice to BPS
+   rebalancing within the existing claimer set, since the on-chain program
+   does not expose claimer-replacement at any role and we never call the
+   secondary admin operations (set partner, extend pre-finalize). The
+   "manager" naming used elsewhere (env var `SOLANA_MANAGER_KEYPAIR`,
+   `lib/solana/manager-signer.ts`) reflects the conceptual role; the
+   on-chain implementation is the admin role because Bags does not expose
+   a REST endpoint for `update_fee_config_manager` and we are not building
+   a direct Anchor client just to call it. See the implementation note in
+   `lib/solana/manager-signer.ts`.
 
 2. **Daily snapshot → manager-keypair BPS rebalance** on a per-project
    configurable cadence (24h initial → 3d second → 3/5/7d configurable

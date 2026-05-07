@@ -80,6 +80,17 @@ const serverEnvSchema = z.object({
   // Solana
   HELIUS_RPC_URL: optionalUrl,
   SOLANA_PAYOUT_KEYPAIR: optionalString,
+  /**
+   * Bags-native v1.1: separate keypair that holds the on-chain
+   * fee-share-config admin role per project. Authority is bounded to BPS
+   * rebalance (`update_fee_config` ix) — cannot drain funds, cannot
+   * replace claimer pubkeys (impossible per IDL), cannot extend the
+   * config (only allowed pre-finalize). The "manager" naming reflects
+   * the conceptual role; on-chain it's implemented as the fee-share
+   * config's admin since Bags doesn't expose the manager-delegation
+   * REST endpoint. See docs/adr/0001-bags-native-payout.md.
+   */
+  SOLANA_MANAGER_KEYPAIR: optionalString,
   SOLANA_TREASURY_ADDRESS: z.preprocess(
     (value) =>
       typeof value === "string" && value.trim() === "" ? undefined : value,
@@ -205,6 +216,7 @@ export const hasCredentials = {
   bagsPartner: () => Boolean(serverEnv().BAGS_PARTNER_WALLET),
   solana: () => Boolean(serverEnv().HELIUS_RPC_URL),
   payoutKey: () => Boolean(serverEnv().SOLANA_PAYOUT_KEYPAIR),
+  managerKey: () => Boolean(serverEnv().SOLANA_MANAGER_KEYPAIR),
   cron: () => Boolean(serverEnv().CRON_SECRET),
 };
 
@@ -353,6 +365,7 @@ export function productionReadiness(): ProductionReadiness {
     ["BAGS_PARTNER_WALLET", env.BAGS_PARTNER_WALLET],
     ["HELIUS_RPC_URL", env.HELIUS_RPC_URL],
     ["SOLANA_PAYOUT_KEYPAIR", env.SOLANA_PAYOUT_KEYPAIR],
+    ["SOLANA_MANAGER_KEYPAIR", env.SOLANA_MANAGER_KEYPAIR],
     ["CRON_SECRET", env.CRON_SECRET],
     ["IDEMPOTENCY_KEY_SECRET", env.IDEMPOTENCY_KEY_SECRET],
   ];

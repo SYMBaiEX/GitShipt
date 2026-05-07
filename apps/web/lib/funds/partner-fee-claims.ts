@@ -4,7 +4,7 @@ import type { PartnerClaimStatsJson } from "@/db/schema/fund-reconciliation";
 import { bags } from "@/lib/bags/client";
 import { applyDbRlsContext, enterDbWorkflowContext } from "@/lib/db-rls";
 import { derivePartnerClaimDeltas } from "@/lib/funds/accounting";
-import { isKillSwitchEnabled } from "@/lib/payouts/safety";
+import { isKillSwitchEnabled } from "@/lib/kill-switch";
 import { solanaConnection } from "@/lib/solana/connection";
 import { and, eq, inArray, sql } from "drizzle-orm";
 

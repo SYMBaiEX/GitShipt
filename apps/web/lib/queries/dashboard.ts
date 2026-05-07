@@ -6,7 +6,6 @@ import {
   contributorClaims,
   payouts,
   payoutRecipients,
-  escrowHoldings,
   wallets,
   ghIndexerState,
   projectMemberships,
@@ -206,21 +205,8 @@ async function getProjectKPIsUncached(projectId: string): Promise<ProjectKPIs> {
             eq(payouts.status, "completed"),
           ),
         ),
-      dbHttp
-        .select({
-          total: sql<string>`coalesce(sum(${escrowHoldings.amountLamports}), 0)::text`,
-        })
-        .from(escrowHoldings)
-        .innerJoin(
-          contributors,
-          eq(contributors.id, escrowHoldings.contributorId),
-        )
-        .where(
-          and(
-            eq(contributors.projectId, projectId),
-            sql`${escrowHoldings.drainedAt} is null`,
-          ),
-        ),
+      // Bags-native: no off-chain escrow surface. Always zero.
+      Promise.resolve([{ total: "0" }] as const),
       dbHttp
         .select({ at: sql<Date | null>`max(executed_at)` })
         .from(payouts)
@@ -361,24 +347,14 @@ async function getMyEarningsUncached(userId: string): Promise<MyEarnings> {
     .where(inArray(payoutRecipients.contributorId, contribIds))
     .groupBy(projects.id, projects.ghOwner, projects.ghRepo);
 
-  const escrowAggRows = await dbHttp
-    .select({
-      projectId: projects.id,
-      projectSlug: sql<string>`${projects.ghOwner} || '/' || ${projects.ghRepo}`,
-      escrow: sql<string>`coalesce(sum(${escrowHoldings.amountLamports}) filter (where ${escrowHoldings.drainedAt} is null), 0)::text`,
-    })
-    .from(escrowHoldings)
-    .innerJoin(contributors, eq(contributors.id, escrowHoldings.contributorId))
-    .innerJoin(projects, eq(projects.id, contributors.projectId))
-    .where(inArray(escrowHoldings.contributorId, contribIds))
-    .groupBy(projects.id, projects.ghOwner, projects.ghRepo);
-
-  const escrowBySlug = new Map(
-    escrowAggRows.map((r) => [
-      r.projectSlug,
-      { escrow: BigInt(r.escrow ?? "0"), projectId: r.projectId },
-    ]),
-  );
+  // Bags-native architecture: contributors claim through Bags' UI; we no
+  // longer hold escrow on their behalf. Pending-escrow is structurally
+  // always zero. Once `bags_claim_events` is consumed by this query, the
+  // lifetime side will switch to that source too.
+  const escrowBySlug = new Map<
+    string,
+    { escrow: bigint; projectId: string }
+  >();
   const lifetimeBySlug = new Map(
     lifetimeRows.map((r) => [
       r.projectSlug,

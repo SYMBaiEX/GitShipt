@@ -7,8 +7,6 @@ import {
   loadProjectStep,
   loadContributorsStep,
   freezeStep,
-  prepareFeeShareUpdateStep,
-  executeFeeShareUpdateStep,
   snapshotRevalidateProjectCachesStep,
   snapshotWriteFeedDigestStep,
   startTakeProjectSnapshotStep,
@@ -75,15 +73,9 @@ export async function takeProjectSnapshot(projectId: string): Promise<{
       leaderboard,
     });
 
-    const preparedUpdate = await prepareFeeShareUpdateStep({
-      project,
-      snapshotId: result.snapshotId,
-      snapshotPeriod: result.snapshotPeriod,
-      leaderboard,
-    });
-    if (preparedUpdate.attemptId) {
-      await executeFeeShareUpdateStep(preparedUpdate.attemptId);
-    }
+    // Bags-native architecture: BPS rebalance happens on its own cadence in
+    // workflows/rebalanceBps.ts driven by payout_schedules.next_run_at, NOT
+    // here. The takeSnapshot workflow's job ends at freezing the leaderboard.
 
     // Write the period_digest feed card before revalidating caches so the
     // first reader after this snapshot sees the new card. Failures inside

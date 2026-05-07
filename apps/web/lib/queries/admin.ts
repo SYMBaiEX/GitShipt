@@ -6,7 +6,6 @@ import {
   payouts,
   snapshots,
   contributors,
-  escrowHoldings,
   auditLogs,
   platformConfig,
   payoutRecipients,
@@ -112,12 +111,8 @@ async function getOpsKpisUncached(
       .select({ c: count() })
       .from(payouts)
       .where(eq(payouts.status, "failed")),
-    dbHttp
-      .select({
-        total: sql<string>`COALESCE(SUM(${escrowHoldings.amountLamports}), 0)::text`,
-      })
-      .from(escrowHoldings)
-      .where(sql`${escrowHoldings.drainedAt} IS NULL`),
+    // Bags-native: no off-chain escrow surface, always zero.
+    Promise.resolve([{ total: "0" }] as const),
   ]);
 
   const escrowLamports = BigInt(escrowRows[0]?.total ?? "0");

@@ -11,9 +11,6 @@
   "crons": [
     { "path": "/api/cron/index-github", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/snapshot", "schedule": "0 0 * * *" },
-    { "path": "/api/cron/payout", "schedule": "30 0 * * *" },
-    { "path": "/api/cron/reconcile-funds", "schedule": "*/15 * * * *" },
-    { "path": "/api/cron/expire-escrow", "schedule": "0 1 * * *" },
     { "path": "/api/cron/health", "schedule": "* * * * *" },
     { "path": "/api/cron/publish-kpis", "schedule": "* * * * *" },
     { "path": "/api/cron/audit-chain", "schedule": "0 */6 * * *" },

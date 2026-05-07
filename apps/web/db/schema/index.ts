@@ -4,9 +4,11 @@ export * from "./wallets";
 export * from "./projects";
 export * from "./contributors";
 export * from "./snapshots";
+// Note: legacy v1.0 ledger. Read-only consumers (lib/queries/*) still use it
+// for historical "your earnings" displays. No new code writes to it; new
+// payout state lives in bags_fee_share_configs / bags_rebalance_attempts /
+// bags_claim_events / payout_schedules.
 export * from "./payouts";
-export * from "./escrow";
-export * from "./fee-share-updates";
 export * from "./fund-reconciliation";
 export * from "./pending-admin-actions";
 export * from "./audit";

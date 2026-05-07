@@ -4,18 +4,13 @@ export type AdminWorkflowName =
   | "healthPulse"
   | "indexGithubDeltas"
   | "takeSnapshot"
-  | "executePayout"
-  | "expireEscrow"
-  | "reconcileFunds"
+  | "rebalanceBps"
   | "publishKpis";
 
 export function workflowRetriggerPermission(
   workflowName: AdminWorkflowName,
 ): Permission {
-  if (workflowName === "executePayout") return "payouts.trigger";
-  if (workflowName === "expireEscrow" || workflowName === "reconcileFunds") {
-    return "platform.maintenance";
-  }
+  if (workflowName === "rebalanceBps") return "payouts.trigger";
   if (workflowName === "takeSnapshot") return "snapshot.force";
   return "admin.workflows.inspect";
 }

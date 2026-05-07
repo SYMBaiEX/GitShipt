@@ -5,7 +5,7 @@
  * All return values are JSON-serializable (no Date instances; bigints as
  * decimal strings) so they survive workflow step boundaries.
  */
-import { FatalError, getStepMetadata } from "workflow";
+import { FatalError } from "workflow";
 import { dbHttp } from "@/db";
 import {
   contributors,
@@ -25,13 +25,6 @@ import {
 } from "@/lib/payouts/distribution";
 import { computeMerkleRoot } from "@/lib/payouts/merkle";
 import { enterDbWorkflowContext } from "@/lib/db-rls";
-import { withIdempotency } from "@/lib/idempotency";
-import {
-  executeFeeShareUpdateAttempt,
-  prepareFeeShareUpdateAttempt,
-  type ExecutedFeeShareUpdate,
-  type PreparedFeeShareUpdate,
-} from "./fee-share-update-helpers";
 import type { WorkflowLock } from "@/lib/workflow-locks";
 
 export type { WorkflowLock };
@@ -331,9 +324,7 @@ export async function snapshotReleaseLockStep(
 export async function snapshotAssertNotKilled(): Promise<void> {
   "use step";
   enterDbWorkflowContext("takeSnapshot:assertNotKilled");
-  // @/lib/payouts/safety transitively imports @solana/web3.js; lazy-load
-  // so the workflow bundle's static graph never touches it.
-  const { isKillSwitchEnabled } = await import("@/lib/payouts/safety");
+  const { isKillSwitchEnabled } = await import("@/lib/kill-switch");
   const killed = await isKillSwitchEnabled();
   if (killed) {
     throw new FatalError("kill_switch_enabled: takeSnapshot aborted");
@@ -388,27 +379,6 @@ export async function freezeStep(
   "use step";
   enterDbWorkflowContext("takeSnapshot:freeze");
   return await freezeSnapshot(args);
-}
-
-export async function prepareFeeShareUpdateStep(
-  args: Parameters<typeof prepareFeeShareUpdateAttempt>[0],
-): Promise<PreparedFeeShareUpdate> {
-  "use step";
-  enterDbWorkflowContext("takeSnapshot:prepareFeeShareUpdate");
-  return await prepareFeeShareUpdateAttempt(args);
-}
-
-export async function executeFeeShareUpdateStep(
-  attemptId: string,
-): Promise<ExecutedFeeShareUpdate> {
-  "use step";
-  enterDbWorkflowContext("takeSnapshot:executeFeeShareUpdate");
-  const { stepId } = getStepMetadata();
-  return await withIdempotency(
-    `${stepId}:${attemptId}`,
-    () => executeFeeShareUpdateAttempt(attemptId),
-    { scope: "workflow:fee-share-update" },
-  );
 }
 
 export async function snapshotRevalidateProjectCachesStep(

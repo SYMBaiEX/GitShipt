@@ -4,11 +4,9 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { start } from "workflow/api";
 import { z } from "zod";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { dbHttp, dbPool } from "@/db";
 import {
-  payoutRecipients,
-  payouts,
   projects,
   projectMemberships,
   users,
@@ -55,12 +53,7 @@ import {
 import { healthPulse } from "@/workflows/healthPulse";
 import { indexGithubDeltas } from "@/workflows/indexGithubDeltas";
 import { takeSnapshot, takeProjectSnapshot } from "@/workflows/takeSnapshot";
-import {
-  executePayout,
-  processSnapshotPayout,
-} from "@/workflows/executePayout";
-import { expireEscrow } from "@/workflows/expireEscrow";
-import { reconcileFunds } from "@/workflows/reconcileFunds";
+import { rebalanceBps } from "@/workflows/rebalanceBps";
 import { publishKpis } from "@/workflows/publishKpis";
 import { computeLeaderboard as computeLeaderboardWorkflow } from "@/workflows/computeLeaderboard";
 import {
@@ -145,8 +138,6 @@ const DirectLaunchSchema = CreateProjectBodySchema.extend({
   idempotencyKey: z.string().min(8).optional(),
 });
 
-const MANUAL_RECONCILIATION_ERROR =
-  "manual_reconciliation_required_external_side_effect_may_have_succeeded";
 const LAUNCH_SUBMISSION_PENDING_PREFIX = "pending:";
 
 export async function directLaunchProject(input: unknown): Promise<{
@@ -772,163 +763,11 @@ export async function overrideScoringConfig(
 // Payouts
 // ---------------------------------------------------------------------------
 
-const PayoutIdSchema = z.object({
-  payoutId: z.string().min(1),
-  idempotencyKey: z.string().min(8).optional(),
-});
-
-export async function retryPayout(input: unknown): Promise<{ ok: true }> {
-  const parsed = PayoutIdSchema.parse(input);
-  const ctx = await requireSession();
-
-  const [row] = await dbHttp
-    .select({
-      id: payouts.id,
-      status: payouts.status,
-      attemptCount: payouts.attemptCount,
-      projectId: payouts.projectId,
-      snapshotId: payouts.snapshotId,
-      claimSignature: payouts.claimSignature,
-      lastError: payouts.lastError,
-    })
-    .from(payouts)
-    .where(eq(payouts.id, parsed.payoutId))
-    .limit(1);
-  if (!row) throw new Error("payout_not_found");
-
-  await requirePermission("payouts.retry", {
-    userId: ctx.userId,
-    projectId: row.projectId,
-  });
-
-  if (row.status !== "failed") {
-    throw new Error("payout_not_retryable");
-  }
-  if (
-    row.claimSignature ||
-    row.lastError?.includes(MANUAL_RECONCILIATION_ERROR)
-  ) {
-    throw new Error("payout_retry_requires_manual_reconciliation");
-  }
-  const [recipientRisk] = await dbHttp
-    .select({ count: sql<number>`count(*)::int` })
-    .from(payoutRecipients).where(sql`
-      ${payoutRecipients.payoutId} = ${row.id}
-      and (
-        ${payoutRecipients.status} = 'sending'
-        or ${payoutRecipients.sendAttemptId} is not null
-        or ${payoutRecipients.error} like ${`%${MANUAL_RECONCILIATION_ERROR}%`}
-      )
-    `);
-  if ((recipientRisk?.count ?? 0) > 0) {
-    throw new Error("payout_retry_requires_manual_reconciliation");
-  }
-
-  await withIdempotency(
-    parsed.idempotencyKey ?? `payout:retry:${row.id}`,
-    async () => {
-      await dbHttp
-        .update(payouts)
-        .set({
-          status: "claiming",
-          attemptCount: row.attemptCount + 1,
-          lastError: null,
-          startedAt: new Date(),
-        })
-        .where(eq(payouts.id, row.id));
-      const workflowRun = await start(processSnapshotPayout, [row.snapshotId]);
-      await audit({
-        actorUserId: ctx.userId,
-        action: "payout.retry",
-        targetType: "payout",
-        targetId: row.id,
-        metadata: {
-          previousStatus: row.status,
-          attempt: row.attemptCount + 1,
-          workflowRunId: workflowRun.runId,
-        },
-        ip: ctx.ip,
-        userAgent: ctx.userAgent,
-      });
-    },
-    { scope: `admin:payout:retry:${row.projectId}:${ctx.userId}` },
-  );
-
-  revalidatePath("/admin/payouts");
-  await updateProjectCaches(row.projectId);
-  return { ok: true };
-}
-
-const CancelPayoutSchema = DestructiveBaseSchema.extend({
-  payoutId: z.string().min(1),
-});
-
-export async function cancelPayout(input: unknown): Promise<AdminActionResult> {
-  const parsed = CancelPayoutSchema.parse(input);
-  const ctx = await requireSession();
-
-  const [row] = await dbHttp
-    .select({
-      id: payouts.id,
-      status: payouts.status,
-      projectId: payouts.projectId,
-    })
-    .from(payouts)
-    .where(eq(payouts.id, parsed.payoutId))
-    .limit(1);
-  if (!row) throw new Error("payout_not_found");
-
-  if (!["pending", "claiming", "distributing"].includes(row.status)) {
-    throw new Error("payout_not_cancellable");
-  }
-
-  const idempotencyKey =
-    parsed.idempotencyKey ??
-    deriveKey("admin-cancel-payout", row.id, ctx.userId);
-
-  const result = await withIdempotency(
-    idempotencyKey,
-    async () =>
-      runDestructiveAction(async () => {
-        await destructiveAction(
-          {
-            actorUserId: ctx.userId,
-            permission: "payouts.cancel",
-            projectId: row.projectId,
-            reason: parsed.reason,
-            targetName: row.id,
-            typedConfirmation: parsed.typedConfirmation,
-            mfaConfirmedAtMs: parsed.mfaConfirmedAtMs,
-            ip: ctx.ip,
-            userAgent: ctx.userAgent,
-            cosign: irreversibleCosign({
-              pendingActionId: parsed.pendingActionId,
-              idempotencyKey,
-            }),
-          },
-          {
-            action: "payout.cancel",
-            targetType: "payout",
-            targetId: row.id,
-            metadata: { previousStatus: row.status },
-          },
-          async () => {
-            await dbHttp
-              .update(payouts)
-              .set({ status: "cancelled" })
-              .where(eq(payouts.id, row.id));
-          },
-        );
-        return { ok: true } as const;
-      }),
-    { scope: `admin:payout:cancel:${row.projectId}:${ctx.userId}` },
-  );
-  if (!result.ok) return result;
-
-  revalidatePath("/admin/payouts");
-  await updateProjectCaches(row.projectId);
-  return result;
-}
+// Legacy payout retry/cancel actions deleted with the off-chain dispatch
+// loop. Under the Bags-native architecture there is no per-recipient
+// dispatch to retry — the cadence cron either re-runs the BPS rebalance
+// (idempotent on plan_hash) or fails loudly and is reset by the operator
+// flipping the schedule's `paused_at`.
 
 const ForceSnapshotSchema = z.object({
   projectId: z.string().min(1),
@@ -1510,46 +1349,10 @@ export async function sybilFlagUser(input: unknown): Promise<{ ok: true }> {
   return { ok: true };
 }
 
-// ---------------------------------------------------------------------------
-// Treasury (read-only top-up stub)
-// ---------------------------------------------------------------------------
-
-const TopUpHotWalletSchema = z
-  .object({
-    idempotencyKey: z.string().min(8).optional(),
-  })
-  .optional();
-
-export async function topUpHotWallet(
-  input?: z.input<typeof TopUpHotWalletSchema>,
-): Promise<{ ok: false; reason: string }> {
-  const parsed = TopUpHotWalletSchema.parse(input) ?? {};
-  const ctx = await requireSession();
-  await requirePermission("platform.treasury.topup", { userId: ctx.userId });
-  await withIdempotency(
-    parsed.idempotencyKey ?? deriveKey("admin-topup-hot-wallet", ctx.userId),
-    async () => {
-      await audit({
-        actorUserId: ctx.userId,
-        action: "treasury.topup",
-        targetType: "treasury",
-        targetId: "hot_wallet",
-        metadata: {
-          stub: true,
-          reason: "manual cold-treasury topup remains offline",
-        },
-        ip: ctx.ip,
-        userAgent: ctx.userAgent,
-      });
-      return { ok: false as const, reason: "offline_topup_required" };
-    },
-    { scope: `admin:treasury:topup:${ctx.userId}` },
-  );
-  return {
-    ok: false,
-    reason: "Hot wallet top-up requires offline cold-treasury signing.",
-  };
-}
+// Legacy hot-wallet top-up action deleted with the off-chain dispatch loop.
+// The Bags-native architecture has no hot wallet — the manager keypair only
+// pays tx fees and is topped up out-of-band by the operator if it ever runs
+// low. No admin action surface needed for that.
 
 // ---------------------------------------------------------------------------
 // Workflow re-trigger
@@ -1560,9 +1363,7 @@ const TriggerWorkflowSchema = z.object({
     "healthPulse",
     "indexGithubDeltas",
     "takeSnapshot",
-    "executePayout",
-    "expireEscrow",
-    "reconcileFunds",
+    "rebalanceBps",
     "publishKpis",
   ]),
   idempotencyKey: z.string().min(8).optional(),
@@ -1596,13 +1397,9 @@ export async function retriggerWorkflow(
             ? await start(indexGithubDeltas, [])
             : parsed.name === "takeSnapshot"
               ? await start(takeSnapshot, [])
-              : parsed.name === "executePayout"
-                ? await start(executePayout, [])
-                : parsed.name === "expireEscrow"
-                  ? await start(expireEscrow, [])
-                  : parsed.name === "reconcileFunds"
-                    ? await start(reconcileFunds, [])
-                    : await start(publishKpis, []);
+              : parsed.name === "rebalanceBps"
+                ? await start(rebalanceBps, [])
+                : await start(publishKpis, []);
 
       await audit({
         actorUserId: ctx.userId,

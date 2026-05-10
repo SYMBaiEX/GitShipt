@@ -128,9 +128,9 @@ const serverEnvSchema = z.object({
   PLATFORM_FEE_BPS_DEFAULT: z.coerce
     .number()
     .int()
-    .min(200)
+    .min(0)
     .max(10_000)
-    .default(500),
+    .default(0),
   ADMIN_EMAIL_ALLOWLIST: z.string().optional(),
   KILL_SWITCH_ENABLED: z.coerce.boolean().default(false),
 

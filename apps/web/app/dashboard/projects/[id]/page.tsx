@@ -36,7 +36,6 @@ import { Badge } from "@repo/ui";
 import { Button } from "@repo/ui";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 
-
 export default function ProjectOverviewPage({
   params,
 }: {
@@ -113,8 +112,8 @@ async function ProjectOverviewPageContent({
           accent="primary"
         />
         <StatTile
-          label="Pending Escrow"
-          value={formatSol(kpis.pendingEscrowLamports, 4)}
+          label="GitShipt Custody"
+          value="0.0000 SOL"
           icon={Sparkles}
           sub={
             kpis.lastSnapshotAt
@@ -167,7 +166,6 @@ function RecentActivityCard({ rows }: { rows: RecentAuditEntry[] }) {
                       date={r.createdAt}
                       className="text-caption text-fg-muted"
                     />
-
                   </div>
                   <div className="text-caption text-fg-muted truncate">
                     {r.actorName ?? "system"}

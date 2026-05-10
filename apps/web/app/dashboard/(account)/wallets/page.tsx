@@ -18,7 +18,6 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { CopyButton } from "@/components/shared";
 import { solscanAddressUrl } from "@/lib/solana/explorer";
 
-
 export default function WalletsPage() {
   return (
     <Suspense fallback={null}>
@@ -68,7 +67,7 @@ async function WalletsPageContent() {
               <EmptyState
                 icon={Wallet}
                 title="No wallets linked"
-                description="Link a Solana wallet to start receiving on-chain payouts directly — no escrow."
+                description="Link a Solana wallet for launch signing and account attestations. Contributor fee claims happen in Bags."
                 cta={{ label: "Link a wallet", href: "/auth/wallet" }}
               />
             </div>

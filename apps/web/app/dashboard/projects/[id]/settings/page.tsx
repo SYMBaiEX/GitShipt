@@ -16,7 +16,6 @@ import { PauseSection } from "./_components/PauseSection";
 import { TransferForm } from "./_components/TransferForm";
 import { DangerSection } from "./_components/DangerSection";
 
-
 export default function SettingsPage({
   params,
 }: {
@@ -86,8 +85,8 @@ async function SettingsPageContent({
         <CardHeader className="border-b border-border px-6 py-4">
           <CardTitle>Transfer ownership</CardTitle>
           <CardDescription>
-            Hand the project to another GitShipt user — by their GitHub username.
-            They must already have signed in at least once.
+            Hand the project to another GitShipt user — by their GitHub
+            username. They must already have signed in at least once.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-6 py-5">
@@ -99,8 +98,9 @@ async function SettingsPageContent({
         <CardHeader className="border-b border-danger/40 px-6 py-4">
           <CardTitle className="text-danger">Danger zone</CardTitle>
           <CardDescription>
-            Deleting marks the project killed. Funds in escrow remain claimable.
-            There is a 24-hour cool-down before re-launching the same repo.
+            Deleting marks the project killed. Bags fee claims remain owned by
+            their wallets. There is a 24-hour cool-down before re-launching the
+            same repo.
           </CardDescription>
         </CardHeader>
         <CardContent className="px-6 py-5">

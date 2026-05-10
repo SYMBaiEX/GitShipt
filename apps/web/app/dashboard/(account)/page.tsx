@@ -22,7 +22,6 @@ import {
 } from "@repo/ui";
 import { Button } from "@repo/ui";
 
-
 /**
  * Dashboard root — overview of all projects the user owns or admins.
  *
@@ -73,9 +72,10 @@ async function DashboardPageContent() {
           accent="primary"
         />
         <StatTile
-          label="Pending Escrow"
-          value={formatSol(earnings.pendingEscrowLamports, 4)}
+          label="GitShipt Custody"
+          value="0.0000 SOL"
           icon={Sparkles}
+          sub="Claims stay in Bags"
         />
         <StatTile
           label="Wallets Linked"

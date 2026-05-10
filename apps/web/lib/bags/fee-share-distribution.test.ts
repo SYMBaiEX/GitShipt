@@ -40,24 +40,23 @@ describe("buildBagsFeeShareDistributionPlan", () => {
         alice: "alice-wallet",
         bob: "bob-wallet",
       },
-      platformFeeBps: 500,
+      platformFeeBps: 0,
       contributorPoolWallet: "pool-wallet",
       treasuryWallet: "treasury-wallet",
     });
 
     expect(plan).toMatchObject({
-      directContributorBps: 7600,
-      contributorPoolBps: 1900,
-      treasuryBps: 500,
-      pooledUnlinkedBps: 1900,
+      directContributorBps: 8000,
+      contributorPoolBps: 2000,
+      treasuryBps: 0,
+      pooledUnlinkedBps: 2000,
       pooledOverflowBps: 0,
       pooledRoundingBps: 0,
     });
     expect(plan.feeClaimers).toEqual([
-      { wallet: "alice-wallet", bps: 4750, role: "contributor" },
-      { wallet: "bob-wallet", bps: 2850, role: "contributor" },
-      { wallet: "pool-wallet", bps: 1900, role: "contributor_pool" },
-      { wallet: "treasury-wallet", bps: 500, role: "treasury" },
+      { wallet: "alice-wallet", bps: 5000, role: "contributor" },
+      { wallet: "bob-wallet", bps: 3000, role: "contributor" },
+      { wallet: "pool-wallet", bps: 2000, role: "contributor_pool" },
     ]);
   });
 
@@ -66,16 +65,15 @@ describe("buildBagsFeeShareDistributionPlan", () => {
       leaderboard: [entry("alice", 1), entry("bob", 2), entry("carol", 3)],
       payoutConfig,
       walletAddresses: {},
-      platformFeeBps: 200,
+      platformFeeBps: 0,
       contributorPoolWallet: "pool-wallet",
       treasuryWallet: "treasury-wallet",
     });
 
     expect(plan.feeClaimers).toEqual([
-      { wallet: "pool-wallet", bps: 9800, role: "contributor_pool" },
-      { wallet: "treasury-wallet", bps: 200, role: "treasury" },
+      { wallet: "pool-wallet", bps: 10000, role: "contributor_pool" },
     ]);
-    expect(plan.contributorPoolBps).toBe(9800);
+    expect(plan.contributorPoolBps).toBe(10000);
   });
 
   it("routes automated contributor share to treasury", () => {
@@ -89,18 +87,17 @@ describe("buildBagsFeeShareDistributionPlan", () => {
         alice: "alice-wallet",
         "github-actions[bot]": "bot-wallet",
       },
-      platformFeeBps: 500,
+      platformFeeBps: 0,
       contributorPoolWallet: "pool-wallet",
       treasuryWallet: "treasury-wallet",
     });
 
     expect(plan.feeClaimers).toEqual([
-      { wallet: "alice-wallet", bps: 5937, role: "contributor" },
-      { wallet: "treasury-wallet", bps: 4062, role: "treasury" },
-      { wallet: "pool-wallet", bps: 1, role: "contributor_pool" },
+      { wallet: "alice-wallet", bps: 6250, role: "contributor" },
+      { wallet: "treasury-wallet", bps: 3750, role: "treasury" },
     ]);
-    expect(plan.treasuryBps).toBe(4062);
-    expect(plan.pooledRoundingBps).toBe(1);
+    expect(plan.treasuryBps).toBe(3750);
+    expect(plan.pooledRoundingBps).toBe(0);
   });
 
   it("falls back to the pool when Bags max-claimer slots are exhausted", () => {
@@ -112,17 +109,17 @@ describe("buildBagsFeeShareDistributionPlan", () => {
         bob: "bob-wallet",
         carol: "carol-wallet",
       },
-      platformFeeBps: 500,
+      platformFeeBps: 0,
       contributorPoolWallet: "pool-wallet",
       treasuryWallet: "treasury-wallet",
       maxClaimers: 3,
     });
 
     expect(plan.feeClaimers).toEqual([
-      { wallet: "alice-wallet", bps: 4750, role: "contributor" },
-      { wallet: "pool-wallet", bps: 4750, role: "contributor_pool" },
-      { wallet: "treasury-wallet", bps: 500, role: "treasury" },
+      { wallet: "alice-wallet", bps: 5000, role: "contributor" },
+      { wallet: "bob-wallet", bps: 3000, role: "contributor" },
+      { wallet: "pool-wallet", bps: 2000, role: "contributor_pool" },
     ]);
-    expect(plan.pooledOverflowBps).toBe(4750);
+    expect(plan.pooledOverflowBps).toBe(2000);
   });
 });

@@ -331,7 +331,7 @@ async function getMyEarningsUncached(userId: string): Promise<MyEarnings> {
     };
   }
 
-  // Per-contributor lifetime sent + escrow + project slug.
+  // Per-contributor lifetime sent + project slug.
   const lifetimeRows = await dbHttp
     .select({
       projectId: projects.id,
@@ -348,13 +348,10 @@ async function getMyEarningsUncached(userId: string): Promise<MyEarnings> {
     .groupBy(projects.id, projects.ghOwner, projects.ghRepo);
 
   // Bags-native architecture: contributors claim through Bags' UI; we no
-  // longer hold escrow on their behalf. Pending-escrow is structurally
-  // always zero. Once `bags_claim_events` is consumed by this query, the
-  // lifetime side will switch to that source too.
-  const escrowBySlug = new Map<
-    string,
-    { escrow: bigint; projectId: string }
-  >();
+  // longer hold contributor custody on their behalf. Pending custody is
+  // structurally always zero. Once `bags_claim_events` is consumed by this
+  // query, the lifetime side will switch to that source too.
+  const escrowBySlug = new Map<string, { escrow: bigint; projectId: string }>();
   const lifetimeBySlug = new Map(
     lifetimeRows.map((r) => [
       r.projectSlug,

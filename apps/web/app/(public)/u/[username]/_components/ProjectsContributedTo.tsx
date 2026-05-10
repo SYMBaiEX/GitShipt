@@ -8,8 +8,8 @@ import type { ContributorProfileProjectRow } from "@/lib/queries/discovery";
 /**
  * Projects this contributor has scored on, sorted by lifetime earnings.
  * Each row links to the project page so the visitor can drop straight
- * into the leaderboard. Wallet-link state is surfaced because unlinked
- * contributors are paid into escrow — a useful nudge.
+ * into the leaderboard. Wallet-link state is surfaced as a useful nudge toward
+ * Bags-native claiming.
  */
 export function ProjectsContributedTo({
   rows,

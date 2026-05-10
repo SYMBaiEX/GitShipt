@@ -104,16 +104,20 @@ export async function executePartnerFeeClaimAttempt(
       cache: false,
     });
     if (BigInt(before.unclaimedFees) <= 0n) {
-      return await markAttemptFailed(attemptId, "no_partner_fees_to_claim", {
+      return await markAttemptSkipped(attemptId, "no_partner_fees_to_claim", {
         before,
       });
     }
 
     const txs = await bags.getPartnerClaimTransactions(claimed.partnerWallet);
     if (txs.length === 0) {
-      return await markAttemptFailed(attemptId, "no_partner_claim_transactions", {
-        before,
-      });
+      return await markAttemptFailed(
+        attemptId,
+        "no_partner_claim_transactions",
+        {
+          before,
+        },
+      );
     }
 
     const conn = solanaConnection("confirmed");
@@ -134,8 +138,7 @@ export async function executePartnerFeeClaimAttempt(
     });
     const deltas = derivePartnerClaimDeltas(before, after);
     const suspicious =
-      deltas.claimedDeltaLamports <= 0n ||
-      deltas.unclaimedDeltaLamports >= 0n;
+      deltas.claimedDeltaLamports <= 0n || deltas.unclaimedDeltaLamports >= 0n;
 
     await dbHttp
       .update(partnerFeeClaimAttempts)
@@ -197,7 +200,9 @@ async function loadExistingResult(
   return {
     attemptId,
     status:
-      row.status === "succeeded" || row.status === "failed" || row.status === "review"
+      row.status === "succeeded" ||
+      row.status === "failed" ||
+      row.status === "review"
         ? row.status
         : "skipped",
     partnerWallet: row.partnerWallet,
@@ -232,6 +237,38 @@ async function markAttemptFailed(
   return {
     attemptId,
     status: "failed",
+    partnerWallet: row?.partnerWallet ?? "",
+    signatures: [],
+    before: row?.beforeStats ?? extra?.before ?? null,
+    after: null,
+    claimedDeltaLamports: "0",
+    unclaimedDeltaLamports: "0",
+    reason,
+  };
+}
+
+async function markAttemptSkipped(
+  attemptId: string,
+  reason: string,
+  extra?: { before?: PartnerClaimStatsJson | null },
+): Promise<PartnerFeeClaimResult> {
+  const [row] = await dbHttp
+    .update(partnerFeeClaimAttempts)
+    .set({
+      status: "skipped",
+      beforeStats: extra?.before ?? undefined,
+      error: reason.slice(0, 1_000),
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(partnerFeeClaimAttempts.id, attemptId))
+    .returning({
+      partnerWallet: partnerFeeClaimAttempts.partnerWallet,
+      beforeStats: partnerFeeClaimAttempts.beforeStats,
+    });
+  return {
+    attemptId,
+    status: "skipped",
     partnerWallet: row?.partnerWallet ?? "",
     signatures: [],
     before: row?.beforeStats ?? extra?.before ?? null,

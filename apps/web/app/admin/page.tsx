@@ -30,7 +30,6 @@ import { formatRelativeTime, formatSol } from "@repo/lib";
 import { RelativeTime } from "@/components/shared/RelativeTime";
 import { cn } from "@repo/lib";
 
-
 /**
  * Ops dashboard. Top stat row + 2x2 bento (heartbeats / failed payouts /
  * recent audit / integrations health).
@@ -112,9 +111,10 @@ async function AdminOpsPageContent() {
           icon={Wallet}
         />
         <StatTile
-          label="Pending escrow"
-          value={`${kpis.pendingEscrowSol.toFixed(4)} SOL`}
+          label="GitShipt custody"
+          value="0.0000 SOL"
           icon={Vault}
+          sub="Contributor claims stay in Bags"
         />
       </section>
 
@@ -246,11 +246,7 @@ function HeartbeatsCard({
                 </span>
               </div>
               <span className="text-mono-sm text-fg-muted">
-                {r.lastBeatAt ? (
-                  <RelativeTime date={r.lastBeatAt} />
-                ) : (
-                  "never"
-                )}
+                {r.lastBeatAt ? <RelativeTime date={r.lastBeatAt} /> : "never"}
               </span>
             </li>
           ))

@@ -133,15 +133,14 @@ async function ProjectDocsPageContent({ params }: { params: Params }) {
 
           <Section id="claiming-earnings" title="Claiming earnings">
             <p>
-              Sign in with your GitHub account, then sign a Sign-In-With-Solana
-              (SIWS) message to link a Solana wallet. Once linked, future
-              payouts route directly to that wallet. Anything earned BEFORE you
-              link is held in escrow and drains automatically the moment you
-              link a wallet.
+              Claiming happens in Bags. Use the GitHub identity that appears on
+              this leaderboard, connect your wallet in Bags, and sign the claim
+              transaction there. GitShipt keeps snapshots and BPS rebalances
+              auditable; it does not custody contributor SOL.
             </p>
             <p>
-              You don&apos;t need to do anything per-cycle. The cron job picks
-              up your latest linked address and includes you in the next
+              You don&apos;t need to do anything per-cycle on GitShipt. The cron
+              job keeps the Bags fee-share BPS aligned with the latest frozen
               snapshot.
             </p>
           </Section>
@@ -224,9 +223,9 @@ async function ProjectDocsPageContent({ params }: { params: Params }) {
           <Section id="limits-and-faqs" title="Limits &amp; FAQs">
             <ul className="list-disc pl-5 text-body-md text-fg-secondary">
               <li>
-                <strong>What if I don&apos;t have a wallet?</strong> Earnings
-                hold in escrow for 30 days. Link a wallet to claim
-                retroactively.
+                <strong>What if I don&apos;t have a wallet?</strong> Connect one
+                in Bags before claiming. Project owners can update claimers as
+                contributors onboard.
               </li>
               <li>
                 <strong>Can scoring change?</strong> The owner can adjust

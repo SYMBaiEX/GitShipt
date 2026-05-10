@@ -27,7 +27,6 @@ export type AuditAction =
   | "project.gh_app_install"
   | "github.event"
   | "bags.event"
-  | "claim.escrow_drained"
   | "auth.mfa_enroll"
   | "auth.mfa_verify"
   | "auth.mfa_revoke"

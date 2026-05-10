@@ -284,8 +284,8 @@ const { meteoraConfigKey } = await sdk.config.createBagsFeeShareConfig({
   payer: launchWallet.publicKey,
   baseMint: tokenInfo.tokenMint,
   feeClaimers: [
-    { user: poolClaimerWallet, userBps: 9500 }, // pool
-    { user: treasuryWallet, userBps: 500 }, // GitShipt platform rail
+    { user: poolClaimerWallet, userBps: 10000 }, // contributor envelope
+    // GitShipt revenue is separate: Bags partner config, not a claimer slot.
   ],
   partner: new PublicKey(process.env.BAGS_PARTNER_WALLET!),
   partnerConfig: process.env.BAGS_PARTNER_CONFIG_KEY
@@ -466,7 +466,7 @@ All background work runs as **Vercel Workflows** triggered by **Vercel Cron Jobs
 - Daily snapshot + payout cron on devnet
 - Public project page + leaderboard (matches the supplied mockup)
 - Project admin console: Overview, Leaderboard, Payouts, Settings (the highest-value tabs)
-- Contributor claim flow with escrow
+- Contributor Bags claim handoff
 - Super-admin console: Ops dashboard, kill switch, fee config, audit log, payout retry, treasury (read-only)
 - DESIGN.md committed and Tailwind theme generated from it
 - "Eat our own dog food" - GitShipt repo launches first token at demo
@@ -775,7 +775,7 @@ The project page (`/r/[org]/[repo]`) is the canonical surface for both public vi
 The same visual layout is shared, with progressive enhancement:
 
 - **Public visitor**: read-only. Sidebar shows only Overview, Leaderboard, Payouts, Repository, Token, Docs. Settings and API Keys are hidden.
-- **Linked contributor (own row)**: their row is highlighted with a subtle `primary-soft` left border. A "Claim earnings" pill appears on their row if escrow > 0.
+- **Linked contributor (own row)**: their row is highlighted with a subtle `primary-soft` left border. A "Claim in Bags" pill appears when the project is live.
 - **Project owner (admin)**: sees full sidebar (Settings, API Keys, Repository config). An "Admin actions" dropdown appears in the project header card with: Force Snapshot, Pause Project, Edit Scoring, Transfer Ownership.
 - **Super-admin**: same as project owner plus an "Admin: super" pill in the header and access to `/admin/projects/[id]` for full override controls.
 
@@ -870,7 +870,7 @@ Routes live under `/admin/*`. Distinct session realm from `/dashboard/*` (separa
 - Force-pause or force-kill any project globally.
 - Resnapshot any project from any historical date (re-runs scoring formula deterministically).
 - Approve / reject project launches if the approval gate flag is on.
-- Manually distribute escrow to a specific wallet (requires reason + MFA).
+- Manually claim GitShipt partner fees (requires reason + MFA + cosign).
 - Adjust platform fee BPS (within the 0-2000 BPS hard cap enforced at DB and contract layer).
 - Top up the hot wallet from the cold treasury (manual signed transaction; admin records the tx, system verifies and updates internal accounting).
 - Toggle feature flags globally or per-cohort.
@@ -994,8 +994,8 @@ Example `vercel.json`:
   "crons": [
     { "path": "/api/cron/index-github", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/snapshot", "schedule": "0 0 * * *" },
-    { "path": "/api/cron/payout", "schedule": "30 0 * * *" },
-    { "path": "/api/cron/expire-escrow", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/rebalance-bps", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/claim-partner-fees", "schedule": "30 0 * * *" },
     { "path": "/api/cron/health", "schedule": "* * * * *" },
     { "path": "/api/cron/publish-kpis", "schedule": "* * * * *" }
   ]
@@ -1056,14 +1056,14 @@ ALLOW_STUBS_IN_PROD=false
 # Solana
 HELIUS_RPC_URL
 SOLANA_PAYOUT_KEYPAIR     # base58 encoded, marked Sensitive
-SOLANA_TREASURY_ADDRESS
+SOLANA_TREASURY_ADDRESS     # optional cold treasury/admin display address
 
 # Cron
 CRON_SECRET               # 32+ random chars, marked Sensitive
 
 # App
 NEXT_PUBLIC_APP_URL=https://gitshipt.com
-PLATFORM_FEE_BPS_DEFAULT=500
+PLATFORM_FEE_BPS_DEFAULT=0
 ADMIN_EMAIL_ALLOWLIST
 ```
 

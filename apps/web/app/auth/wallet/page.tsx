@@ -44,8 +44,8 @@ async function WalletAuthPageContent() {
         <h1 className="text-headline-md">Link your wallet</h1>
         <p className="mt-2 text-body-md text-fg-secondary">
           Sign a Sign-In-With-Solana (SIWS) message to prove ownership of your
-          wallet. We use this to route payouts and to claim earnings from
-          escrow. Signing is free — no SOL is spent.
+          wallet. We use this for launch signing, account attestations, and
+          wallet-aware admin flows. Signing is free; no SOL is spent.
         </p>
 
         <div className="mt-8">

@@ -25,7 +25,7 @@ const SLIDING: Record<LimiterKind, { limit: number; windowSeconds: number }> = {
   "force-snapshot": { limit: 1, windowSeconds: 60 * 60 },
   "trade-quote": { limit: 20, windowSeconds: 60 },
   "trade-swap": { limit: 6, windowSeconds: 60 },
-  // Money-flow endpoints (claim escrow, claim-link wallet binding). Tight.
+  // Money-flow endpoints. Tight.
   claim: { limit: 6, windowSeconds: 60 },
   // API-key minting / revocation per project owner.
   "api-key": { limit: 10, windowSeconds: 60 * 60 },

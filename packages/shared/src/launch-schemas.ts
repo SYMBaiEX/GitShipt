@@ -149,7 +149,7 @@ export const CreateProjectBodySchema = z.object({
   telegram: z.string().trim().url().max(200).optional(),
   scoringConfig: ScoringConfigSchema,
   payoutConfig: PayoutConfigSchema,
-  platformFeeBps: z.number().int().min(200).max(10_000),
+  platformFeeBps: z.number().int().min(0).max(10_000),
 });
 export type CreateProjectBody = z.infer<typeof CreateProjectBodySchema>;
 
@@ -184,7 +184,7 @@ export const UpdateDraftBodySchema = z.object({
   telegram: z.string().trim().url().max(200).optional().or(z.literal("")),
   scoringConfig: ScoringConfigSchema.optional(),
   payoutConfig: PayoutConfigSchema.optional(),
-  platformFeeBps: z.number().int().min(200).max(10_000).optional(),
+  platformFeeBps: z.number().int().min(0).max(10_000).optional(),
 });
 export type UpdateDraftBody = z.infer<typeof UpdateDraftBodySchema>;
 
@@ -297,7 +297,7 @@ export type RepoEnrichment = z.infer<typeof RepoEnrichmentSchema>;
 
 export const DEFAULT_TOP_N = 10;
 export const DEFAULT_WINDOW_DAYS = 30;
-export const DEFAULT_PLATFORM_FEE_BPS = 500; // 5%
+export const DEFAULT_PLATFORM_FEE_BPS = 0;
 export const DEFAULT_CLAIM_THRESHOLD_LAMPORTS = 100_000_000; // 0.1 SOL
 export const LAMPORTS_PER_SOL_NUMBER = 1_000_000_000;
 

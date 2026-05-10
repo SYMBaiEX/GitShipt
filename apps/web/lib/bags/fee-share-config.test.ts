@@ -84,7 +84,7 @@ describe("bags.createFeeShareConfig", () => {
     vi.doUnmock("@/lib/solana/simulation");
   });
 
-  it("adds the platform treasury claimer and preserves the partner config rail", async () => {
+  it("preserves the partner config rail without a treasury claimer", async () => {
     const signer = Keypair.generate();
     const poolClaimer = Keypair.generate().publicKey.toBase58();
     const treasury = Keypair.generate().publicKey.toBase58();
@@ -101,8 +101,8 @@ describe("bags.createFeeShareConfig", () => {
     const result = await bags.createFeeShareConfig({
       payer: signer.publicKey.toBase58(),
       baseMint,
-      feeClaimers: [{ wallet: poolClaimer, bps: 9_800 }],
-      shareFee: 200,
+      feeClaimers: [{ wallet: poolClaimer, bps: 10_000 }],
+      shareFee: 0,
     });
 
     expect(result).toEqual(
@@ -114,8 +114,9 @@ describe("bags.createFeeShareConfig", () => {
       }),
     );
 
-    const calls = createBagsFeeShareConfig.mock
-      .calls as unknown as [[FeeShareConfigCall]];
+    const calls = createBagsFeeShareConfig.mock.calls as unknown as [
+      [FeeShareConfigCall],
+    ];
     const call = calls[0][0];
     expect(call).toMatchObject({
       payer: signer.publicKey,
@@ -130,10 +131,7 @@ describe("bags.createFeeShareConfig", () => {
           userBps: claimer.userBps,
         }),
       ),
-    ).toEqual([
-      { user: poolClaimer, userBps: 9_800 },
-      { user: treasury, userBps: 200 },
-    ]);
+    ).toEqual([{ user: poolClaimer, userBps: 10_000 }]);
   });
 
   it("requires treasury when a platform fee is configured", async () => {

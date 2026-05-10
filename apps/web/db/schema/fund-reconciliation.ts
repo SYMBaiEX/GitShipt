@@ -18,6 +18,7 @@ export const partnerFeeClaimStatusEnum = pgEnum("partner_fee_claim_status", [
   "succeeded",
   "failed",
   "review",
+  "skipped",
 ]);
 
 export const fundReconciliationStatusEnum = pgEnum(
@@ -49,10 +50,12 @@ export const partnerFeeClaimAttempts = pgTable(
     idempotencyKey: text("idempotency_key").notNull(),
     status: partnerFeeClaimStatusEnum("status").notNull().default("pending"),
     attemptCount: integer("attempt_count").notNull().default(0),
-    beforeStats:
-      jsonb("before_stats").$type<PartnerClaimStatsJson | null>().default(null),
-    afterStats:
-      jsonb("after_stats").$type<PartnerClaimStatsJson | null>().default(null),
+    beforeStats: jsonb("before_stats")
+      .$type<PartnerClaimStatsJson | null>()
+      .default(null),
+    afterStats: jsonb("after_stats")
+      .$type<PartnerClaimStatsJson | null>()
+      .default(null),
     signatures: jsonb("signatures").$type<string[]>().notNull().default([]),
     claimedDeltaLamports: bigint("claimed_delta_lamports", {
       mode: "bigint",
@@ -90,9 +93,7 @@ export const fundReconciliationRuns = pgTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => createId()),
-    status: fundReconciliationStatusEnum("status")
-      .notNull()
-      .default("clean"),
+    status: fundReconciliationStatusEnum("status").notNull().default("clean"),
     hotWalletAddress: text("hot_wallet_address"),
     hotWalletBalanceLamports: bigint("hot_wallet_balance_lamports", {
       mode: "bigint",

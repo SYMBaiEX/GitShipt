@@ -115,11 +115,11 @@ export function DirectLaunchForm() {
 
           <fieldset className="grid gap-3 md:grid-cols-3">
             <Field
-              label="Platform fee bps"
+              label="Legacy treasury bps"
               name="platformFeeBps"
               type="number"
               defaultValue={DEFAULT_PLATFORM_FEE_BPS}
-              min={200}
+              min={0}
               required
             />
             <Field

@@ -28,7 +28,7 @@ const validBody = {
     tierWeights: [0.5, 0.3, 0.2],
     claimThresholdLamports: 0,
   },
-  platformFeeBps: 500,
+  platformFeeBps: 0,
 } as const;
 
 describe("Bags launch schemas", () => {
@@ -67,18 +67,18 @@ describe("Bags launch schemas", () => {
     ).toBe(true);
   });
 
-  it("enforces a 2% platform fee floor without the old 20% cap", () => {
+  it("allows zero legacy platform fee because revenue uses the Bags partner rail", () => {
     expect(
       CreateProjectBodySchema.safeParse({
         ...validBody,
-        platformFeeBps: 199,
+        platformFeeBps: -1,
       }).success,
     ).toBe(false);
 
     expect(
       CreateProjectBodySchema.safeParse({
         ...validBody,
-        platformFeeBps: 200,
+        platformFeeBps: 0,
       }).success,
     ).toBe(true);
 

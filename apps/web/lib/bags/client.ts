@@ -390,12 +390,12 @@ function resolvePlatformFeeWallet(
   const wallet = input.platformFeeWallet ?? env.SOLANA_TREASURY_ADDRESS;
   if (!wallet) {
     throw new Error(
-      "SOLANA_TREASURY_ADDRESS is required when platformFeeBps is greater than 0.",
+      "SOLANA_TREASURY_ADDRESS is required when legacy platformFeeBps is greater than 0.",
     );
   }
   if (wallet === input.payer) {
     throw new Error(
-      "SOLANA_TREASURY_ADDRESS must be distinct from the payout wallet when platformFeeBps is greater than 0.",
+      "SOLANA_TREASURY_ADDRESS must be distinct from the payout wallet when legacy platformFeeBps is greater than 0.",
     );
   }
   return wallet;

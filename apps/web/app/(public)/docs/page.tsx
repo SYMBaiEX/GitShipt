@@ -125,36 +125,33 @@ async function DocsPageContent() {
               <code className="rounded bg-surface-elevated px-1.5 py-0.5 text-mono-sm text-fg">
                 [0.30, 0.20, 0.15, 0.05 × 7]
               </code>
-              . Failed sends retry up to 3 times with exponential backoff;
-              persistent failures route to escrow.
+              . Contributors claim through Bags with their own wallet; GitShipt
+              does not dispatch or custody contributor SOL.
             </li>
           </ul>
           <p>
-            Contributors without a linked wallet are paid into a per-contributor
-            escrow row, claimable retroactively the moment they sign in and link
-            a wallet (no funds lost, no expiry).
+            Contributors without a Bags-linked GitHub identity are skipped until
+            the project owner updates the Bags claimer set. No GitShipt escrow
+            balance is created.
           </p>
         </DocSection>
 
-        <DocSection id="wallet-linking" title="Linking your wallet (SIWS)">
+        <DocSection id="wallet-linking" title="Wallet attestation (SIWS)">
           <p>
             Earnings are addressed to GitHub usernames at scoring time. To
-            receive them on-chain, contributors:
+            receive them on-chain, contributors use Bags:
           </p>
           <ol className="list-decimal space-y-2 pl-5 text-body-md text-fg-secondary">
             <li>
-              Sign in with GitHub at{" "}
-              <code className="text-mono-sm text-fg">/auth/signin</code>.
+              Open Bags with the GitHub identity that appears on the
+              leaderboard.
             </li>
             <li>
-              Connect a Solana wallet and sign a Sign-In With Solana (SIWS)
-              message. The message includes a per-user nonce, the origin, and a
-              5-minute expiry.
+              Connect a Solana wallet and sign the Bags claim transaction.
             </li>
             <li>
-              The verified wallet is recorded in{" "}
-              <code className="text-mono-sm text-fg">contributor_claims</code>{" "}
-              and any pending escrow is released on the next payout cycle.
+              GitShipt keeps the leaderboard and snapshot audit trail in sync
+              while Bags owns claim custody.
             </li>
           </ol>
           <p>
@@ -219,7 +216,6 @@ async function DocsPageContent() {
             </li>
           </ul>
         </DocSection>
-
       </article>
     </div>
   );

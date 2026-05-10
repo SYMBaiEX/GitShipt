@@ -30,9 +30,7 @@ export function AccountPreferencesForm({
   settings: AccountSettings;
 }) {
   const router = useRouter();
-  const [payoutEmails, setPayoutEmails] = React.useState(
-    settings.payoutEmails,
-  );
+  const [payoutEmails, setPayoutEmails] = React.useState(settings.payoutEmails);
   const [securityEmails, setSecurityEmails] = React.useState(
     settings.securityEmails,
   );
@@ -107,7 +105,7 @@ export function AccountPreferencesForm({
       <div className="divide-y divide-border rounded-lg border border-border bg-surface">
         <ToggleRow
           label="Payout email"
-          detail="Completed payouts, escrow claim status, and failed payout follow-up."
+          detail="Bags claim status, partner-fee notices, and payout workflow follow-up."
           checked={payoutEmails}
           onCheckedChange={setPayoutEmails}
         />

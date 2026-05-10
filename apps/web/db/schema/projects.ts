@@ -219,7 +219,7 @@ export const projects = pgTable(
 
     // Status + config
     status: projectStatusEnum("status").notNull().default("draft"),
-    platformFeeBps: integer("platform_fee_bps").notNull().default(500),
+    platformFeeBps: integer("platform_fee_bps").notNull().default(0),
     scoringConfig: jsonb("scoring_config").$type<ScoringConfig>().notNull(),
     payoutConfig: jsonb("payout_config").$type<PayoutConfig>().notNull(),
     /** v1 (shipshape §8). Owner-configurable alignment policy with the

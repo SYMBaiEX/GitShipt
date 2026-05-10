@@ -5,7 +5,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  ArrowRight, Building2, Calendar, Coins, ExternalLink, Globe, GitFork, MapPin, Users, Wallet } from "lucide-react";
+  ArrowRight,
+  Building2,
+  Calendar,
+  Coins,
+  ExternalLink,
+  Globe,
+  GitFork,
+  MapPin,
+  Users,
+  Wallet,
+} from "lucide-react";
 import { Badge, Button } from "@repo/ui";
 import { getContributorProfile } from "@/lib/queries/discovery";
 import { getGitHubUser, type GitHubUserProfile } from "@/lib/github/users";
@@ -39,11 +49,7 @@ export async function generateMetadata({
   };
 }
 
-export default function ContributorProfilePage({
-  params,
-}: {
-  params: Params;
-}) {
+export default function ContributorProfilePage({ params }: { params: Params }) {
   return (
     <Suspense fallback={null}>
       <ContributorProfilePageContent params={params} />
@@ -51,11 +57,7 @@ export default function ContributorProfilePage({
   );
 }
 
-async function ContributorProfilePageContent({
-  params,
-}: {
-  params: Params;
-}) {
+async function ContributorProfilePageContent({ params }: { params: Params }) {
   const { username } = await params;
   const [profile, gh, session] = await Promise.all([
     getContributorProfile(username),
@@ -92,9 +94,7 @@ async function ContributorProfilePageContent({
           />
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-display text-fg">
-                {displayName}
-              </h1>
+              <h1 className="text-display text-fg">{displayName}</h1>
               {gh ? (
                 <Badge variant="success" size="sm" dot dotColor="success">
                   GitHub verified
@@ -202,7 +202,7 @@ function ContributorClaimCta({
         }
         description={
           hasEarnings
-            ? "Sign in with GitHub, link a Solana wallet, and use the earnings dashboard to review payouts or claim any available escrow."
+            ? "Sign in with GitHub and use the earnings dashboard to review indexed payouts. Claimable fees are signed directly in Bags."
             : hasGitShiptRows
               ? "This profile is on GitShipt leaderboards. Sign in and link a wallet so future payouts have a direct destination."
               : "This GitHub account is public, but GitShipt has not indexed contributor earnings for it yet."
@@ -240,7 +240,7 @@ function ContributorClaimCta({
         }
         description={
           hasEarnings
-            ? "Your GitHub identity is signed in. Add a Solana wallet so dashboard earnings can route claimable escrow to you."
+            ? "Your GitHub identity is signed in. Open Bags with this account to connect a wallet and claim fee-share earnings."
             : "No claimable earnings are visible on this public profile yet. Linking a wallet prepares your account for future GitShipt payouts."
         }
         primaryHref="/auth/wallet"
@@ -257,7 +257,7 @@ function ContributorClaimCta({
       title={hasEarnings ? "Manage earnings in dashboard" : "Wallet linked"}
       description={
         hasEarnings
-          ? "Your wallet is linked. Open the earnings dashboard to review lifetime payouts and claim project escrow when available."
+          ? "Your wallet is linked. Open the earnings dashboard to review lifetime payouts and continue to Bags when fees are claimable."
           : "No claimable earnings are visible yet. Your linked wallet is ready for future contributor payouts."
       }
       primaryHref="/dashboard/earnings"

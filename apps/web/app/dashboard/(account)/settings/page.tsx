@@ -3,7 +3,14 @@ import { Suspense } from "react";
 import Link from "next/link";
 import type { ComponentType } from "react";
 import {
-  Bell, ChevronRight, KeyRound, Settings, ShieldCheck, UserRound, Wallet } from "lucide-react";
+  Bell,
+  ChevronRight,
+  KeyRound,
+  Settings,
+  ShieldCheck,
+  UserRound,
+  Wallet,
+} from "lucide-react";
 import { hasCredentials } from "@/lib/env";
 import { requireAuthSession } from "@/lib/auth/session";
 import {
@@ -100,7 +107,7 @@ async function SettingsPageContent() {
               href="/dashboard/wallets"
               icon={Wallet}
               label="Wallets"
-              detail="Solana payout destinations for contributor earnings"
+              detail="Wallet attestations for launch signing and account security"
               status={`${wallets.length} linked`}
             />
             <SettingsLink
@@ -121,7 +128,7 @@ async function SettingsPageContent() {
               href="/dashboard/earnings"
               icon={Bell}
               label="Earnings"
-              detail="Payout status, escrow, and claim actions"
+              detail="Contribution earnings overview and Bags claim handoff"
               status={wallets.length > 0 ? "Ready" : "Link wallet"}
               tone={wallets.length > 0 ? "success" : "warning"}
             />

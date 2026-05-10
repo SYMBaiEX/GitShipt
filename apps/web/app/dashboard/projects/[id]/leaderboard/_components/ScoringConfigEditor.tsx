@@ -195,8 +195,8 @@ export function ScoringConfigEditor({
               className="mt-1 w-full max-w-xs rounded-md border border-border-strong bg-surface px-3 py-2 text-mono-md text-fg outline-none focus:border-primary"
             />
             <p className="mt-1 text-caption text-fg-muted">
-              Recipients below this threshold are paid into escrow until they
-              link a wallet.
+              Below-threshold allocations stay in the current Bags fee-share
+              configuration until the next rebalance.
             </p>
           </div>
 

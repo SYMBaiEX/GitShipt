@@ -18,7 +18,7 @@ const TOP_N_MIN = 3; // server-side Zod minimum (PayoutConfigSchema.topN)
 const TOP_N_MAX = 50;
 const WINDOW_MIN = 7;
 const WINDOW_MAX = 90;
-const PLATFORM_FEE_BPS_MIN = 200;
+const PLATFORM_FEE_BPS_MIN = 0;
 const PLATFORM_FEE_BPS_PROTOCOL_MAX = 10_000;
 
 export interface LeaderboardConfigFormProps {
@@ -75,9 +75,9 @@ export function LeaderboardConfigForm({
       : undefined;
   const feeError =
     platformFeeBps < PLATFORM_FEE_BPS_MIN
-      ? "Platform fee must be at least 2%"
+      ? "Legacy platform fee cannot be negative"
       : platformFeeBps > PLATFORM_FEE_BPS_PROTOCOL_MAX
-        ? "Platform fee cannot exceed 100% of trading fees"
+        ? "Legacy platform fee cannot exceed 100% of trading fees"
         : undefined;
 
   const isValid =
@@ -219,13 +219,13 @@ export function LeaderboardConfigForm({
 
         <aside className="space-y-3 rounded-lg border border-border bg-surface-elevated/40 p-3 lg:sticky lg:top-4">
           <FormField
-            label={`Platform fee: ${platformFeePercent}%`}
-            hint="Minimum 2%."
+            label={`Legacy treasury rail: ${platformFeePercent}%`}
+            hint="Production revenue uses the Bags partner rail."
             error={feeError}
           >
             <input
               type="number"
-              min={2}
+              min={0}
               step={0.25}
               value={platformFeeBps / 100}
               onChange={(e) => {
@@ -249,9 +249,11 @@ export function LeaderboardConfigForm({
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-body-sm text-fg-muted">GitShipt fee</span>
-              <span className="text-mono-sm text-fg">
-                {platformFeePercent}%
-              </span>
+              <span className="text-mono-sm text-fg">25.00%</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-body-sm text-fg-muted">Partner rail</span>
+              <span className="text-label-sm text-fg">Bags config</span>
             </div>
             <div className="flex items-center justify-between gap-3 pt-2">
               <span className="text-body-sm text-fg-muted">Agents/bots</span>

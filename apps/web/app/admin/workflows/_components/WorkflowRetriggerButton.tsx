@@ -10,10 +10,8 @@ type WorkflowName =
   | "indexGithubDeltas"
   | "computeLeaderboard"
   | "takeSnapshot"
-  | "executePayout"
-  | "expireEscrow"
-  | "reconcileFunds"
-  | "processClaim"
+  | "rebalanceBps"
+  | "claimPartnerFees"
   | "publishKpis";
 
 export function WorkflowRetriggerButton({

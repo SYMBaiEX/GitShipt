@@ -20,7 +20,7 @@ import {
   VersionedTransaction,
   type TransactionInstruction,
 } from "@solana/web3.js";
-import { and, eq, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, isNull, lte } from "drizzle-orm";
 import { dbHttp } from "@/db";
 import {
   bagsClaimerSlots,
@@ -29,16 +29,9 @@ import {
   payoutSchedules,
   snapshots,
 } from "@/db/schema";
-import {
-  hasCredentials,
-  serverEnv,
-  stubsAllowed,
-} from "@/lib/env";
+import { hasCredentials, serverEnv, stubsAllowed } from "@/lib/env";
 import { audit } from "@/lib/audit";
-import {
-  acquireWorkflowLock,
-  type WorkflowLock,
-} from "@/lib/workflow-locks";
+import { acquireWorkflowLock, type WorkflowLock } from "@/lib/workflow-locks";
 import { managerSigner } from "@/lib/solana/manager-signer";
 import { buildManagerUpdateFeeConfigIx } from "@/lib/bags/program-client";
 import {
@@ -62,7 +55,9 @@ export async function rebalanceAcquireLockStep(
   return await acquireWorkflowLock("rebalanceBps", scope, ttlSeconds);
 }
 
-export async function rebalanceReleaseLockStep(lock: WorkflowLock): Promise<void> {
+export async function rebalanceReleaseLockStep(
+  lock: WorkflowLock,
+): Promise<void> {
   "use step";
   if (!lock.acquired) return;
   const { releaseWorkflowLock } = await import("@/lib/workflow-locks");
@@ -185,7 +180,9 @@ export async function loadRebalanceContextStep(
     .map<ClaimerSlotInput>((row) => ({
       slotIndex: row.slotIndex,
       githubLogin:
-        row.provider === "github" ? row.socialHandle?.toLowerCase() ?? null : null,
+        row.provider === "github"
+          ? (row.socialHandle?.toLowerCase() ?? null)
+          : null,
       contributorId: row.contributorId,
       currentBps: row.currentBps,
     }));
@@ -199,7 +196,7 @@ export async function loadRebalanceContextStep(
         eq(snapshots.status, "frozen"),
       ),
     )
-    .orderBy(snapshots.takenAt)
+    .orderBy(desc(snapshots.takenAt))
     .limit(1);
 
   const scoreInputs =
@@ -574,10 +571,10 @@ export async function finalizeFailureStep(args: {
 
 // ---- Workflow fan-out trigger -------------------------------------------
 
-export async function startProcessScheduleStep(scheduleId: string): Promise<void> {
+export async function startProcessScheduleStep(
+  scheduleId: string,
+): Promise<void> {
   "use step";
-  const { processScheduleRebalance } = await import(
-    "@/workflows/rebalanceBps"
-  );
+  const { processScheduleRebalance } = await import("@/workflows/rebalanceBps");
   await processScheduleRebalance(scheduleId);
 }

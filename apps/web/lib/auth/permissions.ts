@@ -30,6 +30,7 @@ export type Permission =
   // Platform-wide
   | "platform.fees.update"
   | "platform.treasury.read"
+  | "platform.treasury.claim"
   | "platform.treasury.topup"
   | "platform.kill_switch"
   | "platform.maintenance"
@@ -87,6 +88,7 @@ const PERMISSIONS: Record<
 
   "platform.fees.update": ["super_admin"],
   "platform.treasury.read": ["admin", "super_admin"],
+  "platform.treasury.claim": ["super_admin"],
   "platform.treasury.topup": ["super_admin"],
   "platform.kill_switch": ["super_admin"],
   "platform.maintenance": ["super_admin"],

@@ -51,7 +51,10 @@ export type AuditAction =
   | "bags.rebalance_succeeded"
   | "bags.rebalance_failed"
   | "bags.manager_revoked"
-  | "bags.claim_events_ingested";
+  | "bags.claim_events_ingested"
+  | "bags.partner_key_created"
+  | "bags.partner_fees_claimed"
+  | "admin.partner_fees_claimed_manual";
 
 export interface AuditEntry {
   actorUserId: string | null;

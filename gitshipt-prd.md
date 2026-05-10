@@ -6,29 +6,28 @@
 
 ---
 
-## Architecture pointer (2026-05-07)
+## Architecture pointer (2026-05-09)
 
-The architecture sections below this pointer were written against an
-earlier scaffold that assumed off-chain SOL dispatch + escrow + processClaim.
-The current architecture is **Bags-native**: GitShipt holds the on-chain
-manager role per project, signs `manager_update_fee_config` BPS rebalances
-on a configurable cadence (24h initial → 3d second → 3/5/7d), and
-contributors claim directly through Bags' GitHub-OAuth UI. GitShipt never
-custodies SOL.
+The architecture sections below this pointer reflect the **corrected understanding** of Bags fee-share capabilities. GitShipt uses a Bags-native architecture with:
 
-- Decision record: [`docs/adr/0001-bags-native-payout.md`](docs/adr/0001-bags-native-payout.md)
+- **Manager role** (delegated to GitShipt): BPS rebalancing within claimer set
+- **Admin role** (held by project owner): Can add/remove claimers post-launch
+- **Partner role** (GitShipt partner config): Receives 25% of trading fees from all launched tokens
+- **Dynamic contributor inclusion**: Claimers CAN be updated post-launch via admin authority
+- **Zero SOL custody**: Contributors claim directly from Bags, GitShipt claims partner fees directly
+
+- Decision record: [`docs/adr/0001-bags-native-payout.md`](docs/adr/0001-bags-native-payout.md) (updated 2026-05-09)
 - Research backing: [`docs/architecture/bags-native/RESEARCH.md`](docs/architecture/bags-native/RESEARCH.md)
-- IDL inspection: `bun run scripts/inspect-bags-program.ts inspect-program`
 
 For any decision touching payouts, escrow, claims, or wallet linking,
-trust SPEC.md + the ADR over this PRD's architecture text until the PRD
+trust SPEC.md + the updated ADR over this PRD's architecture text until the PRD
 itself is rewritten.
 
 ---
 
 ## TL;DR
 
-GitShipt is a launchpad-leaderboard hybrid where any GitHub repo can spawn a Bags.fm token. Token fees auto-distribute daily to that repo's top contributors, with a configurable platform fee (default 5%). We ship the platform by launching its own token at the demo and rewarding our own contributors live.
+GitShipt is a launchpad-leaderboard hybrid where any GitHub repo can spawn a Bags.fm token. Token fees auto-distribute to that repo's top contributors, with GitShipt receiving 25% of trading fees via Bags partner configuration (no launch fees). We ship the platform by launching its own token at the demo and rewarding our own contributors live.
 
 **One-liner**: Pump.fun for open source. The repo is the project, the contributors are the rewards.
 
@@ -42,31 +41,40 @@ GitShipt is a launchpad-leaderboard hybrid where any GitHub repo can spawn a Bag
 
 ---
 
-## Verified architecture (as of April 25, 2026)
+## Verified architecture (as of May 9, 2026)
 
 This PRD has been verified against current platform docs. Material decisions and their sources:
 
-1. **Bags Token Launch v2 has native fee sharing with direct wallets and social identity lookup**. GitShipt starts with a direct platform pool wallet claimer for the contributor pool, and can update future fee-share configs to route verified contributor wallets directly while routing unlinked contributors to the pool. Bags can also resolve supported social identities (`github`, `twitter`, `kick`, `tiktok`, and legacy `moltbook`) to wallets when a future flow needs identity-based fee recipients. Maximum 100 fee earners per token (including creator). Source: Bags API changelog, Bags skill, and SDK examples (`@bagsfm/bags-sdk`).
-2. **Fee shares are configured at launch and post-launch edits require a Bags fee-share admin update transaction**. This is the single biggest constraint. To support a daily-changing leaderboard, GitShipt treats Bags fee-share updates as prospective accrual routing: verified wallets can become direct Bags claimers for future fees, while unlinked/overflow/rounding shares remain assigned to the platform contributor pool wallet and are paid from GitShipt after verification. GitShipt platform revenue is a second explicit treasury `feeClaimer` in the same Bags config. Bags partner revenue is a separate partner-key rail (`partner` + `partnerConfig`) attached to the launch, not part of the 10,000 BPS claimer envelope.
+1. **Bags Token Launch v2 has native fee sharing with direct wallets and social identity lookup**. GitShipt uses Bags' partner configuration system to receive 25% of trading fees from all launched tokens. Bags can resolve supported social identities (`github`, `twitter`, `kick`, `tiktok`, and legacy `moltbook`) to wallets for contributor fee recipients. Maximum 100 fee earners per token (including creator). Source: Bags API changelog, Bags skill, and SDK examples (`@bagsfm/bags-sdk`).
+
+2. **Fee shares CAN be updated post-launch via admin authority**. The Bags CLI provides `bags config update` and the API provides `POST /fee-share/admin/update-config` to change fee claimers and their BPS allocations after launch. This enables dynamic contributor inclusion - new contributors can be added to the claimer set as they emerge, and inactive contributors can be removed. GitShipt platform revenue comes via the separate partner-key rail (`partner` + `partnerConfig`) which receives 25% of trading fees, independent of the 10,000 BPS contributor envelope.
+
 3. **Next.js 16.2 is current** (March 18, 2026). Cache Components, React Compiler, and Turbopack are all stable. **Critical**: `middleware.ts` is renamed to `proxy.ts` in Next.js 16. Patch level must be current to mitigate React Server Components RCE (CVE-2025-66478, CVSS 10.0, December 2025) and middleware bypass (CVE-2025-29927).
+
 4. **Vercel Postgres is deprecated**. Use Neon Postgres via Vercel Marketplace. The app prefers Neon's server-only `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct) variables, with `POSTGRES_URL` aliases accepted for generic Postgres compatibility.
+
 5. **Vercel Workflows is GA, Vercel Queues is public beta** (no allowlist). Workflows is built on Queues + Fluid Compute + managed persistence. Configured via `experimentalTriggers` in `vercel.json`. Run-level limits: ~2000 events or ~1 GB storage before replay slows down. Fan out via child workflows.
+
 6. **Vercel security incident, April 19, 2026**. Compromised AI tool's OAuth token gave attackers access to Vercel internal systems. Non-sensitive env vars were readable. **All secrets must be flagged Sensitive in the dashboard or via API (`type: "sensitive"`).** Crypto teams are particularly exposed; cold treasury keys never touch Vercel.
+
 7. **Solana SDK**: stay on `@solana/web3.js@^1.98` (v1 line). The Bags SDK uses v1-style imports (`Connection`, `Keypair`, `PublicKey`, `VersionedTransaction`). v2 (`@solana/kit`) is GA but ecosystem migration is incomplete.
+
 8. **Auth**: `better-auth` for GitHub OAuth, with a custom plugin for Sign-In With Solana. SIWS standard is published by Phantom (`@phantom/sign-in-with-solana`). `Credentials`-style provider on Auth.js v5 is the fallback if better-auth's plugin model doesn't fit.
+
 9. **Postgres driver**: `drizzle-orm/neon-http` for Neon runtime queries, `drizzle-orm/neon-serverless` where Neon transactions span multiple statements, and `drizzle-orm/postgres-js` only for generic Postgres compatibility.
+
 10. **UI**: Tailwind v4 + shadcn/ui (CSS-first config, `@theme` directive, no `tailwind.config.js`). Confirmed standard 2026 stack.
 
 ## Assumptions to confirm with team
 
-| #   | Assumption                                                                                       | Confirm by                                 |
-| --- | ------------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| 1   | Platform-as-sole-claimer model is acceptable to Bags (vs native multi-wallet at launch)          | Sync with Teddy                            |
-| 2   | Fee claim cadence: daily 00:30 UTC OK, or per-project?                                           | Default daily, ship configurable post-MVP  |
-| 3   | Hot wallet sits inside Vercel env (`Sensitive`-flagged) for v0; treasury is hardware-wallet-only | Confirm with security review               |
-| 4   | Top 10 default tier weights `[0.30, 0.20, 0.15, 0.05 × 7]`                                       | Default; configurable per-project post-MVP |
-| 5   | Scoring v0 = commits + merged PRs only, 30d window                                               | Locked for hackathon                       |
-| 6   | 5% platform fee is taken on-chain via an explicit treasury fee claimer, not redistribution math  | Cleaner accounting; lock                   |
+| #   | Assumption                                                                                                         | Confirm by                                 |
+| --- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| 1   | Platform-as-sole-claimer model is acceptable to Bags (vs native multi-wallet at launch)                            | Sync with Teddy                            |
+| 2   | Fee claim cadence: daily 00:30 UTC OK, or per-project?                                                             | Default daily, ship configurable post-MVP  |
+| 3   | Hot wallet sits inside Vercel env (`Sensitive`-flagged) for v0; treasury is hardware-wallet-only                   | Confirm with security review               |
+| 4   | Top 10 default tier weights `[0.30, 0.20, 0.15, 0.05 × 7]`                                                         | Default; configurable per-project post-MVP |
+| 5   | Scoring v0 = commits + merged PRs only, 30d window                                                                 | Locked for hackathon                       |
+| 6   | GitShipt revenue comes from the Bags partner configuration, not a treasury claimer inside the contributor envelope | Lock to ADR / SPEC                         |
 
 ---
 
@@ -95,8 +103,8 @@ This PRD has been verified against current platform docs. Material decisions and
 ### F2. Contribute and earn (Contributor)
 
 1. Hit `/u/[githubUsername]` (auto-generated, public, indexed).
-2. Click "Claim earnings" → GitHub OAuth → SIWS link.
-3. Once linked, future payouts route direct to wallet. Backfill from escrow on first link.
+2. Click "Claim earnings" → continue to Bags.
+3. Bags handles GitHub identity, wallet connection, and fee claims directly. GitShipt never holds contributor claim balances.
 
 ### F3. Daily payout (System)
 
@@ -179,7 +187,7 @@ External:
 | `/dashboard/projects/[id]/payouts`  | Payout history                              |
 | `/dashboard/projects/[id]/settings` | Token meta, kill switch, ownership transfer |
 | `/dashboard/wallets`                | Linked wallets                              |
-| `/dashboard/earnings`               | Earnings + escrow claim                     |
+| `/dashboard/earnings`               | Earnings overview with Bags claim handoff   |
 | `/dashboard/api-keys`               | Personal API keys (scoped)                  |
 
 ### Admin `/admin/*` (MFA + role gate)
@@ -203,21 +211,21 @@ External:
 
 ## Data model (Drizzle, Postgres)
 
-| Table                | Key columns                                                                                                                                                                                                                          | Notes                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| `users`              | `id`, `github_id` UNIQUE, `github_username`, `email`, `role`, `mfa_secret_enc`, `created_at`                                                                                                                                         | `role`: `user \| moderator \| admin \| super_admin`                |
-| `wallets`            | `id`, `user_id` FK, `address`, `chain`, `verified_at`, UNIQUE(`user_id`,`address`)                                                                                                                                                   | `chain` default `solana`                                           |
-| `projects`           | `id`, `owner_user_id` FK, `gh_owner`, `gh_repo`, `gh_repo_id`, `gh_installation_id`, `token_mint`, `bags_launch_id`, `bags_launch_wallet`, `status`, `platform_fee_bps`, `scoring_config` JSONB, `payout_config` JSONB, `created_at` | `status`: `draft \| launch_configured \| live \| paused \| killed` |
-| `contributors`       | `id`, `project_id` FK, `gh_user_id`, `gh_username`, `score`, `rank`, `last_indexed_at`                                                                                                                                               | INDEX(`project_id`,`rank`)                                         |
-| `contributor_claims` | `contributor_id` FK, `user_id` FK NULL, `wallet_address`, `claimed_at`                                                                                                                                                               | Null user until claim                                              |
-| `snapshots`          | `id`, `project_id` FK, `taken_at`, `leaderboard` JSONB, `merkle_root`, `total_fees_lamports`, `formula_version`, `status`                                                                                                            | Frozen ledger                                                      |
-| `payouts`            | `id`, `snapshot_id` FK, `project_id` FK, `total_amount`, `status`, `attempt_count`, `last_error`, `scheduled_at`, `executed_at`                                                                                                      | INDEX(`status`,`scheduled_at`)                                     |
-| `payout_recipients`  | `id`, `payout_id` FK, `contributor_id` FK, `wallet_address`, `amount`, `status`, `tx_signature`, `idempotency_key` UNIQUE                                                                                                            | Per-recipient row                                                  |
-| `escrow_holdings`    | `contributor_id`, `token_mint`, `amount`, `created_at`, `expires_at`                                                                                                                                                                 | Sweep job daily                                                    |
-| `platform_config`    | `key` PK, `value` JSONB, `updated_by`, `updated_at`                                                                                                                                                                                  | All global tunables                                                |
-| `audit_logs`         | `id`, `actor_user_id`, `action`, `target_type`, `target_id`, `metadata` JSONB, `ip`, `user_agent`, `created_at`                                                                                                                      | Append-only DB role                                                |
-| `webhooks_inbox`     | `id`, `source`, `event_id` UNIQUE, `signature`, `payload`, `processed_at`                                                                                                                                                            | Idempotency on `event_id`                                          |
-| `gh_indexer_state`   | `project_id` PK, `last_event_cursor`, `last_full_sync_at`                                                                                                                                                                            | Resume tokens                                                      |
+| Table                        | Key columns                                                                                                                                                                                                                          | Notes                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| `users`                      | `id`, `github_id` UNIQUE, `github_username`, `email`, `role`, `mfa_secret_enc`, `created_at`                                                                                                                                         | `role`: `user \| moderator \| admin \| super_admin`                |
+| `wallets`                    | `id`, `user_id` FK, `address`, `chain`, `verified_at`, UNIQUE(`user_id`,`address`)                                                                                                                                                   | `chain` default `solana`                                           |
+| `projects`                   | `id`, `owner_user_id` FK, `gh_owner`, `gh_repo`, `gh_repo_id`, `gh_installation_id`, `token_mint`, `bags_launch_id`, `bags_launch_wallet`, `status`, `platform_fee_bps`, `scoring_config` JSONB, `payout_config` JSONB, `created_at` | `status`: `draft \| launch_configured \| live \| paused \| killed` |
+| `contributors`               | `id`, `project_id` FK, `gh_user_id`, `gh_username`, `score`, `rank`, `last_indexed_at`                                                                                                                                               | INDEX(`project_id`,`rank`)                                         |
+| `contributor_claims`         | `contributor_id` FK, `user_id` FK NULL, `wallet_address`, `claimed_at`                                                                                                                                                               | Null user until claim                                              |
+| `snapshots`                  | `id`, `project_id` FK, `taken_at`, `leaderboard` JSONB, `merkle_root`, `total_fees_lamports`, `formula_version`, `status`                                                                                                            | Frozen ledger                                                      |
+| `payouts`                    | `id`, `snapshot_id` FK, `project_id` FK, `total_amount`, `status`, `attempt_count`, `last_error`, `scheduled_at`, `executed_at`                                                                                                      | INDEX(`status`,`scheduled_at`)                                     |
+| `payout_recipients`          | `id`, `payout_id` FK, `contributor_id` FK, `wallet_address`, `amount`, `status`, `tx_signature`, `idempotency_key` UNIQUE                                                                                                            | Per-recipient row                                                  |
+| `partner_fee_claim_attempts` | `partner_wallet`, `partner_config_key`, `status`, `signatures`, `before_stats`, `after_stats`, `idempotency_key`                                                                                                                     | GitShipt partner revenue claim ledger                              |
+| `platform_config`            | `key` PK, `value` JSONB, `updated_by`, `updated_at`                                                                                                                                                                                  | All global tunables                                                |
+| `audit_logs`                 | `id`, `actor_user_id`, `action`, `target_type`, `target_id`, `metadata` JSONB, `ip`, `user_agent`, `created_at`                                                                                                                      | Append-only DB role                                                |
+| `webhooks_inbox`             | `id`, `source`, `event_id` UNIQUE, `signature`, `payload`, `processed_at`                                                                                                                                                            | Idempotency on `event_id`                                          |
+| `gh_indexer_state`           | `project_id` PK, `last_event_cursor`, `last_full_sync_at`                                                                                                                                                                            | Resume tokens                                                      |
 
 ---
 
@@ -353,7 +361,7 @@ export async function processProjectPayout(projectId: string) {
 
 ### Constraints to design around
 
-- **Max 100 fee claimers per token** including creator. GitShipt must reserve room for the treasury and contributor pool, then route any excess ranked contributors back into the pool instead of exceeding Bags limits.
+- **Max 100 fee claimers per token** including creator. GitShipt must reserve room for project-owner and contributor claimers, then skip or later add overflow contributors through Bags admin updates instead of exceeding Bags limits.
 - **Bags rate limit**: 1,000 requests/hour per API key. With cron driving most calls, this is plenty. Workflows step retries don't compound (each step is idempotent).
 - **JWT tokens last 365 days, rotate if compromised**. API keys are separate from JWT tokens. We use API keys for backend, never JWTs.
 - **Token launches require fee sharing config**: the old no-share flow is no longer supported.
@@ -363,23 +371,21 @@ export async function processProjectPayout(projectId: string) {
 
 ## Payout math
 
-The Bags fee-share config allocates 10000 BPS explicitly. For the default GitShipt launch, 500 BPS accrues directly to the GitShipt treasury wallet and 9500 BPS accrues to the platform hot wallet as the contributor pool. After a project has verified contributor wallets, a prospective Bags fee-share update may split the 9500 BPS contributor budget across direct contributor wallets and the GitShipt contributor pool. The pool receives unlinked contributors' shares, max-claimer overflow, and BPS rounding dust. Separately, launches include the GitShipt Bags partner key so the platform can also claim partner revenue from Bags.
+The Bags fee-share config allocates 10,000 BPS explicitly across the project owner and Bags-resolved contributor wallets. GitShipt revenue is separate: launches include the GitShipt Bags partner key so the platform can claim partner revenue from Bags without reducing the contributor envelope.
 
-The daily contributor payout workflow redistributes only the contributor-pool wallet's claimable fees:
+The daily payout workflow updates Bags-native BPS allocations; contributors claim through Bags:
 
 ```
-poolFees       = bagsClaimablePositions(platformPoolWallet, tokenMint)
-contributorPool = poolFees   // already net of 5% (taken on-chain)
-
-for rank r in topN:
-  recipient[r].amount = contributorPool * tierWeight[r]
+latestSnapshot = frozen leaderboard snapshot
+newBps         = allocate 10,000 BPS across active Bags claimers
+manager signs  = Bags fee-share config BPS rebalance
 ```
 
 Default tier weights (top 10): `[0.30, 0.20, 0.15, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05]`.
 
-If a contributor has no linked wallet at payout time, allocation lands in `escrow_holdings` as a claimable liability. Wallet link drains that liability on next cron tick (or on-demand via `processClaim` workflow). Expiry is an admin-review signal, not permission to silently retire contributor rewards.
+If a contributor has not onboarded to Bags, GitShipt does not create an off-chain balance. The contributor can be added later by the project owner/admin rail once Bags can resolve their GitHub identity.
 
-**Why hybrid Bags-direct + GitShipt-pool routing**: Bags direct wallets reduce custody for verified contributors, but Bags configs are prospective and capped. The GitShipt pool remains necessary for contributors who have not registered yet, contributors beyond Bags' claimer limit, and any policy-controlled fallback where GitHub verification must happen before payout.
+**Why Bags-direct routing**: Bags owns fee custody and claims. GitShipt's job is to keep the leaderboard, snapshots, and Bags BPS allocation in sync with repo activity.
 
 ---
 
@@ -393,7 +399,6 @@ If a contributor has no linked wallet at payout time, allocation lands in `escro
 | POST   | `/api/projects/[id]/launch`      | Fire Bags launch                    |
 | GET    | `/api/projects/[id]/leaderboard` | Cached leaderboard (5min)           |
 | POST   | `/api/wallets/verify`            | SIWS verify                         |
-| POST   | `/api/claims/link`               | Link contributor to user/wallet     |
 | POST   | `/api/admin/projects/[id]/pause` | Admin pause                         |
 | POST   | `/api/admin/payouts/[id]/retry`  | Admin retry                         |
 | POST   | `/api/webhooks/github`           | GitHub webhook receiver (HMAC)      |
@@ -403,15 +408,15 @@ If a contributor has no linked wallet at payout time, allocation lands in `escro
 
 All background work runs as **Vercel Workflows** triggered by **Vercel Cron Jobs** or webhooks. Each workflow is a `"use workflow"` function with `"use step"` units that are individually retried, persisted, and resumable across deploys.
 
-| Workflow             | Trigger                          | Cadence         | Pattern                                             |
-| -------------------- | -------------------------------- | --------------- | --------------------------------------------------- |
-| `indexGithubDeltas`  | Vercel Cron + GitHub webhook     | every 15m       | Root workflow fans out one child per active project |
-| `computeLeaderboard` | Internal (post-index) or cron    | hourly          | Per-project, idempotent                             |
-| `takeSnapshot`       | Vercel Cron                      | daily 00:00 UTC | Freezes leaderboard, persists Merkle root           |
-| `executePayout`      | Internal (post-snapshot)         | daily 00:30 UTC | Per-snapshot, fans out per-recipient batch          |
-| `expireEscrow`       | Vercel Cron                      | daily 01:00 UTC | Sweep                                               |
-| `processClaim`       | Server Action (post wallet-link) | on-demand       | Drains escrow to newly-linked wallet                |
-| `healthPulse`        | Vercel Cron                      | every 1m        | Heartbeat to admin dashboard                        |
+| Workflow             | Trigger                       | Cadence         | Pattern                                             |
+| -------------------- | ----------------------------- | --------------- | --------------------------------------------------- |
+| `indexGithubDeltas`  | Vercel Cron + GitHub webhook  | every 15m       | Root workflow fans out one child per active project |
+| `computeLeaderboard` | Internal (post-index) or cron | hourly          | Per-project, idempotent                             |
+| `takeSnapshot`       | Vercel Cron                   | daily 00:00 UTC | Freezes leaderboard, persists Merkle root           |
+| `executePayout`      | Internal (post-snapshot)      | daily 00:30 UTC | Per-snapshot, fans out per-recipient batch          |
+| `expireEscrow`       | Vercel Cron                   | daily 01:00 UTC | Sweep                                               |
+| `claimPartnerFees`   | Workflow + admin action       | daily / manual  | Claims GitShipt Bags partner revenue                |
+| `healthPulse`        | Vercel Cron                   | every 1m        | Heartbeat to admin dashboard                        |
 
 **Pro plan required**: Hobby cron is daily-only with ±60min imprecision. Pro unlocks per-minute schedules and tight timing (needed for 00:00 UTC snapshots).
 
@@ -1126,7 +1131,7 @@ export async function GET(req: Request) {
 ### Day 3 (April 27)
 
 - `takeSnapshot` + `executePayout` workflows end-to-end on devnet
-- `expireEscrow` + `processClaim` workflows
+- `rebalanceBps` + `claimPartnerFees` workflows
 - **Super-admin console**: Ops dashboard, kill switch, fee config, audit log, payout retry, treasury (read-only), workflow run inspector
 - Permission matrix and `requirePermission` helper enforced across all routes
 - Security pass (CSP, HMAC, idempotency, rate limits, CRON_SECRET, sensitive env audit)

@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import {
   ApiErrorResponseSchema,
-  ClaimEscrowRequestSchema,
   MfaEnrollResponseSchema,
   MfaVerifyResponseSchema,
   ProjectLeaderboardResponseSchema,
@@ -37,8 +36,6 @@ function schema(s: z.ZodType): JsonSchema {
 }
 
 const ErrorResponse = schema(ApiErrorResponseSchema);
-const SOLANA_ADDRESS_HINT = "Base58-encoded Solana public key (32–44 chars).";
-
 const NOT_AUTHENTICATED = {
   description: "Missing or invalid better-auth session.",
   content: { "application/json": { schema: ErrorResponse } },
@@ -83,7 +80,6 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
         WalletNonceRequest: schema(WalletNonceRequestSchema),
         WalletNonceResponse: schema(WalletNonceResponseSchema),
         WalletVerifyResponse: schema(WalletVerifyResponseSchema),
-        ClaimEscrowRequest: schema(ClaimEscrowRequestSchema),
         ProjectLeaderboardResponse: schema(ProjectLeaderboardResponseSchema),
         MfaEnrollResponse: schema(MfaEnrollResponseSchema),
         MfaVerifyResponse: schema(MfaVerifyResponseSchema),
@@ -326,59 +322,6 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
               description:
                 "Permission denied or destructive-action gate failed (`mfa_required`, `mfa_expired`, `confirmation_mismatch`, `reason_too_short`).",
             },
-            "429": RATE_LIMITED,
-          },
-        },
-      },
-
-      "/api/claims/link": {
-        post: {
-          summary: "Link a SIWS-verified wallet to a contributor row",
-          description: `Binds a verified wallet (already SIWS-linked to the same account) to the contributor's identity so future payouts route on-chain instead of into escrow. ${SOLANA_ADDRESS_HINT}`,
-          security: [{ session: [] }],
-          parameters: [
-            {
-              in: "header",
-              name: "Idempotency-Key",
-              required: false,
-              schema: { type: "string", pattern: "^[A-Za-z0-9_\\-:.]{8,128}$" },
-            },
-          ],
-          responses: {
-            "200": { description: "Linked." },
-            "400": INVALID_BODY,
-            "401": NOT_AUTHENTICATED,
-            "429": RATE_LIMITED,
-          },
-        },
-      },
-
-      "/api/claims/escrow": {
-        post: {
-          summary: "Drain eligible escrow holdings to the caller's wallet",
-          description:
-            "Sweeps held SOL/SPL liabilities for the caller across all eligible projects. Per-user rate limit: 6/min.",
-          security: [{ session: [] }],
-          parameters: [
-            {
-              in: "header",
-              name: "Idempotency-Key",
-              required: false,
-              schema: { type: "string", pattern: "^[A-Za-z0-9_\\-:.]{8,128}$" },
-            },
-          ],
-          requestBody: {
-            required: false,
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/ClaimEscrowRequest" },
-              },
-            },
-          },
-          responses: {
-            "200": { description: "Sweep started or completed." },
-            "400": INVALID_BODY,
-            "401": NOT_AUTHENTICATED,
             "429": RATE_LIMITED,
           },
         },

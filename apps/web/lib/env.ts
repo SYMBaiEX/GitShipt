@@ -220,7 +220,12 @@ export const hasCredentials = {
     ),
   bags: () => Boolean(serverEnv().BAGS_API_KEY),
   bagsWebhook: () => Boolean(serverEnv().BAGS_WEBHOOK_SECRET),
-  bagsPartner: () => Boolean(serverEnv().BAGS_PARTNER_WALLET),
+  bagsPartner: () =>
+    Boolean(
+      serverEnv().BAGS_API_KEY &&
+      serverEnv().BAGS_PARTNER_WALLET &&
+      serverEnv().BAGS_PARTNER_CONFIG_KEY,
+    ),
   solana: () => Boolean(serverEnv().HELIUS_RPC_URL),
   payoutKey: () => Boolean(serverEnv().SOLANA_PAYOUT_KEYPAIR),
   managerKey: () => Boolean(serverEnv().SOLANA_MANAGER_KEYPAIR),
@@ -371,6 +376,7 @@ export function productionReadiness(): ProductionReadiness {
     ["BAGS_API_KEY", env.BAGS_API_KEY],
     ["BAGS_WEBHOOK_SECRET", env.BAGS_WEBHOOK_SECRET],
     ["BAGS_PARTNER_WALLET", env.BAGS_PARTNER_WALLET],
+    ["BAGS_PARTNER_CONFIG_KEY", env.BAGS_PARTNER_CONFIG_KEY],
     ["HELIUS_RPC_URL", env.HELIUS_RPC_URL],
     ["SOLANA_PAYOUT_KEYPAIR", env.SOLANA_PAYOUT_KEYPAIR],
     ["SOLANA_MANAGER_KEYPAIR", env.SOLANA_MANAGER_KEYPAIR],

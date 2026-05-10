@@ -25,11 +25,6 @@ export const WalletVerifyResponseSchema = z.object({
 });
 export type WalletVerifyResponse = z.infer<typeof WalletVerifyResponseSchema>;
 
-export const ClaimEscrowRequestSchema = z.object({
-  projectId: z.string().min(1).optional(),
-});
-export type ClaimEscrowRequest = z.infer<typeof ClaimEscrowRequestSchema>;
-
 export const ProjectLeaderboardRowSchema = z.object({
   rank: z.number().int().positive(),
   contributorId: z.string().min(1),
@@ -48,9 +43,7 @@ export const ProjectLeaderboardRowSchema = z.object({
   weightPercent: z.number().min(0).max(100),
   isWalletLinked: z.boolean(),
 });
-export type ProjectLeaderboardRow = z.infer<
-  typeof ProjectLeaderboardRowSchema
->;
+export type ProjectLeaderboardRow = z.infer<typeof ProjectLeaderboardRowSchema>;
 
 export const ProjectLeaderboardResponseSchema = z.object({
   projectId: z.string().min(1),

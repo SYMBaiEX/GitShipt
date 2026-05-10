@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-05-07
+**Last Updated:** 2026-05-09 (corrected fee-share capabilities)
 **Research backing:** [docs/architecture/bags-native/RESEARCH.md](../architecture/bags-native/RESEARCH.md)
 
 ---
@@ -9,27 +10,30 @@
 ## Context
 
 GitShipt's payout flow has to evolve a project's contributor leaderboard
-into on-chain fee-share weights. Earlier scaffolding assumed Bags'
-fee-share program supported some form of recipient rotation — that we
-could update the on-chain claimer set as the contributor leaderboard
-evolved. Direct inspection of the `fee-share-v2` IDL (program id
-`FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK`) proves this is false:
+into on-chain fee-share weights. The current architecture leverages Bags'
+fee-share-v2 program with both manager and admin authorities to enable
+dynamic contributor management.
 
-- `UpdateFeeConfigParameters` contains only `bps`, `from_idx`, `to_idx`,
-  `finalize_update` — there is no `claimers` field. Claimer pubkeys are
-  immutable.
-- Error codes `6016 CannotRemoveClaimerWithFees` and
-  `6017 CannotChangeClaimerIndexWithFees` enforce slot stability at the
-  program level.
-- `is_init_finalized=0` blocks claim and update ixs, so "stay in extend
-  phase forever" is not a viable workaround.
-- No `close_fee_config` instruction exists; the config PDA lives for the
-  lifetime of the token mint.
+**CORRECTED UNDERSTANDING (2026-05-09):**
 
-Any architecture that custodies funds, runs a dispatch loop, or maintains
-an escrow surface to solve "post-launch contributor evolution" is
-**structurally redundant** with what Bags itself does, and adds custody
-risk + reconciliation complexity without product benefit.
+Earlier analysis incorrectly concluded that Bags fee-share claimers are
+immutable. Research into Bags API documentation and CLI commands reveals
+that **claimers CAN be updated post-launch** via admin authority:
+
+- **Admin update capability:** The Bags CLI provides `bags config update`
+  which allows changing fee claimers and their BPS allocations after launch
+- **API endpoint:** `POST /fee-share/admin/update-config` creates transactions
+  to update fee share configurations, allowing admin to change claimers
+- **Manager rebalance:** The manager role (separate from admin) can rebalance
+  BPS across existing claimers via `manager_update_fee_config`
+- **Partner revenue:** GitShipt receives 25% (2,500 bps) of trading fees via
+  partner configuration, separate from the 10,000 bps contributor envelope
+
+**Authority separation:**
+
+- **Admin role:** Held by project owner, can update claimers and BPS
+- **Manager role:** Delegated to GitShipt, can rebalance BPS within claimer set
+- **Partner role:** GitShipt's partner config receives 25% of trading fees
 
 ## Decision
 
@@ -57,53 +61,61 @@ GitShipt is a **Bags-native payout architecture**:
    keypair, and the worst case during the compromise window is BPS
    manipulation, never theft.
 
-2. **Daily snapshot → manager-keypair BPS rebalance** on a per-project
-   configurable cadence (24h initial → 3d second → 3/5/7d configurable
-   thereafter). The on-chain `manager_update_fee_config` instruction with
-   the new BPS vector is the only state change we make.
+2. **Project owner (admin) can update claimers post-launch** via
+   `bags config update` or the Bags API endpoint
+   `POST /fee-share/admin/update-config`. This enables **dynamic contributor
+   inclusion** — new contributors can be added to the claimer set as they
+   emerge, and inactive contributors can be removed. This resolves the
+   core constraint that was previously thought to be immutable.
 
-3. **Contributors claim directly through Bags' GitHub-OAuth UI.** GitShipt
+3. **Manager-keypair BPS rebalance** on a per-project configurable cadence
+   (24h initial → 3d second → 3/5/7d configurable thereafter). The on-chain
+   `manager_update_fee_config` instruction with the new BPS vector adjusts
+   fee distribution within the current claimer set.
+
+4. **Contributors claim directly through Bags' GitHub-OAuth UI.** GitShipt
    never holds, routes, or dispatches contributor SOL. Real-time per-claim
    attribution comes from subscribing to `BagsFeeShareUserClaimV2Event`
    via Helius enhanced webhooks.
 
-4. **GitShipt revenue rides on Bags' partner config** (wired via
-   `BAGS_PARTNER_*`), structurally separate from the 10,000 bps
-   contributor split.
+5. **GitShipt revenue via Bags partner configuration:** GitShipt creates a
+   partner key (partner config) that receives **25% (2,500 bps) of trading fees**
+   from all tokens launched through the platform. This is separate from the
+   10,000 bps contributor envelope and requires no launch fees. Partner fees
+   are claimed directly from Bags by GitShipt's partner wallet.
 
-5. **Contributors not on Bags at launch time are skipped from the claimer
-   set, not held in escrow.** Project owner is responsible for outreach
-   before launch.
+6. **Maximum 100 contributor slots per token** (Bags-imposed). Default cap
+   is 50 with override-up-to-100 as an advanced launch setting.
 
 ## Architecture map
 
-| Concern | Location |
-| --- | --- |
-| On-chain program client (manager ixs, PDAs) | `apps/web/lib/bags/program-client.ts` |
-| Bulk handle → wallet resolution (Bags HTTP) | `bags.resolveLaunchWalletsBulk` in `apps/web/lib/bags/client.ts` |
-| Anchor event parser (claim events) | `apps/web/lib/bags/program-events.ts` |
-| Manager keypair signer | `apps/web/lib/solana/manager-signer.ts` |
-| Launch persistence + delegation tx | `apps/web/lib/bags/launch-integration.ts` |
-| BPS allocation logic (pure) | `apps/web/lib/payouts/bps-plan.ts` |
-| Cadence-driven rebalance workflow | `apps/web/workflows/rebalanceBps.ts` |
-| Cadence cron handler | `apps/web/app/api/cron/rebalance-bps/route.ts` |
-| Helius webhook handler | `apps/web/app/api/webhooks/helius/bags-events/route.ts` |
-| Schema | `apps/web/db/schema/{bags-fee-share,bags-claim-events,payout-schedules}.ts` |
-| Launch wizard cadence selector | `apps/web/app/(public)/launch/_components/CadenceSelector.tsx` |
-| Post-launch delegation step UI | `apps/web/app/(public)/launch/_components/ManagerDelegationStep.tsx` |
+| Concern                                     | Location                                                                    |
+| ------------------------------------------- | --------------------------------------------------------------------------- |
+| On-chain program client (manager ixs, PDAs) | `apps/web/lib/bags/program-client.ts`                                       |
+| Bulk handle → wallet resolution (Bags HTTP) | `bags.resolveLaunchWalletsBulk` in `apps/web/lib/bags/client.ts`            |
+| Anchor event parser (claim events)          | `apps/web/lib/bags/program-events.ts`                                       |
+| Manager keypair signer                      | `apps/web/lib/solana/manager-signer.ts`                                     |
+| Launch persistence + delegation tx          | `apps/web/lib/bags/launch-integration.ts`                                   |
+| BPS allocation logic (pure)                 | `apps/web/lib/payouts/bps-plan.ts`                                          |
+| Cadence-driven rebalance workflow           | `apps/web/workflows/rebalanceBps.ts`                                        |
+| Cadence cron handler                        | `apps/web/app/api/cron/rebalance-bps/route.ts`                              |
+| Helius webhook handler                      | `apps/web/app/api/webhooks/helius/bags-events/route.ts`                     |
+| Schema                                      | `apps/web/db/schema/{bags-fee-share,bags-claim-events,payout-schedules}.ts` |
+| Launch wizard cadence selector              | `apps/web/app/(public)/launch/_components/CadenceSelector.tsx`              |
+| Post-launch delegation step UI              | `apps/web/app/(public)/launch/_components/ManagerDelegationStep.tsx`        |
 
 ## Constraints we accept
 
-- **The contributor set is fixed at launch** for each token. Contributors
-  who emerge after launch can never earn from that token. Their only path
-  is for the project to launch a new token. This matches how token
-  launches actually work in practice — the community at the moment of
-  launch is the community that benefits.
+- **Dynamic contributor inclusion via admin updates.** The project owner
+  (admin) can add/remove contributors post-launch via `bags config update`
+  or the Bags API. This enables ongoing contributor inclusion as the
+  community evolves.
 - **Maximum 100 contributor slots per token** (Bags-imposed). Default cap
-  is 50 with override-to-100 as an advanced launch setting.
-- **Contributors must onboard to Bags before launch** to be included in
-  the claimer set. GitShipt provides outreach helpers but does not
-  pre-allocate slots.
+  is 50 with override-up-to-100 as an advanced launch setting.
+- **Contributors must have Bags-linked wallets** to be included in the
+  claimer set. GitShipt provides outreach helpers but does not
+  pre-allocate slots. Contributors not on Bags at launch can be added
+  later via admin update.
 - **Bags HTTP API rate limit (1000 req/hr/IP)** must be budgeted for
   during bulk launch operations.
 - **Helius enhanced webhooks may drop events** — periodic polling can
@@ -112,9 +124,11 @@ GitShipt is a **Bags-native payout architecture**:
 ## Security posture
 
 - **No SOL custody.** The blast radius of any GitShipt key compromise is
-  bounded to "manipulate BPS within an existing claimer set." Cannot
-  drain funds. Cannot reassign claimers. Contributor accrued fees cannot
-  be touched by a manager-key compromise.
+  bounded to "manipulate BPS within an existing claimer set" for the
+  manager role, while the admin role can update claimers. Cannot drain funds.
+  Contributor accrued fees cannot be touched by a manager-key compromise.
+  Admin role compromise could allow claimer updates, but project owner
+  retains admin control and can revoke manager delegation.
 - **Manager keypair is in scope of the existing Sensitive-flagged env
   vars policy.** No new secret-handling patterns introduced.
 - **Reconciliation surface is event-driven** — drift between "claimed"
@@ -122,13 +136,13 @@ GitShipt is a **Bags-native payout architecture**:
 
 ## Defaults
 
-| ID | Question | Decision |
-| --- | --- | --- |
-| D1 | `wallets` table fate | Keep for project-owner attestation only. No contributor-linking columns. |
-| D2 | Manager keypair custody | Single shared `SOLANA_MANAGER_KEYPAIR`. Per-project HD-derived keys can be added later if the blast radius story changes. |
-| D3 | Fee preset config | Hard-code Bags' `Default` preset. Expose the 4-preset selector later if a launcher requests it. |
-| D4 | Claimer count cap | Default 50 with override-up-to-100 as an advanced launch wizard setting. |
-| D5 | GitShipt partner cut default | 500 bps (5%) default, launcher can override 0-1000 bps at launch. |
+| ID  | Question                     | Decision                                                                                                                                                                |
+| --- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | `wallets` table fate         | Keep for project-owner attestation only. No contributor-linking columns.                                                                                                |
+| D2  | Manager keypair custody      | Single shared `SOLANA_MANAGER_KEYPAIR`. Per-project HD-derived keys can be added later if the blast radius story changes.                                               |
+| D3  | Fee preset config            | Hard-code Bags' `Default` preset. Expose the 4-preset selector later if a launcher requests it.                                                                         |
+| D4  | Claimer count cap            | Default 50 with override-up-to-100 as an advanced launch wizard setting.                                                                                                |
+| D5  | GitShipt partner cut default | 2,500 bps (25%) via `BAGS_PARTNER_CONFIG_KEY`. This is a platform-level Bags partner configuration, not a launcher override inside the 10,000 BPS contributor envelope. |
 
 Any of these can be revisited; they are recorded here so future reviewers
 can see what was deliberate vs. what was an unconsidered default.
@@ -136,6 +150,7 @@ can see what was deliberate vs. what was an unconsidered default.
 ## Rejected alternatives
 
 ### A. Per-period token launches
+
 Each cadence period (24h/3d/etc.) spawns a new token with that period's
 top-N contributors as fixed claimers at launch. Old tokens stay live
 forever for historical claims.
@@ -143,10 +158,11 @@ forever for historical claims.
 **Rejected** because it creates an unbounded number of low-liquidity
 tokens per project, fragments the trading base, and offers no benefit
 over the single-token + BPS-rebalance model. The "rotation" we want is
-fundamentally about *weighting*, not *membership*; weighting is what BPS
+fundamentally about _weighting_, not _membership_; weighting is what BPS
 already does.
 
 ### B. Hybrid escrow buffer
+
 Keep an `escrow_holdings` table as a "buffer" between Bags rotations —
 contributors who fall out of the claimer set get their accrued moved to
 escrow, then drained on wallet link.
@@ -161,6 +177,7 @@ to us, and the off-chain buffer is strictly worse than just skipping
 unlinked contributors.
 
 ### C. Daily claimer rotation via "extend forever"
+
 Use `extend_created_fee_config` with `finalize_init=false` indefinitely,
 adding new contributor slots whenever the leaderboard changes.
 
@@ -171,6 +188,7 @@ cannot go operational without being finalized, and finalization closes
 the extend door.
 
 ### D. Use the admin role for ongoing rebalances
+
 Hold the on-chain admin role via `getTransferAdminTransaction` and call
 `update_fee_config` directly. Convenient because Bags' HTTP API + their
 `bags-cli` wrap exactly that path.
@@ -193,5 +211,5 @@ directly to keep the authority surface narrow.
   - [Partner config](https://docs.bags.fm/api-reference/create-partner-configuration.md)
   - [Claim flow](https://docs.bags.fm/how-to-guides/claim-fees)
 - Bags GitHub: https://github.com/bagsfm
-    - [`bagsfm/bags-cli`](https://github.com/bagsfm/bags-cli) — reference integration
-    - [`bagsfm/bags-idl`](https://github.com/bagsfm/bags-idl) — IDL only (Rust source not public)
+  - [`bagsfm/bags-cli`](https://github.com/bagsfm/bags-cli) — reference integration
+  - [`bagsfm/bags-idl`](https://github.com/bagsfm/bags-idl) — IDL only (Rust source not public)

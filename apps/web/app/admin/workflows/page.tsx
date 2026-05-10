@@ -9,16 +9,13 @@ import { cn } from "@repo/lib";
 import vercelConfig from "../../../../../vercel.json";
 import { WorkflowRetriggerButton } from "./_components/WorkflowRetriggerButton";
 
-
 type WorkflowName =
   | "healthPulse"
   | "indexGithubDeltas"
   | "computeLeaderboard"
   | "takeSnapshot"
-  | "executePayout"
-  | "expireEscrow"
-  | "reconcileFunds"
-  | "processClaim"
+  | "rebalanceBps"
+  | "claimPartnerFees"
   | "publishKpis";
 
 type ManualTrigger =
@@ -103,40 +100,16 @@ const WORKFLOWS: WorkflowDef[] = [
       "Daily snapshot freeze. Per-project trigger lives on project pages.",
   },
   {
-    name: "executePayout",
-    heartbeatKey: "payouts",
-    cronPath: "/api/cron/payout",
-    fallbackSchedule: "30 0 * * *",
-    manual: {
-      kind: "enabled",
-      label: "No args",
-      detail: "Queues payout fan-out for frozen snapshots awaiting payout.",
-    },
-    description: "Claim + distribute all frozen snapshots awaiting payout.",
-  },
-  {
-    name: "expireEscrow",
-    heartbeatKey: "escrow",
-    cronPath: "/api/cron/expire-escrow",
-    fallbackSchedule: "0 1 * * *",
-    manual: {
-      kind: "enabled",
-      label: "No args",
-      detail: "Queues the escrow expiry sweep.",
-    },
-    description: "Sweep expired escrow back to platform.",
-  },
-  {
-    name: "reconcileFunds",
-    heartbeatKey: "fund_reconciliation",
-    cronPath: "/api/cron/reconcile-funds",
+    name: "rebalanceBps",
+    heartbeatKey: "rebalance_bps",
+    cronPath: "/api/cron/rebalance-bps",
     fallbackSchedule: "*/15 * * * *",
     manual: {
       kind: "enabled",
       label: "No args",
-      detail: "Promotes finalized signatures and records liability checks.",
+      detail: "Queues Bags-native BPS rebalance for due schedules.",
     },
-    description: "Reconcile hot-wallet balance, escrow, payouts, and claim attempts.",
+    description: "Updates existing Bags claimer BPS from frozen snapshots.",
   },
   {
     name: "publishKpis",
@@ -151,17 +124,17 @@ const WORKFLOWS: WorkflowDef[] = [
     description: "Publish the cached public landing ticker.",
   },
   {
-    name: "processClaim",
+    name: "claimPartnerFees",
     heartbeatKey: null,
-    cronPath: null,
-    fallbackSchedule: "event only",
+    cronPath: "/api/cron/claim-partner-fees",
+    fallbackSchedule: "30 0 * * *",
     manual: {
-      kind: "event",
-      label: "Event payload required",
-      detail:
-        "Triggered by claim routes with contributorId, userId, and walletAddress.",
+      kind: "enabled",
+      label: "No args",
+      detail: "Claims GitShipt partner fees using Bags-provided transactions.",
     },
-    description: "Drains escrow on wallet link. Event-driven, not cron.",
+    description:
+      "Claims Bags partner revenue into the configured partner wallet.",
   },
 ];
 

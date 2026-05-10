@@ -23,8 +23,6 @@ describe("buildOpenApiSpec", () => {
       "/api/projects/{id}/leaderboard",
       "/api/projects/{id}/launch",
       "/api/projects/{id}/transfer",
-      "/api/claims/link",
-      "/api/claims/escrow",
       "/api/auth/mfa/enroll",
       "/api/auth/mfa/verify",
     ];
@@ -71,8 +69,6 @@ describe("buildOpenApiSpec", () => {
       "/api/projects",
       "/api/projects/{id}/launch",
       "/api/projects/{id}/transfer",
-      "/api/claims/link",
-      "/api/claims/escrow",
     ];
     for (const path of limited) {
       const responses = (

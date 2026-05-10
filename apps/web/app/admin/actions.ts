@@ -55,6 +55,7 @@ import { indexGithubDeltas } from "@/workflows/indexGithubDeltas";
 import { takeSnapshot, takeProjectSnapshot } from "@/workflows/takeSnapshot";
 import { rebalanceBps } from "@/workflows/rebalanceBps";
 import { publishKpis } from "@/workflows/publishKpis";
+import { claimPartnerFeesWorkflow } from "@/workflows/claimPartnerFees";
 import { computeLeaderboard as computeLeaderboardWorkflow } from "@/workflows/computeLeaderboard";
 import {
   type AdminWorkflowName,
@@ -1002,7 +1003,7 @@ export async function claimPartnerFees(input: unknown): Promise<
         destructiveAction(
           {
             actorUserId: ctx.userId,
-            permission: "platform.treasury.topup",
+            permission: "platform.treasury.claim",
             reason: parsed.reason,
             targetName: "partner.fees.claim",
             typedConfirmation: parsed.typedConfirmation,
@@ -1364,6 +1365,7 @@ const TriggerWorkflowSchema = z.object({
     "indexGithubDeltas",
     "takeSnapshot",
     "rebalanceBps",
+    "claimPartnerFees",
     "publishKpis",
   ]),
   idempotencyKey: z.string().min(8).optional(),
@@ -1399,7 +1401,9 @@ export async function retriggerWorkflow(
               ? await start(takeSnapshot, [])
               : parsed.name === "rebalanceBps"
                 ? await start(rebalanceBps, [])
-                : await start(publishKpis, []);
+                : parsed.name === "claimPartnerFees"
+                  ? await start(claimPartnerFeesWorkflow, [])
+                  : await start(publishKpis, []);
 
       await audit({
         actorUserId: ctx.userId,

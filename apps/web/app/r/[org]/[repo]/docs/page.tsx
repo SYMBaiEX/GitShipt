@@ -122,11 +122,10 @@ async function ProjectDocsPageContent({ params }: { params: Params }) {
             </p>
             <p>
               Once a day at <span className="text-mono-sm">00:30 UTC</span>, the
-              platform claims the contributor pool from Bags and sends each
-              contributor a share of SOL based on their leaderboard rank. The
-              split is tier-weighted —{" "}
+              platform refreshes the Bags-native contributor split based on the
+              latest leaderboard snapshot. The split is tier-weighted:{" "}
               {header.payoutConfig.topN > 0
-                ? `${(header.payoutConfig.tierWeights[0]! * 100).toFixed(0)}% to rank 1, ${(header.payoutConfig.tierWeights[1]! * 100).toFixed(0)}% to rank 2, ${(header.payoutConfig.tierWeights[2]! * 100).toFixed(0)}% to rank 3, and the rest distributed across ranks 4–${header.payoutConfig.topN}.`
+                ? `${(header.payoutConfig.tierWeights[0]! * 100).toFixed(0)}% to rank 1, ${(header.payoutConfig.tierWeights[1]! * 100).toFixed(0)}% to rank 2, ${(header.payoutConfig.tierWeights[2]! * 100).toFixed(0)}% to rank 3, and the rest allocated across ranks 4-${header.payoutConfig.topN}.`
                 : "see the Token tab for current weights."}
             </p>
           </Section>

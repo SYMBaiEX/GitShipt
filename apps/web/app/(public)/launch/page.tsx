@@ -7,6 +7,7 @@ import { dbHttp } from "@/db";
 import { projects } from "@/db/schema";
 import { requirePermission, PermissionError } from "@/lib/auth/permissions";
 import { WizardShell, type DraftHydration } from "./_components/WizardShell";
+import { SolanaWalletProvider } from "@/components/providers/SolanaWalletProvider";
 
 export const metadata = {
   title: "Launch a token",
@@ -50,12 +51,14 @@ async function LaunchPageContent({ searchParams }: LaunchPageProps) {
   }
 
   return (
-    <WizardShell
-      signedIn={signedIn}
-      isStubMode={config.isStubMode}
-      initialBuyLamports={config.initialBuyLamports}
-      draft={draft}
-    />
+    <SolanaWalletProvider>
+      <WizardShell
+        signedIn={signedIn}
+        isStubMode={config.isStubMode}
+        initialBuyLamports={config.initialBuyLamports}
+        draft={draft}
+      />
+    </SolanaWalletProvider>
   );
 }
 

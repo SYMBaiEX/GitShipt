@@ -784,6 +784,36 @@ export async function completeLaunchAction(input: {
       );
     }
 
+    // Record the launch in the Bags-native data layer before switching the
+    // visible project state to `live`. If this fails after the wallet
+    // broadcast, the project remains `launch_configured` and the user/admin
+    // can safely retry completion without a half-live rebalance gap.
+    const claimers = buildLaunchClaimerSet(project);
+    if (!claimers) {
+      throw new ActionError(
+        "launch_record_missing_claimers",
+        "Launch succeeded on-chain but GitShipt could not derive the claimer set to record. Manual reconciliation required.",
+        500,
+        projectId,
+      );
+    }
+    if (!project.tokenMint) {
+      throw new ActionError(
+        "launch_record_missing_mint",
+        "Launch succeeded but tokenMint is missing from the persisted project row. Manual reconciliation required.",
+        500,
+        projectId,
+      );
+    }
+    await recordLaunch({
+      projectId,
+      baseMint: project.tokenMint,
+      adminPubkey: launchWalletAddress,
+      claimers,
+      steadyStateCadenceHours:
+        project.payoutConfig?.steadyStateCadenceHours ?? 72,
+    });
+
     const now = new Date();
     const [updated] = await dbHttp
       .update(projects)
@@ -806,7 +836,7 @@ export async function completeLaunchAction(input: {
     if (!updated?.tokenMint) {
       throw new ActionError(
         "launch_complete_persist_failed",
-        "The launch was broadcast, but GitShipt could not persist the live state. Manual review is required before retrying.",
+        "The launch was broadcast and mirrored, but GitShipt could not mark the project live. Retry launch completion; the mirror rows are idempotent.",
         500,
         projectId,
       );
@@ -827,36 +857,6 @@ export async function completeLaunchAction(input: {
         initialBuyLamports: ready.config.initialBuyLamports,
         cluster: serverEnvCluster(),
       },
-    });
-
-    // Record the launch in the Bags-native data layer. Failure here is a
-    // hard failure — the on-chain launch succeeded but our DB doesn't
-    // know about the fee-share config, which means the rebalance cron
-    // can't run and the claim feed can't render. Surface it.
-    const claimers = buildLaunchClaimerSet(project);
-    if (!claimers) {
-      throw new ActionError(
-        "launch_record_missing_claimers",
-        "Launch succeeded on-chain but GitShipt could not derive the claimer set to record. Manual reconciliation required.",
-        500,
-        projectId,
-      );
-    }
-    if (!updated.tokenMint) {
-      throw new ActionError(
-        "launch_record_missing_mint",
-        "Launch succeeded but tokenMint is missing from the persisted project row. Manual reconciliation required.",
-        500,
-        projectId,
-      );
-    }
-    await recordLaunch({
-      projectId,
-      baseMint: updated.tokenMint,
-      adminPubkey: launchWalletAddress,
-      claimers,
-      steadyStateCadenceHours:
-        project.payoutConfig?.steadyStateCadenceHours ?? 72,
     });
 
     revalidatePath(`/r/${updated.ghOwner}/${updated.ghRepo}`);
@@ -1024,10 +1024,7 @@ export async function prepareManagerDelegationAction(
 export async function confirmManagerDelegationAction(input: {
   projectId: string;
   txSignature: string;
-}): Promise<
-  | { ok: true; managerPubkey: string }
-  | LaunchActionError
-> {
+}): Promise<{ ok: true; managerPubkey: string } | LaunchActionError> {
   const session = await auth().api.getSession({ headers: await headers() });
   if (!session?.user?.id) {
     return {

@@ -29,7 +29,7 @@ const STEPS: Step[] = [
     n: 3,
     icon: Rocket,
     title: "Launch a token",
-    desc: "Mint via Bags.fm; trading fees auto-distribute to top contributors daily.",
+    desc: "Mint via Bags.fm and let GitShipt keep contributor BPS aligned with the leaderboard.",
   },
 ];
 
@@ -46,8 +46,9 @@ export function OnboardingHero() {
       <div className="text-center">
         <h2 className="text-headline-md text-fg">Get started in 3 steps</h2>
         <p className="mx-auto mt-1 max-w-xl text-body-md text-fg-secondary">
-          GitShipt pays out trading fees to your repo&rsquo;s top contributors
-          every day. Here&rsquo;s how to launch your first token.
+          GitShipt routes trading fees to your repo&rsquo;s top contributors
+          through Bags-native fee sharing. Here&rsquo;s how to launch your first
+          token.
         </p>
       </div>
 

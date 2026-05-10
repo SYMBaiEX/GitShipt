@@ -32,6 +32,9 @@ const HAS_E2E_DB = Boolean(
   process.env.POSTGRES_URL_NON_POOLING ||
   process.env.POSTGRES_PRISMA_URL,
 );
+if (process.env.E2E_REQUIRE_DB === "1" && !HAS_E2E_DB) {
+  throw new Error("E2E_REQUIRE_DB=1 requires a staging DATABASE_URL/POSTGRES_URL.");
+}
 const dbTest = HAS_E2E_DB ? test : test.skip;
 
 const HYDRATION_RE =

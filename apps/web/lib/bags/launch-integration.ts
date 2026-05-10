@@ -30,7 +30,7 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { eq } from "drizzle-orm";
-import { dbHttp } from "@/db";
+import { dbHttp, dbPool } from "@/db";
 import {
   bagsClaimerProviderEnum,
   bagsClaimerSlots,
@@ -96,105 +96,136 @@ export interface RecordLaunchResult {
  * uses. Sets payout_schedules.next_run_at to now + 24h (the cadence
  * ramp-up's first-run window).
  *
- * Throws if a bags_fee_share_configs row already exists for this project.
- * The launch wizard owns the single attempt; there is no replay path.
+ * Idempotent for retry safety: if the mirror row already exists for the same
+ * project/base mint, returns the existing config + schedule. This lets launch
+ * completion recover after the wallet broadcast succeeds but a later DB write
+ * fails.
  */
 export async function recordLaunch(
   input: RecordLaunchInput,
 ): Promise<RecordLaunchResult> {
   validateLaunchInput(input);
 
-  const existing = await dbHttp
-    .select()
-    .from(bagsFeeShareConfigs)
-    .where(eq(bagsFeeShareConfigs.projectId, input.projectId))
-    .limit(1);
-  if (existing[0]) {
-    throw new Error(
-      `recordLaunch: a bags_fee_share_configs row already exists for project ${input.projectId} — refusing to overwrite. Manual cleanup required.`,
-    );
-  }
-
   const baseMintPk = new PublicKey(input.baseMint);
   const [feeShareConfigPda] = deriveFeeShareConfigPda(baseMintPk);
   const [feeShareAuthorityPda] = deriveFeeShareAuthorityPda(baseMintPk);
 
-  // Single transaction in spirit — Drizzle pool transactions would be
-  // ideal here, but the schema-level FKs make ordering safe across
-  // separate inserts: configs → slots → schedule.
-  const [insertedConfig] = await dbHttp
-    .insert(bagsFeeShareConfigs)
-    .values({
-      projectId: input.projectId,
-      baseMint: input.baseMint,
-      quoteMint: WSOL_MINT.toBase58(),
-      feeShareConfigPda: feeShareConfigPda.toBase58(),
-      feeShareAuthorityPda: feeShareAuthorityPda.toBase58(),
-      adminPubkey: input.adminPubkey,
-      managerPubkey: null, // populated by confirmManagerDelegation
-      claimerCount: input.claimers.length,
-      isInitFinalized: true, // Bags' SDK auto-finalizes at launch
-      isUpdateLocked: false,
-      isUpdateFinalized: false,
-    })
-    .returning({ id: bagsFeeShareConfigs.id });
-  if (!insertedConfig) {
-    throw new Error(
-      "recordLaunch: failed to insert bags_fee_share_configs row",
+  const result = await dbPool().transaction(async (tx) => {
+    const [existing] = await tx
+      .select({
+        id: bagsFeeShareConfigs.id,
+        baseMint: bagsFeeShareConfigs.baseMint,
+        feeShareConfigPda: bagsFeeShareConfigs.feeShareConfigPda,
+      })
+      .from(bagsFeeShareConfigs)
+      .where(eq(bagsFeeShareConfigs.projectId, input.projectId))
+      .limit(1);
+    if (existing) {
+      if (existing.baseMint !== input.baseMint) {
+        throw new Error(
+          `recordLaunch: existing base mint ${existing.baseMint} does not match ${input.baseMint} for project ${input.projectId}`,
+        );
+      }
+      const [schedule] = await tx
+        .select({ id: payoutSchedules.id })
+        .from(payoutSchedules)
+        .where(eq(payoutSchedules.projectId, input.projectId))
+        .limit(1);
+      if (!schedule) {
+        throw new Error(
+          `recordLaunch: existing fee-share mirror for project ${input.projectId} is missing payout schedule`,
+        );
+      }
+      return {
+        feeShareConfigId: existing.id,
+        payoutScheduleId: schedule.id,
+        feeShareConfigPda: existing.feeShareConfigPda,
+        inserted: false,
+      };
+    }
+
+    const [insertedConfig] = await tx
+      .insert(bagsFeeShareConfigs)
+      .values({
+        projectId: input.projectId,
+        baseMint: input.baseMint,
+        quoteMint: WSOL_MINT.toBase58(),
+        feeShareConfigPda: feeShareConfigPda.toBase58(),
+        feeShareAuthorityPda: feeShareAuthorityPda.toBase58(),
+        adminPubkey: input.adminPubkey,
+        managerPubkey: null, // populated by confirmManagerDelegation
+        claimerCount: input.claimers.length,
+        isInitFinalized: true, // Bags' SDK auto-finalizes at launch
+        isUpdateLocked: false,
+        isUpdateFinalized: false,
+      })
+      .returning({ id: bagsFeeShareConfigs.id });
+    if (!insertedConfig) {
+      throw new Error(
+        "recordLaunch: failed to insert bags_fee_share_configs row",
+      );
+    }
+    const feeShareConfigId = insertedConfig.id;
+
+    await tx.insert(bagsClaimerSlots).values(
+      input.claimers.map((c) => ({
+        feeShareConfigId,
+        slotIndex: c.slotIndex,
+        claimerPubkey: c.claimerPubkey,
+        provider: c.provider,
+        socialHandle: c.socialHandle,
+        contributorId: c.contributorId,
+        initialBps: c.initialBps,
+        currentBps: c.initialBps,
+      })),
     );
-  }
-  const feeShareConfigId = insertedConfig.id;
 
-  await dbHttp.insert(bagsClaimerSlots).values(
-    input.claimers.map((c) => ({
-      feeShareConfigId,
-      slotIndex: c.slotIndex,
-      claimerPubkey: c.claimerPubkey,
-      provider: c.provider,
-      socialHandle: c.socialHandle,
-      contributorId: c.contributorId,
-      initialBps: c.initialBps,
-      currentBps: c.initialBps,
-    })),
-  );
-
-  const now = new Date();
-  const nextRunAt = new Date(
-    now.getTime() + RAMP_UP_FIRST_RUN_HOURS * 3600 * 1000,
-  );
-  const [insertedSchedule] = await dbHttp
-    .insert(payoutSchedules)
-    .values({
-      projectId: input.projectId,
-      steadyStateCadenceHours: input.steadyStateCadenceHours,
-      status: "pending_first_run",
-      nextRunAt,
-    })
-    .returning({ id: payoutSchedules.id });
-  if (!insertedSchedule) {
-    throw new Error(
-      "recordLaunch: failed to insert payout_schedules row",
+    const now = new Date();
+    const nextRunAt = new Date(
+      now.getTime() + RAMP_UP_FIRST_RUN_HOURS * 3600 * 1000,
     );
-  }
+    const [insertedSchedule] = await tx
+      .insert(payoutSchedules)
+      .values({
+        projectId: input.projectId,
+        steadyStateCadenceHours: input.steadyStateCadenceHours,
+        status: "pending_first_run",
+        nextRunAt,
+      })
+      .returning({ id: payoutSchedules.id });
+    if (!insertedSchedule) {
+      throw new Error("recordLaunch: failed to insert payout_schedules row");
+    }
 
-  await audit({
-    actorUserId: null,
-    action: "project.launch_complete",
-    targetType: "project",
-    targetId: input.projectId,
-    metadata: {
+    return {
       feeShareConfigId,
+      payoutScheduleId: insertedSchedule.id,
       feeShareConfigPda: feeShareConfigPda.toBase58(),
-      claimerCount: input.claimers.length,
-      steadyStateCadenceHours: input.steadyStateCadenceHours,
+      inserted: true,
       nextRunAtISO: nextRunAt.toISOString(),
-    },
+    };
   });
 
+  if (result.inserted) {
+    await audit({
+      actorUserId: null,
+      action: "project.launch_complete",
+      targetType: "project",
+      targetId: input.projectId,
+      metadata: {
+        feeShareConfigId: result.feeShareConfigId,
+        feeShareConfigPda: result.feeShareConfigPda,
+        claimerCount: input.claimers.length,
+        steadyStateCadenceHours: input.steadyStateCadenceHours,
+        nextRunAtISO: result.nextRunAtISO,
+      },
+    });
+  }
+
   return {
-    feeShareConfigId,
-    payoutScheduleId: insertedSchedule.id,
-    feeShareConfigPda: feeShareConfigPda.toBase58(),
+    feeShareConfigId: result.feeShareConfigId,
+    payoutScheduleId: result.payoutScheduleId,
+    feeShareConfigPda: result.feeShareConfigPda,
   };
 }
 
@@ -209,7 +240,11 @@ function validateLaunchInput(input: RecordLaunchInput): void {
   const seenPubkeys = new Set<string>();
   for (const c of input.claimers) {
     bpsSum += c.initialBps;
-    if (!Number.isInteger(c.initialBps) || c.initialBps < 0 || c.initialBps > 10_000) {
+    if (
+      !Number.isInteger(c.initialBps) ||
+      c.initialBps < 0 ||
+      c.initialBps > 10_000
+    ) {
       throw new Error(`initialBps must be in [0, 10000]; got ${c.initialBps}`);
     }
     if (!Number.isInteger(c.slotIndex) || c.slotIndex < 0) {
@@ -427,4 +462,3 @@ export async function confirmManagerDelegation(
 
   return { managerPubkey: expectedManager.toBase58() };
 }
-

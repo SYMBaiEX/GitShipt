@@ -301,9 +301,9 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
         const isStub = Boolean(tokenInfo.__stub);
 
         // Step 2: fee-share config.
-        // Payer is the platform hot wallet — when SOLANA_PAYOUT_KEYPAIR is
-        // missing we fall back to the resolved pool wallet so the SDK
-        // payload still validates (in stub mode the value is unused anyway).
+        // Payer is the server-side launch/manager signer. When
+        // SOLANA_PAYOUT_KEYPAIR is missing we fall back to the resolved pool
+        // wallet so the SDK payload still validates in stub mode.
         const payoutWallet = payoutSignerPublicKey();
         if (!isStub && !payoutWallet) {
           throw new LaunchError(
@@ -548,7 +548,7 @@ function deriveSymbolFromName(name: string): string {
 }
 
 function defaultTokenDescription(owner: string, repo: string): string {
-  return `Token for ${owner}/${repo}. Fees redistribute to top contributors daily.`;
+  return `Token for ${owner}/${repo}. Fees route to top contributors through Bags.`;
 }
 
 function serverEnvCluster(): string {

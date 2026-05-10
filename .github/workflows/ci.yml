@@ -64,12 +64,10 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Audit (HIGH+ blocks; document accepted advisories explicitly)
-        # Two transitive advisories are tracked upstream
-        # (bigint-buffer via @bagsfm/bags-sdk, uuid via @solana/web3.js).
-        # We let the job complete with informational output until upstream
-        # ships fixes, then flip continue-on-error to false.
-        continue-on-error: true
-        run: bun audit --audit-level=high
+        # High+ advisories block CI. If an unavoidable transitive advisory
+        # appears, document it in docs/security-audit-exceptions.md with an
+        # owner and expiry before adding a narrow temporary exception here.
+        run: bun run security:audit
 
   e2e:
     name: playwright e2e

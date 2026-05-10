@@ -30,94 +30,92 @@ export default async function ProjectOgImage({
   const ghRepo = data?.header.ghRepo ?? repo;
 
   return new ImageResponse(
-    (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background:
+          "radial-gradient(circle at 30% 20%, #1a1a1a 0%, #050505 60%)",
+        color: "#f5f5f5",
+        fontFamily: "system-ui, sans-serif",
+        padding: "60px 72px",
+        justifyContent: "space-between",
+      }}
+    >
       <div
         style={{
-          width: "100%",
-          height: "100%",
           display: "flex",
-          flexDirection: "column",
-          background:
-            "radial-gradient(circle at 30% 20%, #1a1a1a 0%, #050505 60%)",
-          color: "#f5f5f5",
-          fontFamily: "system-ui, sans-serif",
-          padding: "60px 72px",
+          alignItems: "center",
           justifyContent: "space-between",
+          color: "#a3a3a3",
+          fontSize: 24,
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            color: "#a3a3a3",
-            fontSize: 24,
-            letterSpacing: "0.05em",
-            textTransform: "uppercase",
-          }}
-        >
-          <div>GitShipt</div>
-          <div style={{ fontFamily: "ui-monospace, monospace" }}>
-            {ghOwner}/{ghRepo}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div
-            style={{
-              fontSize: 88,
-              lineHeight: 1.05,
-              fontWeight: 700,
-              color: "#fafafa",
-              letterSpacing: "-0.025em",
-            }}
-          >
-            {name}
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              fontFamily: "ui-monospace, monospace",
-              fontSize: 32,
-              color: "#71717a",
-            }}
-          >
-            {language ? (
-              <span
-                style={{
-                  background: "#262626",
-                  padding: "8px 16px",
-                  borderRadius: 12,
-                  color: "#fafafa",
-                }}
-              >
-                {language}
-              </span>
-            ) : null}
-            <span>daily on-chain payouts</span>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderTop: "1px solid #262626",
-            paddingTop: 28,
-            color: "#737373",
-            fontSize: 22,
-          }}
-        >
-          <div>Trade fees → top contributors, every 24h</div>
-          <div style={{ fontFamily: "ui-monospace, monospace" }}>
-            gitshipt.com
-          </div>
+        <div>GitShipt</div>
+        <div style={{ fontFamily: "ui-monospace, monospace" }}>
+          {ghOwner}/{ghRepo}
         </div>
       </div>
-    ),
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div
+          style={{
+            fontSize: 88,
+            lineHeight: 1.05,
+            fontWeight: 700,
+            color: "#fafafa",
+            letterSpacing: "-0.025em",
+          }}
+        >
+          {name}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            fontFamily: "ui-monospace, monospace",
+            fontSize: 32,
+            color: "#71717a",
+          }}
+        >
+          {language ? (
+            <span
+              style={{
+                background: "#262626",
+                padding: "8px 16px",
+                borderRadius: 12,
+                color: "#fafafa",
+              }}
+            >
+              {language}
+            </span>
+          ) : null}
+          <span>Bags-native fee sharing</span>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderTop: "1px solid #262626",
+          paddingTop: 28,
+          color: "#737373",
+          fontSize: 22,
+        }}
+      >
+        <div>Trade fees → top contributors, every 24h</div>
+        <div style={{ fontFamily: "ui-monospace, monospace" }}>
+          gitshipt.com
+        </div>
+      </div>
+    </div>,
     { ...size },
   );
 }

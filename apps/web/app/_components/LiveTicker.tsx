@@ -22,7 +22,7 @@ function deriveCells(initial: LandingTicker): CellShape[] {
   const cells: CellShape[] = [
     {
       key: "fees",
-      label: "Lifetime fees distributed",
+      label: "Lifetime fees routed",
       Icon: Coins,
       value: formatSol(
         BigInt(Math.max(0, Math.round(lifetimeSol * 1_000_000_000))),

@@ -118,8 +118,8 @@ async function LandingPageContent() {
 
             <p className="max-w-xl text-body-md text-fg-secondary">
               GitShipt mints a Bags.fm token for any GitHub repo and streams the
-              trading fees back to its contributors — ranked daily, paid
-              on-chain in SOL.
+              trading fees back to its contributors through Bags-native fee
+              sharing.
             </p>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-caption">
@@ -183,11 +183,7 @@ async function LandingPageContent() {
   );
 }
 
-function TokenLaunchCarousel({
-  launches,
-}: {
-  launches: LandingLaunchToken[];
-}) {
+function TokenLaunchCarousel({ launches }: { launches: LandingLaunchToken[] }) {
   if (launches.length === 0) return null;
 
   const loopItems = repeatLaunches(launches, 8);

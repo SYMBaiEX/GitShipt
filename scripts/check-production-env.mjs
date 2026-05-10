@@ -118,6 +118,12 @@ const REQUIRED = [
     note: "Mainnet Helius RPC URL.",
   },
   {
+    name: "HELIUS_WEBHOOK_AUTH_TOKEN",
+    scope: "Solana",
+    sensitive: true,
+    note: "Bearer token Helius sends to /api/webhooks/helius/bags-events.",
+  },
+  {
     name: "SOLANA_PAYOUT_KEYPAIR",
     scope: "Solana",
     sensitive: true,
@@ -140,6 +146,12 @@ const REQUIRED = [
     scope: "Cron",
     sensitive: true,
     note: "Bearer token for cron endpoints.",
+  },
+  {
+    name: "IDEMPOTENCY_KEY_SECRET",
+    scope: "Idempotency",
+    sensitive: true,
+    note: "HMAC key for production idempotency replay envelopes.",
   },
 ];
 

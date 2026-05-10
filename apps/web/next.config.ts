@@ -3,10 +3,9 @@ import { withWorkflow } from "workflow/next";
 
 /**
  * Shared headers — applied to every route.
- * CSP and X-Frame-Options vary per source (embed routes need to be iframe-able).
- * CSP is generated in proxy.ts so Next.js can attach per-request nonces during
- * SSR. Keeping it out of next.config avoids a second static policy that would
- * conflict with the nonce policy.
+ * X-Frame-Options varies per source (embed routes need to be iframe-able).
+ * CSP is generated in proxy.ts so HTML routes receive one enforced policy.
+ * API/static responses still receive the other hardening headers below.
  */
 const sharedSecurityHeaders = [
   {
@@ -27,107 +26,6 @@ const sharedSecurityHeaders = [
     value: 'csp-endpoint="/api/security/csp-report"',
   },
 ];
-
-/**
- * Content-Security-Policy — static fallback.
- *
- * Per-request nonce CSP is set by `proxy.ts` for every HTML route it matches
- * (everything except /api/*, /_next/static, /_next/image, and static assets).
- * The proxy mints a fresh nonce, sets `x-nonce` so layouts can pass it to
- * inline-script consumers (next-themes, etc.), and emits a CSP that drops
- * `'unsafe-inline'` from script-src in favour of `'strict-dynamic'` + nonce.
- *
- * The headers below are the floor for routes the proxy does NOT touch:
- * static assets, API responses, image-optimisation responses. Those don't
- * have inline scripts so `'unsafe-inline'` here is a non-issue. Keeping a
- * defined CSP on every response is required by OWASP ASVS V14.4.
- */
-const isDev = process.env.NODE_ENV !== "production";
-const scriptSrc = [
-  "'self'",
-  "'unsafe-inline'",
-  "https://va.vercel-scripts.com",
-  "https://vitals.vercel-insights.com",
-  ...(isDev ? ["'unsafe-eval'"] : []),
-].join(" ");
-const reportOnlyScriptSrc = [
-  "'self'",
-  "https://va.vercel-scripts.com",
-  "https://vitals.vercel-insights.com",
-  ...(isDev ? ["'unsafe-eval'"] : []),
-].join(" ");
-const connectSrc = [
-  "'self'",
-  "https://api.github.com",
-  "https://github.com",
-  "https://*.bags.fm",
-  "https://public-api-v2.bags.fm",
-  "https://api.devnet.solana.com",
-  "https://api.testnet.solana.com",
-  "https://api.mainnet-beta.solana.com",
-  "https://*.helius-rpc.com",
-  "https://*.helius.xyz",
-  "https://*.upstash.io",
-  "https://*.redislabs.com",
-  "https://*.supabase.co",
-  "https://*.neon.tech",
-  "https://*.vercel.app",
-  "https://vitals.vercel-insights.com",
-  "https://va.vercel-scripts.com",
-  "wss:",
-].join(" ");
-
-const cspStrict = [
-  "default-src 'self'",
-  `script-src ${scriptSrc}`,
-  "script-src-attr 'none'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://github.com https://*.githubusercontent.com https://avatars.githubusercontent.com https://opengraph.githubassets.com https://*.bags.fm https://*.solana.com https://arweave.net https://*.arweave.net https://ipfs.io https://*.ipfscdn.io https://shdw-drive.genesysgo.net",
-  "font-src 'self' data:",
-  `connect-src ${connectSrc}`,
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'",
-  "upgrade-insecure-requests",
-  "report-uri /api/security/csp-report",
-  "report-to csp-endpoint",
-].join("; ");
-
-const cspReportOnly = [
-  "default-src 'self'",
-  `script-src ${reportOnlyScriptSrc}`,
-  "script-src-attr 'none'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: https://github.com https://*.githubusercontent.com https://avatars.githubusercontent.com https://opengraph.githubassets.com https://*.bags.fm https://*.solana.com https://arweave.net https://*.arweave.net https://ipfs.io https://*.ipfscdn.io https://shdw-drive.genesysgo.net",
-  "font-src 'self' data:",
-  `connect-src ${connectSrc}`,
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'",
-  "upgrade-insecure-requests",
-  "report-uri /api/security/csp-report",
-  "report-to csp-endpoint",
-].join("; ");
-
-const cspReportOnlyEmbed = cspReportOnly.replace(
-  "frame-ancestors 'none'",
-  "frame-ancestors *",
-);
-
-const reportOnlyHeader = isDev
-  ? []
-  : [{ key: "Content-Security-Policy-Report-Only", value: cspReportOnly }];
-
-const reportOnlyEmbedHeader = isDev
-  ? []
-  : [
-      {
-        key: "Content-Security-Policy-Report-Only",
-        value: cspReportOnlyEmbed,
-      },
-    ];
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -153,11 +51,11 @@ const nextConfig: NextConfig = {
   // Match CACHE_SECONDS in lib/cache.ts so the migration from
   // unstable_cache(...) -> 'use cache' is a behaviour-preserving swap.
   cacheLife: {
-    live:    { stale: 30,  revalidate: 60,   expire: 600 },
-    auth:    { stale: 30,  revalidate: 30,   expire: 300 },
-    browse:  { stale: 60,  revalidate: 120,  expire: 1800 },
-    profile: { stale: 60,  revalidate: 300,  expire: 3600 },
-    admin:   { stale: 15,  revalidate: 30,   expire: 300 },
+    live: { stale: 30, revalidate: 60, expire: 600 },
+    auth: { stale: 30, revalidate: 30, expire: 300 },
+    browse: { stale: 60, revalidate: 120, expire: 1800 },
+    profile: { stale: 60, revalidate: 300, expire: 3600 },
+    admin: { stale: 15, revalidate: 30, expire: 300 },
   },
   devIndicators: { position: "top-right" },
   allowedDevOrigins: ["127.0.0.1"],

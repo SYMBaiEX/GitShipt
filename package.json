@@ -27,8 +27,10 @@
   },
   "scripts": {
     "dev": "cd apps/web && bun --env-file=../../.env.local run dev",
-    "build": "cd apps/web && NODE_ENV=production bun --env-file=../../.env.local run build",
-    "start": "cd apps/web && NODE_ENV=production bun --env-file=../../.env.local run start",
+    "build": "cd apps/web && NODE_ENV=production bun run build",
+    "build:local": "cd apps/web && NODE_ENV=production bun --env-file=../../.env.local run build",
+    "start": "cd apps/web && NODE_ENV=production bun run start",
+    "start:local": "cd apps/web && NODE_ENV=production bun --env-file=../../.env.local run start",
     "lint": "cd apps/web && bun run lint",
     "typecheck": "bun --filter @repo/lib typecheck && bun --filter @repo/shared typecheck && bun --filter @repo/ui typecheck && cd apps/web && bun run typecheck",
     "test": "cd apps/web && bun run test",
@@ -42,20 +44,21 @@
     "db:seed:tracked": "cd apps/web && bun --env-file=../../.env.local run scripts/seed-tracked-projects.ts",
     "env:check": "NODE_ENV=production bun scripts/check-production-env.mjs",
     "env:template": "bun scripts/check-production-env.mjs --print-template",
+    "security:audit": "bun scripts/check-bun-audit.mjs",
     "bun:http3:check": "bun scripts/check-bun-http3.mjs",
     "theme:export": "bun scripts/theme-export.mjs",
     "theme:lint": "bun scripts/theme-lint.mjs",
     "format": "bunx prettier --write \"**/*.{ts,tsx,js,mjs,json,md,css}\""
   },
   "devDependencies": {
-    "next": "16.2.4",
+    "next": "16.2.6",
     "prettier": "^3.4.2",
-    "react": "19.2.5",
-    "react-dom": "19.2.5",
-    "typescript": "^6"
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@solana/codecs-numbers": "^6.8.0",
-    "rpc-websockets": "^9.3.8"
+    "@solana/codecs-numbers": "6.9.0",
+    "rpc-websockets": "9.3.9"
   }
 }

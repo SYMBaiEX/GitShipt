@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/theme-provider";
-import { SolanaWalletProvider } from "@/components/providers/SolanaWalletProvider";
 import { SessionChromeProvider } from "@/components/auth/SessionChromeProvider";
 import { Toaster } from "@/components/providers/Toaster";
 import { SkipLink } from "@/components/shared/SkipLink";
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     template: "%s · GitShipt",
   },
   description:
-    "GitShipt turns any GitHub repo into a tradeable Bags.fm token. Swap fees fund a daily on-chain SOL payout to the top contributors — automatic, transparent, no committee.",
+    "GitShipt turns any GitHub repo into a tradeable Bags.fm token. Swap fees flow to top contributors through Bags-native fee sharing.",
   applicationName: "GitShipt",
   authors: [{ name: "SYMBiEX" }],
   keywords: [
@@ -57,9 +57,20 @@ export const metadata: Metadata = {
     siteName: "GitShipt",
     title: "GitShipt — tokenize your repo, pay your contributors",
     description:
-      "GitShipt turns any GitHub repo into a tradeable Bags.fm token. Swap fees fund a daily on-chain SOL payout to the top contributors — automatic, transparent, no committee.",
+      "GitShipt turns any GitHub repo into a tradeable Bags.fm token. Swap fees flow to top contributors through Bags-native fee sharing.",
+    images: [{ url: "/content.png", width: 1600, height: 900 }],
   },
-  twitter: { card: "summary_large_image" },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/content.png"],
+  },
+  alternates: {
+    canonical: "/",
+  },
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
   robots: { index: true, follow: true },
 };
 
@@ -94,6 +105,7 @@ export default function RootLayout({
           <Toaster />
         </ThemeProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
@@ -103,9 +115,5 @@ async function SessionShell({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const user = await getSessionUser();
-  return (
-    <SessionChromeProvider user={user}>
-      <SolanaWalletProvider>{children}</SolanaWalletProvider>
-    </SessionChromeProvider>
-  );
+  return <SessionChromeProvider user={user}>{children}</SessionChromeProvider>;
 }

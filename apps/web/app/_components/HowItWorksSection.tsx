@@ -24,7 +24,7 @@ const STEPS = [
     n: 3,
     title: "Contributors get paid",
     Icon: Coins,
-    body: "Every day at 00:30 UTC, swap fees claim, distribute, and land in your top contributors' wallets.",
+    body: "GitShipt refreshes contributor BPS from the leaderboard. Contributors claim eligible fees directly through Bags.",
   },
 ] as const;
 
@@ -34,8 +34,8 @@ export function HowItWorksSection() {
       <div>
         <h2 className="text-headline-md text-fg">How GitShipt works</h2>
         <p className="text-body-md text-fg-secondary">
-          Three steps from a public repo to recurring on-chain payouts for the
-          people who built it.
+          Three steps from a public repo to Bags-native fee sharing for the
+          people who build it.
         </p>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

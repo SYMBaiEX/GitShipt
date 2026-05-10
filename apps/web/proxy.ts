@@ -11,16 +11,13 @@ import { hasAuthCookie } from "@/lib/auth/cookies";
  * and Server Component.
  *
  * What this file does:
- *   1. Generate a per-request CSP nonce and pass it through request headers.
- *   2. Set the matching enforced response CSP. Production script-src has no
- *      'unsafe-inline'; development keeps React's required 'unsafe-eval'.
- *   3. Send unauthenticated requests to /dashboard/* to /auth/signin?next=...
- *   4. Strip `x-middleware-subrequest` if a client tries to set it (defense
- *      in depth).
- *   4. Mint a per-request CSP nonce + set the response CSP. The root layout
- *      reads `x-nonce` via `headers()` and threads it into ThemeProvider's
- *      inline theme bootstrap. Together with `'strict-dynamic'` this closes
- *      the `'unsafe-inline'` script-src gap the audit flagged.
+ *   1. Set the enforced response CSP for HTML routes.
+ *   2. Send unauthenticated requests to /dashboard/* to /auth/signin?next=...
+ *   3. Strip `x-middleware-subrequest` if a client tries to set it.
+ *
+ * CSP currently uses the standard Next/Vercel-compatible inline-script
+ * allowance. A previous per-request nonce design conflicted with cached HTML
+ * because the response CSP nonce could drift from the cached markup.
  */
 const isDev = process.env.NODE_ENV !== "production";
 

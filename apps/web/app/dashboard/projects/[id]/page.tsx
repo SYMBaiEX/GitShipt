@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Coins,
   ExternalLink,
+  ShieldCheck,
   Sparkles,
   Trophy,
   Users,
@@ -35,6 +36,8 @@ import {
 import { Badge } from "@repo/ui";
 import { Button } from "@repo/ui";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
+import { ManagerDelegationStep } from "@/app/(public)/launch/_components/ManagerDelegationStep";
+import { currentSolanaCluster } from "@/lib/solana/explorer";
 
 export default function ProjectOverviewPage({
   params,
@@ -122,6 +125,36 @@ async function ProjectOverviewPageContent({
           }
         />
       </section>
+
+      {project.status === "live" && !project.managerPubkey ? (
+        <Card depth="raised" padding="default" className="border-warning/50">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex gap-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-md bg-warning-soft text-warning">
+                <ShieldCheck className="size-4" aria-hidden />
+              </span>
+              <div>
+                <h2 className="text-headline-sm text-fg">Launch incomplete</h2>
+                <p className="mt-1 max-w-2xl text-body-sm text-fg-secondary">
+                  The Bags launch transaction is recorded, but GitShipt cannot
+                  run scheduled BPS rebalances until the owner delegates the
+                  manager role. Contributor claims remain in Bags; cadence
+                  automation starts after this signature lands.
+                </p>
+              </div>
+            </div>
+            <Badge variant="warning" size="sm">
+              Delegation pending
+            </Badge>
+          </div>
+          <div className="mt-4">
+            <ManagerDelegationStep
+              projectId={project.id}
+              cluster={currentSolanaCluster()}
+            />
+          </div>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <RecentActivityCard rows={audit} />

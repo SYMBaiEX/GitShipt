@@ -90,7 +90,7 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
         get: {
           summary: "Service health probe",
           description:
-            "Lightweight readiness check. Returns DB / Redis / Bags / Solana sub-statuses, productionReadiness diagnostics, and the override flags from the running env.",
+            "Lightweight health check. Add ?strict=1 for deployment readiness; strict mode returns 503 when production integrations are missing, stubbed, or failing.",
           responses: {
             "200": {
               description: "Health snapshot.",
@@ -100,6 +100,7 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
                     type: "object",
                     properties: {
                       ok: { type: "boolean" },
+                      strict: { type: "boolean" },
                       status: { type: "object", additionalProperties: true },
                       production: {
                         type: "object",
@@ -109,10 +110,13 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
                       stubMode: { type: "object", additionalProperties: true },
                       at: { type: "string", format: "date-time" },
                     },
-                    required: ["ok", "status", "production", "at"],
+                    required: ["ok", "strict", "status", "production", "at"],
                   },
                 },
               },
+            },
+            "503": {
+              description: "Strict readiness failed.",
             },
           },
         },
@@ -290,6 +294,244 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
               description:
                 "Stub credentials missing in production with `ALLOW_STUBS_IN_PROD=false`.",
             },
+          },
+        },
+      },
+
+      "/api/projects/{id}/install-github": {
+        get: {
+          summary: "Start GitHub App installation or repair",
+          description:
+            "Redirects the project owner to GitHub App installation for this project. If the App is already installed, the callback reconciles the installation and returns to the project setup flow.",
+          security: [{ session: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": { description: "Installation already verified." },
+            "302": { description: "Redirect to GitHub installation flow." },
+            "401": NOT_AUTHENTICATED,
+            "403": { description: "Permission denied." },
+            "404": { description: "Project not found." },
+          },
+        },
+      },
+
+      "/api/projects/{id}/install-github/callback": {
+        get: {
+          summary: "Reconcile GitHub App installation callback",
+          description:
+            "Validates the callback state, verifies the GitHub installation covers the repository, stores the installation id, and redirects back to the launch wizard or project console.",
+          security: [{ session: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              in: "query",
+              name: "installation_id",
+              required: false,
+              schema: { type: "string" },
+            },
+            {
+              in: "query",
+              name: "setup_action",
+              required: false,
+              schema: { type: "string" },
+            },
+            {
+              in: "query",
+              name: "state",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": { description: "Installation reconciled." },
+            "302": { description: "Redirect to the next setup step." },
+            "400": { description: "Invalid callback state or installation." },
+            "401": NOT_AUTHENTICATED,
+            "403": { description: "Permission denied." },
+          },
+        },
+      },
+
+      "/api/projects/{id}/incorporation/start": {
+        post: {
+          summary: "Start project incorporation request",
+          description:
+            "Creates an audited incorporation intake request for a launched project. Requires project-owner permission and `Idempotency-Key`.",
+          security: [{ session: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              in: "header",
+              name: "Idempotency-Key",
+              required: true,
+              schema: { type: "string", pattern: "^[A-Za-z0-9_\\-:.]{8,128}$" },
+            },
+          ],
+          responses: {
+            "200": { description: "Incorporation intake started." },
+            "400": INVALID_BODY,
+            "401": NOT_AUTHENTICATED,
+            "403": { description: "Permission denied." },
+            "429": RATE_LIMITED,
+          },
+        },
+      },
+
+      "/api/projects/{id}/trading/quote": {
+        post: {
+          summary: "Request a Bags trading quote",
+          description:
+            "Returns a Bags quote for the project token. This endpoint never broadcasts transactions and is rate-limited per project and user/IP.",
+          security: [{ session: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": { description: "Quote returned." },
+            "400": INVALID_BODY,
+            "401": NOT_AUTHENTICATED,
+            "404": { description: "Project or token not found." },
+            "429": RATE_LIMITED,
+          },
+        },
+      },
+
+      "/api/projects/{id}/trading/swap": {
+        post: {
+          summary: "Prepare a Bags swap transaction",
+          description:
+            "Builds a wallet-reviewed swap transaction for the project token. Requires `Idempotency-Key`; the user wallet signs and broadcasts.",
+          security: [{ session: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              in: "header",
+              name: "Idempotency-Key",
+              required: true,
+              schema: { type: "string", pattern: "^[A-Za-z0-9_\\-:.]{8,128}$" },
+            },
+          ],
+          responses: {
+            "200": {
+              description:
+                "Unsigned or partially prepared swap payload returned.",
+            },
+            "400": INVALID_BODY,
+            "401": NOT_AUTHENTICATED,
+            "404": { description: "Project or token not found." },
+            "429": RATE_LIMITED,
+          },
+        },
+      },
+
+      "/api/projects/{id}/api-keys": {
+        get: {
+          summary: "List project API keys",
+          description:
+            "Lists metadata for project-scoped API keys. Secret material is never returned after creation.",
+          security: [{ session: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string" },
+            },
+          ],
+          responses: {
+            "200": { description: "API key metadata returned." },
+            "401": NOT_AUTHENTICATED,
+            "403": { description: "Permission denied." },
+          },
+        },
+        post: {
+          summary: "Create a project API key",
+          description:
+            "Creates a scoped API key for project automation. Requires `Idempotency-Key`; returns the plaintext key exactly once.",
+          security: [{ session: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              in: "header",
+              name: "Idempotency-Key",
+              required: true,
+              schema: { type: "string", pattern: "^[A-Za-z0-9_\\-:.]{8,128}$" },
+            },
+          ],
+          responses: {
+            "200": { description: "API key created." },
+            "400": INVALID_BODY,
+            "401": NOT_AUTHENTICATED,
+            "403": { description: "Permission denied." },
+            "429": RATE_LIMITED,
+          },
+        },
+      },
+
+      "/api/projects/{id}/api-keys/{keyId}": {
+        delete: {
+          summary: "Revoke a project API key",
+          description:
+            "Revokes a project-scoped API key and records an audit log entry. Requires `Idempotency-Key`.",
+          security: [{ session: [] }],
+          parameters: [
+            {
+              in: "path",
+              name: "id",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              in: "path",
+              name: "keyId",
+              required: true,
+              schema: { type: "string" },
+            },
+            {
+              in: "header",
+              name: "Idempotency-Key",
+              required: true,
+              schema: { type: "string", pattern: "^[A-Za-z0-9_\\-:.]{8,128}$" },
+            },
+          ],
+          responses: {
+            "200": { description: "API key revoked." },
+            "401": NOT_AUTHENTICATED,
+            "403": { description: "Permission denied." },
+            "404": { description: "API key not found." },
+            "429": RATE_LIMITED,
           },
         },
       },

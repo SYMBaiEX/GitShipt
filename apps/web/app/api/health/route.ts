@@ -14,7 +14,8 @@ import { noStoreJson } from "@/lib/no-store-response";
  * Always returns 200 with a JSON body so monitoring can parse the
  * sub-statuses; only the HTTP layer being reachable is the "up" signal.
  */
-export async function GET(): Promise<Response> {
+export async function GET(req: Request): Promise<Response> {
+  const strict = new URL(req.url).searchParams.get("strict") === "1";
   const status: Record<string, "ok" | "stub" | "fail"> = {
     db: "stub",
     redis: "stub",
@@ -24,6 +25,9 @@ export async function GET(): Promise<Response> {
     githubApp: hasCredentials.githubApp() ? "ok" : "stub",
     solana: hasCredentials.solana() ? "ok" : "stub",
     payoutKey: hasCredentials.payoutKey() ? "ok" : "stub",
+    managerKey: hasCredentials.managerKey() ? "ok" : "stub",
+    heliusWebhook: hasCredentials.heliusWebhook() ? "ok" : "stub",
+    cron: hasCredentials.cron() ? "ok" : "stub",
   };
 
   if (hasCredentials.db()) {
@@ -69,12 +73,22 @@ export async function GET(): Promise<Response> {
       .map(([key, value]) => [key, value === "stub"]),
   );
 
-  return noStoreJson({
-    ok: !Object.values(status).some((v) => v === "fail"),
-    status,
-    production,
-    overrides,
-    stubMode,
-    at: new Date().toISOString(),
-  });
+  const ok = !Object.values(status).some((v) => v === "fail");
+  const strictOk =
+    ok &&
+    production.ok &&
+    !Object.entries(stubMode).some(([, value]) => value === true);
+
+  return noStoreJson(
+    {
+      ok: strict ? strictOk : ok,
+      strict,
+      status,
+      production,
+      overrides,
+      stubMode,
+      at: new Date().toISOString(),
+    },
+    strict && !strictOk ? { status: 503 } : undefined,
+  );
 }

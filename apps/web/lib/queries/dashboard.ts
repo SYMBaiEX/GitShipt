@@ -2,6 +2,7 @@ import "server-only";
 import { dbHttp } from "@/db";
 import {
   projects,
+  bagsFeeShareConfigs,
   contributors,
   contributorClaims,
   payouts,
@@ -483,6 +484,9 @@ export interface ProjectRecord {
   tokenMint: string | null;
   bagsLaunchId: string | null;
   ghInstallationId: string | null;
+  bagsFeeShareConfigId: string | null;
+  managerPubkey: string | null;
+  managerDelegatedAt: Date | null;
   platformFeeBps: number;
   ownerUserId: string;
   scoringConfig: ScoringConfig;
@@ -502,6 +506,15 @@ async function getProjectRecordUncached(
     .where(eq(projects.id, projectId))
     .limit(1);
   if (!r) return null;
+  const [config] = await dbHttp
+    .select({
+      id: bagsFeeShareConfigs.id,
+      managerPubkey: bagsFeeShareConfigs.managerPubkey,
+      managerDelegatedAt: bagsFeeShareConfigs.managerDelegatedAt,
+    })
+    .from(bagsFeeShareConfigs)
+    .where(eq(bagsFeeShareConfigs.projectId, projectId))
+    .limit(1);
   return {
     id: r.id,
     slug: `${r.ghOwner}/${r.ghRepo}`,
@@ -514,6 +527,9 @@ async function getProjectRecordUncached(
     tokenMint: r.tokenMint,
     bagsLaunchId: r.bagsLaunchId,
     ghInstallationId: r.ghInstallationId,
+    bagsFeeShareConfigId: config?.id ?? null,
+    managerPubkey: config?.managerPubkey ?? null,
+    managerDelegatedAt: config?.managerDelegatedAt ?? null,
     platformFeeBps: r.platformFeeBps,
     ownerUserId: r.ownerUserId,
     scoringConfig: parseScoringConfig(r.scoringConfig),

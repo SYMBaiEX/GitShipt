@@ -19,7 +19,11 @@ export function TopEarnersBento({
 }) {
   const top = entries.slice(0, limit);
   return (
-    <Card depth="raised" padding="none" className="flex h-full flex-col overflow-hidden">
+    <Card
+      depth="raised"
+      padding="none"
+      className="flex h-full flex-col overflow-hidden"
+    >
       <div className="flex items-center justify-between gap-2 px-4 py-3">
         <div className="flex items-center gap-2">
           <Trophy className="size-4 text-fg-secondary" aria-hidden />
@@ -36,7 +40,7 @@ export function TopEarnersBento({
 
       {top.length === 0 ? (
         <div className="px-4 py-10 text-center text-body-sm text-fg-muted">
-          No earners yet — first cycle lands at midnight UTC.
+          No earners yet. The first leaderboard cycle starts at midnight UTC.
         </div>
       ) : (
         <ul className="flex flex-1 flex-col divide-y divide-border">

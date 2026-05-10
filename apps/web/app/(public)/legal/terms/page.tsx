@@ -49,9 +49,9 @@ async function TermsPageContent() {
             you do not agree, do not use the service.
           </p>
           <p>
-            GitShipt is provided strictly on an &ldquo;as is&rdquo; and &ldquo;as
-            available&rdquo; basis with no warranty of any kind. These Terms
-            apply to the website at gitshipt.com, all subdomains, and any
+            GitShipt is provided strictly on an &ldquo;as is&rdquo; and
+            &ldquo;as available&rdquo; basis with no warranty of any kind. These
+            Terms apply to the website at gitshipt.com, all subdomains, and any
             associated APIs or webhooks operated by the GitShipt team.
           </p>
         </LegalSection>
@@ -64,20 +64,20 @@ async function TermsPageContent() {
           </p>
           <p>
             When the token trades, a configured share of the swap fees is
-            claimed by GitShipt on behalf of the project and redistributed to the
-            repository&apos;s top contributors, ranked by an automated scoring
-            workflow that runs on a daily cadence. Payouts settle directly to
-            each contributor&apos;s linked Solana wallet.
+            allocated to the repository&apos;s top contributors through
+            Bags-native fee sharing, ranked by an automated scoring workflow
+            that runs on a daily cadence. Contributors claim eligible fees
+            directly through Bags.
           </p>
         </LegalSection>
 
         <LegalSection index={3} title="Eligibility">
           <p>
             You must be at least the age of legal majority in your jurisdiction
-            and have a valid GitHub account in good standing to use GitShipt. You
-            must not be located in, a resident of, or accessing the service from
-            any country or region subject to comprehensive U.S. sanctions, and
-            you must not be a person designated on any U.S. or applicable
+            and have a valid GitHub account in good standing to use GitShipt.
+            You must not be located in, a resident of, or accessing the service
+            from any country or region subject to comprehensive U.S. sanctions,
+            and you must not be a person designated on any U.S. or applicable
             international sanctions list.
           </p>
           <p>
@@ -89,8 +89,8 @@ async function TermsPageContent() {
 
         <LegalSection index={4} title="Token launches">
           <p>
-            By initiating a launch you authorize GitShipt to mint a Bags.fm token
-            bound to the GitHub repository you select and to register the
+            By initiating a launch you authorize GitShipt to mint a Bags.fm
+            token bound to the GitHub repository you select and to register the
             resulting royalty split with the repository&apos;s top contributors
             as recipients. You retain full ownership of your repository, its
             source code, and its license. GitShipt takes no equity in your
@@ -108,18 +108,18 @@ async function TermsPageContent() {
         <LegalSection index={5} title="Trading fees and payouts">
           <p>
             GitShipt does not custody user funds. Trades occur on-chain through
-            Bags.fm liquidity. Fee claims are executed by an automated workflow
-            that pulls accrued fees into a short-lived hot escrow wallet and
-            immediately distributes them to contributor wallets in the same
-            workflow run.
+            Bags.fm liquidity. Contributor fee allocations are registered with
+            Bags, and contributors claim eligible fees directly through Bags.
+            GitShipt may run automated workflows to refresh contributor basis
+            points and claim GitShipt partner fees, but those workflows do not
+            take custody of contributor balances.
           </p>
           <p>
-            The escrow window is the only period during which GitShipt
-            technically holds funds, and it exists solely to batch a single
-            on-chain transaction. We do not promise any specific payout amount,
-            frequency beyond &ldquo;daily best effort,&rdquo; or transaction
-            inclusion latency. On-chain failures, congestion, or RPC outages may
-            delay distributions.
+            We do not promise any specific payout amount, claim availability,
+            refresh cadence beyond &ldquo;daily best effort,&rdquo; or
+            transaction inclusion latency. Bags API availability, on-chain
+            failures, congestion, or RPC outages may delay leaderboard updates,
+            BPS rebalances, partner fee claims, or contributor claims.
           </p>
         </LegalSection>
 
@@ -160,10 +160,10 @@ async function TermsPageContent() {
           </p>
           <p>
             A kill action is not a refund. Tokens already minted on Solana
-            remain on-chain and are not unwound. Pending fees that have not yet
-            been distributed at the time of a kill action may be returned to the
-            project treasury, redirected to remaining eligible contributors, or
-            held pending resolution, in our reasonable discretion.
+            remain on-chain and are not unwound. Pending Bags fee-share
+            allocations may be paused, redirected to remaining eligible
+            contributors, returned to the project treasury, or held pending
+            resolution, in our reasonable discretion.
           </p>
         </LegalSection>
 
@@ -187,9 +187,9 @@ async function TermsPageContent() {
 
         <LegalSection index={9} title="Network and demo-mode disclaimer">
           <p>
-            GitShipt may run in local, devnet, testnet, or mainnet mode depending
-            on deployment configuration. Non-mainnet SOL and tokens have no
-            monetary value, and any &ldquo;USD&rdquo; figure shown for a
+            GitShipt may run in local, devnet, testnet, or mainnet mode
+            depending on deployment configuration. Non-mainnet SOL and tokens
+            have no monetary value, and any &ldquo;USD&rdquo; figure shown for a
             non-mainnet project is a synthetic display value.
           </p>
           <p>
@@ -212,12 +212,12 @@ async function TermsPageContent() {
             your violation of these Terms.
           </p>
           <p>
-            To the maximum extent permitted by law, GitShipt and its contributors
-            are not liable for any indirect, incidental, consequential, or
-            punitive damages, or for any loss of tokens, missed payouts, RPC
-            failures, or third-party outages (including GitHub, Bags.fm, Helius,
-            Vercel, and Neon). Aggregate liability for any direct claim is
-            capped at one hundred U.S. dollars (USD 100).
+            To the maximum extent permitted by law, GitShipt and its
+            contributors are not liable for any indirect, incidental,
+            consequential, or punitive damages, or for any loss of tokens,
+            missed payouts, RPC failures, or third-party outages (including
+            GitHub, Bags.fm, Helius, Vercel, and Neon). Aggregate liability for
+            any direct claim is capped at one hundred U.S. dollars (USD 100).
           </p>
           <p>
             These Terms are governed by the laws of the State of Delaware, USA,
@@ -233,8 +233,8 @@ async function TermsPageContent() {
             We may update these Terms at any time. The &ldquo;last
             updated&rdquo; date at the top of this page reflects the most recent
             revision. Material changes will be announced in the product or via
-            the project repository. Your continued use of GitShipt after a change
-            constitutes acceptance of the updated Terms.
+            the project repository. Your continued use of GitShipt after a
+            change constitutes acceptance of the updated Terms.
           </p>
         </LegalSection>
 

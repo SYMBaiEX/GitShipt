@@ -110,7 +110,7 @@ async function DocsPageContent() {
           </p>
         </DocSection>
 
-        <DocSection id="payouts" title="Daily payout pipeline">
+        <DocSection id="payouts" title="Daily Bags rebalance">
           <p>Two cron-driven workflows run every day:</p>
           <ul className="list-disc space-y-2 pl-5 text-body-md text-fg-secondary">
             <li>
@@ -119,9 +119,9 @@ async function DocsPageContent() {
               events. Freeze the result into a snapshot row with a Merkle root.
             </li>
             <li>
-              <span className="text-fg">00:30 UTC — payout.</span> For each
-              snapshot, claim accrued Bags fees, then distribute lamports to the
-              top 10 according to the tier weights{" "}
+              <span className="text-fg">00:30 UTC — BPS rebalance.</span> For
+              each snapshot, GitShipt computes contributor BPS targets and
+              updates the Bags fee-share config according to the tier weights{" "}
               <code className="rounded bg-surface-elevated px-1.5 py-0.5 text-mono-sm text-fg">
                 [0.30, 0.20, 0.15, 0.05 × 7]
               </code>
@@ -131,8 +131,8 @@ async function DocsPageContent() {
           </ul>
           <p>
             Contributors without a Bags-linked GitHub identity are skipped until
-            the project owner updates the Bags claimer set. No GitShipt escrow
-            balance is created.
+            the Bags claimer set can include them. No GitShipt escrow balance is
+            created.
           </p>
         </DocSection>
 

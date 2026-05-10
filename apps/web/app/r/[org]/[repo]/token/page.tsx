@@ -11,6 +11,7 @@ import {
 } from "@/lib/queries/token-stats";
 import { BagsAnalyticsCard } from "@/components/bags/BagsAnalyticsCard";
 import { TradingPanel } from "@/components/bags/TradingPanel";
+import { SolanaWalletProvider } from "@/components/providers/SolanaWalletProvider";
 import {
   Card,
   CardHeader,
@@ -217,11 +218,13 @@ async function ProjectTokenPageContent({ params }: { params: Params }) {
           </div>
 
           <aside className="flex min-w-0 flex-col gap-4">
-            <TradingPanel
-              projectId={header.id}
-              symbol={stats.symbol}
-              tokenMint={header.tokenMint}
-            />
+            <SolanaWalletProvider>
+              <TradingPanel
+                projectId={header.id}
+                symbol={stats.symbol}
+                tokenMint={header.tokenMint}
+              />
+            </SolanaWalletProvider>
             <TokenInfoCard
               stats={stats}
               ghOwner={header.ghOwner}

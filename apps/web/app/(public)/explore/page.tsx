@@ -14,7 +14,7 @@ import { ProjectCard } from "./_components/ProjectCard";
 export const metadata: Metadata = {
   title: "Explore projects",
   description:
-    "Open-source repos rewarding their contributors with daily on-chain payouts.",
+    "Open-source repos routing token fees to contributors through Bags-native fee sharing.",
 };
 
 type SearchParams = Promise<{
@@ -44,7 +44,6 @@ function parseFilters(raw: Awaited<SearchParams>): ExploreFilters {
     search: raw.q ?? undefined,
   };
 }
-
 
 export default function ExplorePage({
   searchParams,

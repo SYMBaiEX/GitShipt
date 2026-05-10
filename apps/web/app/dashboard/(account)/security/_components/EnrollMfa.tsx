@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { Button } from "@repo/ui";
 import { Input } from "@repo/ui";
 import { FormField } from "@/components/shared/FormField";
@@ -108,12 +109,12 @@ export function EnrollMfa({
   return (
     <div className="flex flex-col gap-4 sm:flex-row">
       <div className="flex shrink-0 items-center justify-center rounded-md border border-border bg-surface-elevated p-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={data.qrDataUrl}
           alt="MFA QR code"
           width={192}
           height={192}
+          unoptimized
           className="rounded"
         />
       </div>

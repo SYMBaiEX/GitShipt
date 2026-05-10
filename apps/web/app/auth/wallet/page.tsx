@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { getAuthSession } from "@/lib/auth/session";
 import { SignInWithSolanaFlow } from "@/components/wallet/SignInWithSolanaFlow";
+import { SolanaWalletProvider } from "@/components/providers/SolanaWalletProvider";
 
 export const metadata = { title: "Link wallet" };
 
@@ -49,7 +50,9 @@ async function WalletAuthPageContent() {
         </p>
 
         <div className="mt-8">
-          <SignInWithSolanaFlow />
+          <SolanaWalletProvider>
+            <SignInWithSolanaFlow />
+          </SolanaWalletProvider>
         </div>
 
         <p className="mt-8 text-caption text-fg-muted">

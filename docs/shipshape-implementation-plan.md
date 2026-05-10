@@ -92,20 +92,20 @@ migration, already landed).
 Each commit adds new code, exports new functions, ships tests. **No existing
 code path is modified.** Reverting any of these removes only the new exports.
 
-| # | Title | Files | Tests | What it gives |
-|---|---|---|---|---|
-| 19 | scoring/v1 — formula | `lib/scoring/v1.ts` | unit, property | Pure `computeRawScoreV1(inputs, weights, decayMul)` |
-| 20 | scoring/alignment | `lib/scoring/alignment.ts` | unit | Pure `computeAlignmentFactor(...)` + `alignmentMultiplier(...)` |
-| 21 | scoring/penalty | `lib/scoring/penalty.ts` | unit | `activePenaltyFor(contributorId, projectId, ts)` + multipliers |
-| 22 | scoring/pacing | `lib/scoring/pacing.ts` | unit | `applyPerDayCap(merged_prs, cap, allowance)` returning credited+deferred |
-| 23 | indexer/reviews | `lib/github/indexer/reviews.ts` | unit (mocked Octokit) | `fetchReviewsForPr(octo, owner, repo, prNumber, floor)` returning `(reviews, substantive_score)` per reviewer, with head-SHA delta check for iteration bonus |
-| 24 | indexer/squash | `lib/github/indexer/squash.ts` | unit | `isSquashCommit(commit, mergedPrs)` — detects squash-merge by SHA + message pattern |
-| 25 | indexer/coauthor | `lib/github/indexer/coauthor.ts` | unit | `parseCoAuthorTrailers(message)` + noreply-pattern user resolver |
-| 26 | indexer/trivial | `lib/github/indexer/trivial.ts` | unit | `isTrivialCommit(files)` — lockfile/dist/whitespace filter |
-| 27 | agents/shipshape | `lib/agents/shipshape.ts` + `lib/agents/templates/shipshape.tmpl.md` | unit (snapshot) | `generateShipshape(project, scoringConfig, alignmentConfig, agentRoutingPolicy, communityLinks)` |
-| 28 | agents/logbook | `lib/agents/logbook.ts` + template | unit (snapshot) | `generateLogbook(projectState, topContributors, recentAreas, hotIssues)` |
-| 29 | badge/svg | `lib/badge/svg.ts` | unit (snapshot) | `renderTrackedBadge(orgRepo)` — pure SVG string |
-| 30 | orgs/inheritance | `lib/orgs/inheritance.ts` | unit | `resolveProjectDefaults(orgRow, scoringConfig?, alignmentConfig?, ...)` snapshotting org defaults at project create |
+| #   | Title                | Files                                                                | Tests                 | What it gives                                                                                                                                                |
+| --- | -------------------- | -------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 19  | scoring/v1 — formula | `lib/scoring/v1.ts`                                                  | unit, property        | Pure `computeRawScoreV1(inputs, weights, decayMul)`                                                                                                          |
+| 20  | scoring/alignment    | `lib/scoring/alignment.ts`                                           | unit                  | Pure `computeAlignmentFactor(...)` + `alignmentMultiplier(...)`                                                                                              |
+| 21  | scoring/penalty      | `lib/scoring/penalty.ts`                                             | unit                  | `activePenaltyFor(contributorId, projectId, ts)` + multipliers                                                                                               |
+| 22  | scoring/pacing       | `lib/scoring/pacing.ts`                                              | unit                  | `applyPerDayCap(merged_prs, cap, allowance)` returning credited+deferred                                                                                     |
+| 23  | indexer/reviews      | `lib/github/indexer/reviews.ts`                                      | unit (mocked Octokit) | `fetchReviewsForPr(octo, owner, repo, prNumber, floor)` returning `(reviews, substantive_score)` per reviewer, with head-SHA delta check for iteration bonus |
+| 24  | indexer/squash       | `lib/github/indexer/squash.ts`                                       | unit                  | `isSquashCommit(commit, mergedPrs)` — detects squash-merge by SHA + message pattern                                                                          |
+| 25  | indexer/coauthor     | `lib/github/indexer/coauthor.ts`                                     | unit                  | `parseCoAuthorTrailers(message)` + noreply-pattern user resolver                                                                                             |
+| 26  | indexer/trivial      | `lib/github/indexer/trivial.ts`                                      | unit                  | `isTrivialCommit(files)` — lockfile/dist/whitespace filter                                                                                                   |
+| 27  | agents/shipshape     | `lib/agents/shipshape.ts` + `lib/agents/templates/shipshape.tmpl.md` | unit (snapshot)       | `generateShipshape(project, scoringConfig, alignmentConfig, agentRoutingPolicy, communityLinks)`                                                             |
+| 28  | agents/logbook       | `lib/agents/logbook.ts` + template                                   | unit (snapshot)       | `generateLogbook(projectState, topContributors, recentAreas, hotIssues)`                                                                                     |
+| 29  | badge/svg            | `lib/badge/svg.ts`                                                   | unit (snapshot)       | `renderTrackedBadge(orgRepo)` — pure SVG string                                                                                                              |
+| 30  | orgs/inheritance     | `lib/orgs/inheritance.ts`                                            | unit                  | `resolveProjectDefaults(orgRow, scoringConfig?, alignmentConfig?, ...)` snapshotting org defaults at project create                                          |
 
 **After Phase 1**: typecheck clean, all tests pass, no behavior change.
 
@@ -114,13 +114,13 @@ code path is modified.** Reverting any of these removes only the new exports.
 Each ships a new route or page. Renders data from DB. v0 projects continue
 working unchanged.
 
-| # | Title | Files | Tests | Depends on |
-|---|---|---|---|---|
-| 31 | route: badge SVG | `app/badge/r/[org]/[repo].svg/route.ts` | e2e (request → svg response) | 29 |
-| 32 | route: shipshape + logbook + runbook.json | `app/r/[org]/[repo]/shipshape.md/route.ts`, `…/logbook.md/route.ts`, `app/api/r/[org]/[repo]/runbook.json/route.ts` | e2e | 27, 28 |
-| 33 | page: contributor cross-repo view | `app/dashboard/me/contributions/page.tsx` | unit (rendering with seeded data) | schema |
-| 34 | page: org dashboard read-only | `app/dashboard/orgs/[ghLogin]/page.tsx` | unit | schema, 30 |
-| 35 | page: org settings | `app/dashboard/orgs/[ghLogin]/settings/page.tsx` (read-only display in PR 1; editor in PR 3) | unit | 30 |
+| #   | Title                                     | Files                                                                                                               | Tests                             | Depends on |
+| --- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ---------- |
+| 31  | route: badge SVG                          | `app/badge/r/[org]/[repo].svg/route.ts`                                                                             | e2e (request → svg response)      | 29         |
+| 32  | route: shipshape + logbook + runbook.json | `app/r/[org]/[repo]/shipshape.md/route.ts`, `…/logbook.md/route.ts`, `app/api/r/[org]/[repo]/runbook.json/route.ts` | e2e                               | 27, 28     |
+| 33  | page: contributor cross-repo view         | `app/dashboard/me/contributions/page.tsx`                                                                           | unit (rendering with seeded data) | schema     |
+| 34  | page: org dashboard read-only             | `app/dashboard/orgs/[ghLogin]/page.tsx`                                                                             | unit                              | schema, 30 |
+| 35  | page: org settings                        | `app/dashboard/orgs/[ghLogin]/settings/page.tsx` (read-only display in PR 1; editor in PR 3)                        | unit                              | 30         |
 
 **After Phase 2**: shipshape + logbook + badge + runbook.json publicly live.
 Cross-repo + org dashboards visible. Scoring still v0 — they render based on
@@ -132,11 +132,11 @@ Endpoints and webhooks that let external systems write to our DB. Behind
 proper auth. No scoring-level effects yet because nothing in computeLeaderboard
 reads them yet.
 
-| # | Title | Files | Tests | Depends on |
-|---|---|---|---|---|
-| 36 | slash-command parser | `lib/github/slash-commands.ts` | unit | — |
-| 37 | webhook: issue_comment | `app/api/webhooks/github/issue_comment/route.ts` | e2e (HMAC + payload) | 36, 21 |
-| 38 | route: ci-event | `app/api/projects/[projectId]/ci-event/route.ts` + `lib/ci-events/auth.ts` (OIDC + HMAC) + `lib/ci-events/handlers.ts` (per-event-type) | e2e (mocked OIDC) | 21 |
+| #   | Title                  | Files                                                                                                                                   | Tests                | Depends on |
+| --- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | ---------- |
+| 36  | slash-command parser   | `lib/github/slash-commands.ts`                                                                                                          | unit                 | —          |
+| 37  | webhook: issue_comment | `app/api/webhooks/github/issue_comment/route.ts`                                                                                        | e2e (HMAC + payload) | 36, 21     |
+| 38  | route: ci-event        | `app/api/projects/[projectId]/ci-event/route.ts` + `lib/ci-events/auth.ts` (OIDC + HMAC) + `lib/ci-events/handlers.ts` (per-event-type) | e2e (mocked OIDC)    | 21         |
 
 **After Phase 3**: maintainers can `/gitshipt flag/ban/clear/...` and CI can
 post events. `contributor_penalties` and `contributors.inputs.ci.*` get
@@ -148,13 +148,13 @@ This is where v1 behavior turns on for `formulaVersion: "v1"` projects.
 Each commit modifies exactly one workflow or step, behind a `formulaVersion`
 check that defaults to v0.
 
-| # | Title | Files | Tests | Depends on |
-|---|---|---|---|---|
-| 39 | wire: scoring dispatch in computeLeaderboard | `workflows/computeLeaderboard.ts` | unit (v0 path unchanged, v1 path uses v1 formula + decay) | 19 |
-| 40 | wire: indexer dispatch in indexProjectDeltas | `workflows/indexProjectDeltas.ts` (calls Phase 1 indexer/* helpers when v1) | unit (mocked Octokit) | 23, 24, 25, 26, 22 |
-| 41 | wire: alignment + pacing in computeLeaderboard | `workflows/computeLeaderboard.ts` | unit | 20, 22, 39 |
-| 42 | wire: penalty enforcement (yellow alignment, red/black payout skip) | `workflows/computeLeaderboard.ts` + `workflows/executePayout.ts` | unit | 21, 41 |
-| 43 | wire: community-verified payout gate | `workflows/executePayout.ts` | unit | schema, 42 |
+| #   | Title                                                                 | Files                                                                        | Tests                                                     | Depends on         |
+| --- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------ |
+| 39  | wire: scoring dispatch in computeLeaderboard                          | `workflows/computeLeaderboard.ts`                                            | unit (v0 path unchanged, v1 path uses v1 formula + decay) | 19                 |
+| 40  | wire: indexer dispatch in indexProjectDeltas                          | `workflows/indexProjectDeltas.ts` (calls Phase 1 indexer/\* helpers when v1) | unit (mocked Octokit)                                     | 23, 24, 25, 26, 22 |
+| 41  | wire: alignment + pacing in computeLeaderboard                        | `workflows/computeLeaderboard.ts`                                            | unit                                                      | 20, 22, 39         |
+| 42  | wire: penalty enforcement (yellow alignment, red/black BPS exclusion) | `workflows/computeLeaderboard.ts` + `workflows/rebalanceBps.ts`              | unit                                                      | 21, 41             |
+| 43  | wire: community-verified claimer gate                                 | `workflows/rebalanceBps.ts`                                                  | unit                                                      | schema, 42         |
 
 **After Phase 4**: v1 wiring is in place. New projects default to v1 and use
 the new behavior. **Existing projects still on v0** (their schema rows still
@@ -167,11 +167,12 @@ Single SQL migration that promotes every existing project from v0 to v1 in
 one cut-over. Lands AFTER all Phase 4 wiring is verified, so projects
 flipping to v1 immediately get the new behavior.
 
-| # | Title | Files | Tests | Depends on |
-|---|---|---|---|---|
-| 44 | db: 0021_promote_v0_to_v1 backfill | `apps/web/db/migrations/0021_promote_v0_to_v1.sql` | unit (verify v1 fields populated for promoted projects), e2e (one v0 project rendered as v1 after migration) | 39, 40, 41, 42, 43 |
+| #   | Title                              | Files                                              | Tests                                                                                                        | Depends on         |
+| --- | ---------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------ |
+| 44  | db: 0021_promote_v0_to_v1 backfill | `apps/web/db/migrations/0021_promote_v0_to_v1.sql` | unit (verify v1 fields populated for promoted projects), e2e (one v0 project rendered as v1 after migration) | 39, 40, 41, 42, 43 |
 
 The backfill:
+
 - `UPDATE projects SET scoring_config = jsonb_set(scoring_config, '{formulaVersion}', '"v1"')` for all rows where current `formulaVersion = 'v0'`.
 - Same UPDATE adds the v1 config defaults: `perPrCommitCap = 5`,
   `perWindowPrCap = 10`, `draftQueueEnabled = true`,
@@ -196,11 +197,11 @@ The auto-review pipeline + the gitshipt-bot's contributor-facing comments and
 checks. None of these are economically load-bearing — they enhance the UX
 of the v1 system already wired in Phase 4.
 
-| # | Title | Files | Tests | Depends on |
-|---|---|---|---|---|
-| 45 | workflow: processDraftQueue | `workflows/processDraftQueue.ts` + cron entry in `vercel.json` | unit (mocked Octokit + DB) | 22, 36 |
-| 46 | gh-bot over-cap comment + score-status check | `lib/github/bot-comments.ts` + integration in indexProjectDeltas | unit | 22, 40 |
-| 47 | gh-bot penalty-status check | `lib/github/bot-comments.ts` (extend) | unit | 21, 42 |
+| #   | Title                                        | Files                                                            | Tests                      | Depends on |
+| --- | -------------------------------------------- | ---------------------------------------------------------------- | -------------------------- | ---------- |
+| 45  | workflow: processDraftQueue                  | `workflows/processDraftQueue.ts` + cron entry in `vercel.json`   | unit (mocked Octokit + DB) | 22, 36     |
+| 46  | gh-bot over-cap comment + score-status check | `lib/github/bot-comments.ts` + integration in indexProjectDeltas | unit                       | 22, 40     |
+| 47  | gh-bot penalty-status check                  | `lib/github/bot-comments.ts` (extend)                            | unit                       | 21, 42     |
 
 **After Phase 5**: contributors see status checks on their PRs and helpful
 bot comments when over cap. Drafts left open for >24h get auto-reviewed.
@@ -210,12 +211,12 @@ bot comments when over cap. Drafts left open for >24h get auto-reviewed.
 Final commits prove the spine works on this repo and align the public docs
 with reality.
 
-| # | Title | Files | Depends on |
-|---|---|---|---|
-| 48 | dogfood: GitShipt own shipshape.md at repo root | `shipshape.md` | 27, 32 |
-| 49 | dogfood: GitShipt own .github/workflows/gitshipt-report.yml | workflow file | 38 |
-| 50 | dogfood: GitShipt own README badge | `README.md` (additive) | 31 |
-| 51 | docs: honesty fix at /docs | `apps/web/app/(public)/docs/page.tsx` | all of Phase 4 + 44 |
+| #   | Title                                                       | Files                                 | Depends on          |
+| --- | ----------------------------------------------------------- | ------------------------------------- | ------------------- |
+| 48  | dogfood: GitShipt own shipshape.md at repo root             | `shipshape.md`                        | 27, 32              |
+| 49  | dogfood: GitShipt own .github/workflows/gitshipt-report.yml | workflow file                         | 38                  |
+| 50  | dogfood: GitShipt own README badge                          | `README.md` (additive)                | 31                  |
+| 51  | docs: honesty fix at /docs                                  | `apps/web/app/(public)/docs/page.tsx` | all of Phase 4 + 44 |
 
 **After Phase 6**: PR 1 ships. Branch is mergeable.
 

@@ -27,7 +27,7 @@ itself is rewritten.
 
 ## TL;DR
 
-GitShipt is a launchpad-leaderboard hybrid where any GitHub repo can spawn a Bags.fm token. Token fees auto-distribute to that repo's top contributors, with GitShipt receiving 25% of trading fees via Bags partner configuration (no launch fees). We ship the platform by launching its own token at the demo and rewarding our own contributors live.
+GitShipt is a launchpad-leaderboard hybrid where any GitHub repo can spawn a Bags.fm token. Token fees route to that repo's top contributors through Bags-native fee sharing, with GitShipt receiving 25% of trading fees via Bags partner configuration (no launch fees). We ship the platform by launching its own token at the demo and rewarding our own contributors live.
 
 **One-liner**: Pump.fun for open source. The repo is the project, the contributors are the rewards.
 
@@ -106,13 +106,13 @@ This PRD has been verified against current platform docs. Material decisions and
 2. Click "Claim earnings" → continue to Bags.
 3. Bags handles GitHub identity, wallet connection, and fee claims directly. GitShipt never holds contributor claim balances.
 
-### F3. Daily payout (System)
+### F3. Daily Bags rebalance (System)
 
 1. **23:30 UTC**: indexer reconciles GitHub deltas for all live projects.
 2. **00:00 UTC**: leaderboard snapshot generated, frozen, hashed (Merkle root persisted).
-3. **00:15 UTC**: Bags API queried for accrued fees per token.
-4. **00:30 UTC**: payouts dispatched per snapshot tier weights, idempotent on `(snapshotId, contributorId)`.
-5. Failures retry with exponential backoff (5m, 15m, 1h, 6h). Permanent failures escalate to admin payout queue.
+3. **00:15 UTC**: GitShipt computes snapshot-derived contributor BPS targets.
+4. **00:30 UTC**: Bags fee-share config is rebalanced via delegated manager authority when targets changed.
+5. Failures retry with exponential backoff (5m, 15m, 1h, 6h). Permanent failures escalate to admin workflow queue.
 
 ### F4. Admin oversight
 
@@ -155,7 +155,8 @@ External:
 - Browser ↔ Next.js: better-auth session cookies, HttpOnly + Secure + SameSite=Lax.
 - Next.js ↔ Workflows: same Vercel project, same env, same secrets. No cross-network HTTP.
 - Workflow steps ↔ Bags API: server-only, key in Vercel env (encrypted at rest).
-- Workflow steps ↔ Solana: payout signing key in Vercel env, hot wallet capped balance, refilled via MFA-gated admin action.
+- Workflow steps ↔ Solana: server-side manager key may sign Bags BPS
+  rebalances and partner fee claims. Contributor claim balances stay in Bags.
 
 ---
 
@@ -273,7 +274,7 @@ const tokenInfo = await sdk.tokenLaunch.createTokenInfoAndMetadata({
   name: "GitShipt",
   symbol: "GSHIPT",
   description:
-    "Token for the gitshipt repo. Fees redistribute to top contributors daily.",
+    "Token for the gitshipt repo. Fees route to top contributors through Bags.",
   imageUrl: "https://gitshipt.com/og/gitshipt.png",
 });
 
@@ -319,45 +320,45 @@ the GitShipt partner wallet `HXs58Qa6YtgJfWVkQVnpFmw6WoEdFEL4LLD1ArZjMvTH` and
 referral code `symbiex` (`https://bags.fm/?ref=symbiex`) unless an explicit
 override is passed for a specialized partner campaign.
 
-### Daily fee claim and redistribute
+### Daily leaderboard snapshot and Bags rebalance
 
-The `executeDailyPayout` workflow (Vercel Workflow, triggered at 00:30 UTC):
+Contributor funds stay in Bags. GitShipt does not claim contributor fees into a
+hot wallet or redistribute them. The daily automation computes a reproducible
+leaderboard snapshot and, when the ranking changed enough to matter, asks Bags
+to update the fee-share BPS allocation under the delegated manager role:
 
 ```ts
-// workflows/executeDailyPayout.ts
+// workflows/rebalanceBps.ts
 "use workflow";
 
-export async function executeDailyPayout() {
+export async function rebalanceBps() {
   const projects = await fetchActiveProjects(); // 'use step'
-  await Promise.all(projects.map((p) => processProjectPayout(p.id)));
+  await Promise.all(projects.map((p) => rebalanceProjectBps(p.id)));
 }
 
-export async function processProjectPayout(projectId: string) {
+export async function rebalanceProjectBps(projectId: string) {
   "use workflow";
   const project = await loadProject(projectId); // step
-  const claimable = await checkClaimablePositions(project); // step (Bags API)
-  if (claimable.lamports < CLAIM_THRESHOLD_LAMPORTS) return;
-
-  const claimSig = await claimBagsFees(project); // step (sends Solana tx)
   const snapshot = await loadLatestSnapshot(projectId); // step
-  const plan = computeDistributionPlan(snapshot, claimable.lamports); // pure
-  await distributeToContributors(project, plan); // step (fan out per recipient)
-  await recordPayout(projectId, snapshot.id, plan, claimSig); // step
+  const plan = computeContributorBps(snapshot); // pure
+  if (!needsManagerRebalance(project, plan)) return;
+  const sig = await updateBagsFeeShareConfig(project, plan); // step
+  await recordBpsRebalance(projectId, snapshot.id, plan, sig); // step
 }
 ```
 
 ### Bags API endpoints we use
 
-| Purpose                                | Endpoint                                                                                       | When                   |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------- |
-| Resolve GitHub username to Bags wallet | `GET /api/v1/token-launch/fee-share/wallet/v2?provider=github&username={u}`                    | Launch + onboarding    |
-| Create fee share config                | `POST /api/v1/fee-share/config`                                                                | Launch                 |
-| Create launch tx                       | `POST /api/v1/token-launch/create-launch-transaction`                                          | Launch                 |
-| List claimable positions               | `GET /api/v1/token-launch/claimable-positions?wallet={addr}`                                   | Daily payout cron      |
-| Claim fees (SDK)                       | `sdk.fee.*`                                                                                    | Daily payout cron      |
-| Partner fee stats + claim txs          | `sdk.partner.getPartnerConfigClaimStats()` / `sdk.partner.getPartnerConfigClaimTransactions()` | Admin fees console     |
-| Lifetime fees (analytics)              | `GET /api/v1/token-launch/lifetime-fees?tokenMint={m}`                                         | Project page           |
-| Token holders (top N)                  | SDK `analytics.getTokenHolders`                                                                | Optional dividend mode |
+| Purpose                                | Endpoint                                                                                       | When                     |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------ |
+| Resolve GitHub username to Bags wallet | `GET /api/v1/token-launch/fee-share/wallet/v2?provider=github&username={u}`                    | Launch + onboarding      |
+| Create fee share config                | `POST /api/v1/fee-share/config`                                                                | Launch                   |
+| Create launch tx                       | `POST /api/v1/token-launch/create-launch-transaction`                                          | Launch                   |
+| List claimable positions               | `GET /api/v1/token-launch/claimable-positions?wallet={addr}`                                   | Contributor/Bags handoff |
+| Claim fees (SDK)                       | `sdk.fee.*`                                                                                    | Contributor/Bags handoff |
+| Partner fee stats + claim txs          | `sdk.partner.getPartnerConfigClaimStats()` / `sdk.partner.getPartnerConfigClaimTransactions()` | Admin fees console       |
+| Lifetime fees (analytics)              | `GET /api/v1/token-launch/lifetime-fees?tokenMint={m}`                                         | Project page             |
+| Token holders (top N)                  | SDK `analytics.getTokenHolders`                                                                | Optional dividend mode   |
 
 ### Constraints to design around
 
@@ -365,7 +366,7 @@ export async function processProjectPayout(projectId: string) {
 - **Bags rate limit**: 1,000 requests/hour per API key. With cron driving most calls, this is plenty. Workflows step retries don't compound (each step is idempotent).
 - **JWT tokens last 365 days, rotate if compromised**. API keys are separate from JWT tokens. We use API keys for backend, never JWTs.
 - **Token launches require fee sharing config**: the old no-share flow is no longer supported.
-- **Fee claimers support direct wallets**: GitShipt registers the platform hot wallet as the initial pool claimer. For later config updates, verified contributor wallets can receive direct Bags BPS. Unlinked contributors, overflow contributors, and BPS rounding dust remain in the GitShipt contributor pool so no earned fees disappear.
+- **Fee claimers support direct wallets**: GitShipt registers Bags-resolved contributor wallets wherever possible. Later config updates can add verified contributor wallets via Bags admin updates. Unlinked contributors, overflow contributors, and BPS rounding dust remain excluded until they can be safely represented in the Bags claimer set.
 
 ---
 
@@ -373,7 +374,7 @@ export async function processProjectPayout(projectId: string) {
 
 The Bags fee-share config allocates 10,000 BPS explicitly across the project owner and Bags-resolved contributor wallets. GitShipt revenue is separate: launches include the GitShipt Bags partner key so the platform can claim partner revenue from Bags without reducing the contributor envelope.
 
-The daily payout workflow updates Bags-native BPS allocations; contributors claim through Bags:
+The daily rebalance workflow updates Bags-native BPS allocations; contributors claim through Bags:
 
 ```
 latestSnapshot = frozen leaderboard snapshot
@@ -413,8 +414,7 @@ All background work runs as **Vercel Workflows** triggered by **Vercel Cron Jobs
 | `indexGithubDeltas`  | Vercel Cron + GitHub webhook  | every 15m       | Root workflow fans out one child per active project |
 | `computeLeaderboard` | Internal (post-index) or cron | hourly          | Per-project, idempotent                             |
 | `takeSnapshot`       | Vercel Cron                   | daily 00:00 UTC | Freezes leaderboard, persists Merkle root           |
-| `executePayout`      | Internal (post-snapshot)      | daily 00:30 UTC | Per-snapshot, fans out per-recipient batch          |
-| `expireEscrow`       | Vercel Cron                   | daily 01:00 UTC | Sweep                                               |
+| `rebalanceBps`       | Internal (post-snapshot)      | daily 00:30 UTC | Applies snapshot-derived contributor BPS in Bags    |
 | `claimPartnerFees`   | Workflow + admin action       | daily / manual  | Claims GitShipt Bags partner revenue                |
 | `healthPulse`        | Vercel Cron                   | every 1m        | Heartbeat to admin dashboard                        |
 
@@ -821,11 +821,11 @@ Routes live under `/dashboard/projects/[id]/*`. The sidebar shown in the project
 
 - Edit project metadata (name, description, social links).
 - Edit scoring config: window (7-90 days), weights for commits/PRs/reviews/issues/lines, time decay (off/linear/exponential), bot allowlist/blocklist (GitHub usernames).
-- Edit payout config: top-N (3-50), tier weights (must sum to 1.0), claim threshold (lamports above which a daily payout fires).
+- Edit payout config: top-N (3-50), tier weights (must sum to 1.0), and rebalance threshold.
 - Force a snapshot outside the cron schedule (rate-limited to 1/hour, idempotent).
 - Pause project (stops payouts, leaderboard freezes; trading on Bags continues).
-- Trigger a manual payout for a specific snapshot (requires reason string, MFA reverify, audit log).
-- Retry a failed payout from `payouts.status = failed`.
+- Trigger a manual BPS rebalance for a specific snapshot (requires reason string, MFA reverify, audit log).
+- Retry a failed rebalance workflow.
 - Add or remove project moderators with scoped permissions.
 - Transfer ownership to another GitHub user (target must accept via dashboard within 7 days).
 - Delete the project (24-hour cooldown; payouts continue to schedule during the cooldown; final confirm requires typing the repo name).
@@ -835,7 +835,7 @@ Routes live under `/dashboard/projects/[id]/*`. The sidebar shown in the project
 #### What project admins **cannot** do
 
 - Change the platform fee BPS (set globally by super-admin within bounds).
-- Withdraw funds from the platform pool (Bags routes fees, GitShipt redistributes; project admins never touch the wallet).
+- Withdraw GitShipt partner revenue or contributor claim balances.
 - Re-launch the token or change the on-chain fee share config (immutable post-launch).
 - Override the global kill switch.
 - Access other projects' data.
@@ -872,7 +872,7 @@ Routes live under `/admin/*`. Distinct session realm from `/dashboard/*` (separa
 - Approve / reject project launches if the approval gate flag is on.
 - Manually claim GitShipt partner fees (requires reason + MFA + cosign).
 - Adjust platform fee BPS (within the 0-2000 BPS hard cap enforced at DB and contract layer).
-- Top up the hot wallet from the cold treasury (manual signed transaction; admin records the tx, system verifies and updates internal accounting).
+- Rotate or fund the server-side manager signer after an explicit security review.
 - Toggle feature flags globally or per-cohort.
 - Access the audit log unfiltered.
 
@@ -1072,8 +1072,8 @@ ADMIN_EMAIL_ALLOWLIST
 Every `/api/cron/*` handler validates `Authorization: Bearer ${CRON_SECRET}` before triggering its workflow. Vercel auto-injects this header on cron-triggered requests.
 
 ```ts
-// app/api/cron/payout/route.ts
-import { triggerPayoutWorkflow } from "@/workflows/executePayout";
+// app/api/cron/rebalance/route.ts
+import { triggerBpsRebalanceWorkflow } from "@/workflows/rebalanceBps";
 
 export async function GET(req: Request) {
   if (
@@ -1081,7 +1081,7 @@ export async function GET(req: Request) {
   ) {
     return new Response("Unauthorized", { status: 401 });
   }
-  await triggerPayoutWorkflow();
+  await triggerBpsRebalanceWorkflow();
   return Response.json({ ok: true });
 }
 ```
@@ -1126,22 +1126,22 @@ export async function GET(req: Request) {
 - `computeLeaderboard` workflow + **public project page UI matching the supplied mockup**
 - Project admin console: Overview, Leaderboard, Settings tabs (Payouts and others stubbed)
 - Vercel Cron entries for all schedules in `vercel.json`
-- Claim flow MVP
+- Bags claim handoff MVP
 
 ### Day 3 (April 27)
 
-- `takeSnapshot` + `executePayout` workflows end-to-end on devnet
+- `takeSnapshot` + `rebalanceBps` workflows end-to-end on devnet
 - `rebalanceBps` + `claimPartnerFees` workflows
 - **Super-admin console**: Ops dashboard, kill switch, fee config, audit log, payout retry, treasury (read-only), workflow run inspector
 - Permission matrix and `requirePermission` helper enforced across all routes
 - Security pass (CSP, HMAC, idempotency, rate limits, CRON_SECRET, sensitive env audit)
 - DESIGN.md final pass, contrast lint clean, Tailwind theme regenerated
-- Smoke test full payout pipeline against devnet
+- Smoke test full Bags rebalance and claim handoff pipeline against devnet
 
 ### April 28 morning
 
 - Launch GitShipt's own token live
-- Push final commits, redistribute first payout on stage
+- Push final commits, run first Bags rebalance on stage
 - Demo recording + submission
 
 ---
@@ -1153,11 +1153,11 @@ export async function GET(req: Request) {
 | Bags API undocumented surface    | Day 1 sync with Teddy; stub-and-mock wrapper to unblock work                                                |
 | GitHub rate limits               | Use GitHub App (15k req/hr), aggressive caching, webhook-first                                              |
 | Sybil farming on small repos     | Min repo age (30d) + min star count (10) at launch, configurable                                            |
-| Payout key compromise            | Hot wallet daily balance cap, cold treasury, MFA on top-ups                                                 |
+| Manager signer compromise        | Dedicated manager signer, least-privilege delegation, rotation playbook, no contributor fee custody         |
 | Legal exposure                   | Pre-mainnet counsel review on US fee distribution to anonymous wallets                                      |
 | Snapshot drift / non-determinism | Lock formula_version per snapshot, store full inputs, replayable                                            |
 | Demo failure on stage            | Pre-record fallback video, run demo on devnet with mainnet UI                                               |
-| Vercel function 14min cap        | Fan-out pattern: chunk payouts to many recipients across child workflows                                    |
+| Vercel function duration cap     | Step-based workflows with idempotent Bags updates and bounded fan-out per project                           |
 | Vercel cron timing imprecision   | Pro plan required for sub-daily and precise timing                                                          |
 | Vendor lock to Vercel Workflows  | Workflow SDK is open-source and portable; Postgres-backed self-host adapter exists if migration ever needed |
 
@@ -1166,7 +1166,7 @@ export async function GET(req: Request) {
 ## Success metrics (post-hackathon)
 
 - 10 live projects in week 1
-- $5k cumulative fees distributed in month 1
+- $5k cumulative Bags-routed fees in month 1
 - 50% contributor wallet link rate
 - < 1% payout failure rate after retries
 - Zero unauthorized admin actions (audit log clean)

@@ -1351,7 +1351,7 @@ export async function sybilFlagUser(input: unknown): Promise<{ ok: true }> {
 }
 
 // Legacy hot-wallet top-up action deleted with the off-chain dispatch loop.
-// The Bags-native architecture has no hot wallet — the manager keypair only
+// The Bags-native architecture has no hot wallet. The manager keypair only
 // pays tx fees and is topped up out-of-band by the operator if it ever runs
 // low. No admin action surface needed for that.
 

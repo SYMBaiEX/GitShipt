@@ -91,7 +91,7 @@ async function ProjectPayoutsPageContent({
           value={allPayouts.length.toLocaleString("en-US")}
         />
         <SummaryTile
-          label="Lifetime distributed"
+          label="Lifetime routed"
           value={formatSol(totals.lamports, 4)}
           mono
         />
@@ -107,14 +107,14 @@ async function ProjectPayoutsPageContent({
             <Coins className="size-10 text-fg-muted" aria-hidden />
             <div className="text-headline-sm text-fg">No payouts yet</div>
             <p className="max-w-md text-body-md text-fg-secondary">
-              The first cycle lands at midnight UTC. Trading fees on{" "}
+              The first leaderboard cycle starts at midnight UTC. Trading fees
+              on{" "}
               <span className="text-mono-sm text-fg">
                 {header.tokenMint
                   ? "the launched token"
                   : "this repo's token (once launched)"}
               </span>{" "}
-              will be claimed and redistributed to the top-
-              {header.payoutConfig.topN}.
+              become claimable through Bags for the active contributor set.
             </p>
           </div>
         ) : (

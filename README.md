@@ -33,7 +33,8 @@ If this README disagrees with those files, the spec wins.
   transactions
 - Redis for rate limits, idempotency, nonce storage, MFA confirmation, and cache
   coordination
-- Vercel Workflows for indexing, snapshots, payouts, escrow expiry, and KPI
+- Vercel Workflows for indexing, snapshots, Bags BPS rebalances, partner fee
+  claims, and KPI
   publishing
 - `@bagsfm/bags-sdk` v1.3.x, `@solana/web3.js` v1.98.x, Helius RPC
 
@@ -104,6 +105,8 @@ Core variables:
   classification.
 - Run `bun run env:check -- --env-file=.env.production.local` before launch to
   validate a local production env file without printing secret values.
+- Vercel does not reveal Sensitive values through `vercel env pull`; use
+  `GET /api/health?strict=1` on the deployed URL as the runtime readiness gate.
 - `NEXT_PUBLIC_APP_URL` and `BETTER_AUTH_URL` should point at the deployed app
   origin. Production uses `https://gitshipt.com`.
 - `DATABASE_URL` and `DATABASE_URL_UNPOOLED` are the preferred server-only Neon
@@ -124,8 +127,9 @@ Core variables:
 - `BAGS_API_KEY` enables live Bags SDK calls.
 - `BAGS_PARTNER_WALLET`, `BAGS_PARTNER_CONFIG_KEY`, and `BAGS_CONFIG_TYPE` are
   optional Bags partner/config controls.
-- `HELIUS_RPC_URL` and `SOLANA_PAYOUT_KEYPAIR` are required before live Bags
-  fee-share config transactions can be signed.
+- `HELIUS_RPC_URL`, `SOLANA_MANAGER_KEYPAIR`, and the legacy
+  `SOLANA_PAYOUT_KEYPAIR` gate are required before live Bags fee-share config
+  transactions can be signed.
 - `SOLANA_TREASURY_ADDRESS` receives the GitShipt platform fee share.
 - `CRON_SECRET` protects cron/admin automation endpoints.
 
@@ -198,10 +202,9 @@ Auth and account API:
 
 - `GET|POST /api/auth/[...all]` is delegated to `better-auth`.
 - `POST /api/wallets/nonce` issues SIWS nonces.
-- `POST /api/wallets/verify` verifies SIWS and links a wallet.
+- `POST /api/wallets/verify` verifies SIWS and links the project owner's
+  launch wallet.
 - `POST /api/auth/mfa/enroll`, `/verify`, and `/revoke` manage TOTP MFA.
-- `POST /api/claims/link` starts contributor wallet claim processing.
-- `POST /api/claims/escrow` drains eligible escrowed earnings.
 - `GET /api/github/me/repos` lists launchable repos for the current user.
 
 Platform and automation API:
@@ -211,6 +214,8 @@ Platform and automation API:
 - `GET /api/cron/*` workflow triggers, protected by `CRON_SECRET`
 - `POST /api/webhooks/github` GitHub webhook receiver with HMAC verification
 - `GET /api/health` deployment health check
+- `GET /api/health?strict=1` deployment readiness check; returns 503 if any
+  production integration is missing, stubbed, or failing.
 
 Mutation invariants:
 
@@ -236,9 +241,10 @@ The current live Bags path is centralized in
    `sdk.state.getLaunchWalletV2Bulk()`, merges duplicate wallets, adds the
    GitShipt platform fee wallet, and calls
    `sdk.config.createBagsFeeShareConfig()`.
-3. Fee-share config transactions returned by Bags are signed with
-   `SOLANA_PAYOUT_KEYPAIR` through `signAndSendTransaction()`.
-4. Claim reads and payout preparation use the `sdk.fee.*` namespace.
+3. Fee-share config transactions returned by Bags are signed through the
+   server-side signer only after instruction-policy checks.
+4. Contributor claims stay in Bags. GitShipt records claim events and runs
+   cadence-driven BPS rebalances; it does not expose `/api/claims/*`.
 
 GitShipt deliberately keeps two revenue rails separate:
 
@@ -257,11 +263,12 @@ credentials, launch stays in deterministic stub mode.
 
 Workflow files live in [`apps/web/workflows`](./apps/web/workflows):
 
-- `indexGithub` and `indexProjectDeltas` import GitHub activity.
+- `indexGithubDeltas` and `indexProjectDeltas` import GitHub activity.
 - `computeLeaderboard` turns activity into ranked contributors.
 - `takeSnapshot` freezes daily leaderboard state.
-- `executePayout` claims Bags fees and distributes payouts.
-- `expireEscrow` sweeps stale escrowed balances.
+- `rebalanceBps` updates Bags fee-share BPS weights on the project cadence.
+- `claimPartnerFees` claims GitShipt partner fees through Bags-native
+  partner-claim transactions.
 - `publishKpis` refreshes public metrics.
 
 Vercel Workflow step idempotency is not automatic. Any external API call inside

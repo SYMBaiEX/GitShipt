@@ -162,7 +162,7 @@ export function LeaderboardConfigForm({
 
             <FormField
               label={`Min payout: ${thresholdSol.toFixed(4)} SOL`}
-              hint="Skip tiny daily payouts."
+              hint="Skip tiny fee-share updates."
               error={thresholdError}
             >
               <input

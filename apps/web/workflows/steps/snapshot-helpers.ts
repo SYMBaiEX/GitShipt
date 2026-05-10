@@ -191,8 +191,9 @@ export async function freezeSnapshot(args: {
       // weight gets us to a per-contributor target; for snapshot integrity
       // we hash the (contributorId, weight) projection so the root depends
       // on the rank ordering AND the tier weights chosen at snapshot time.
-      // Amount-in-lamports isn't known yet (no claim total) — Merkle root
-      // is updated to the amount tree at payout time inside executePayout.
+      // Amount-in-lamports is intentionally not part of this root. Contributors
+      // claim through Bags, so this root proves rank/weight ordering for the
+      // snapshot that later BPS rebalances are derived from.
       amountLamports: BigInt(Math.round(e.weight * 1_000_000_000)),
     })),
   );

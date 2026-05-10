@@ -29,7 +29,6 @@ import { DexscreenerUpsellCard } from "@/components/bags/DexscreenerUpsellCard";
 import { getActiveDexscreenerOrderForProject } from "@/lib/queries/dexscreener-orders";
 import { solscanTokenUrl, solscanTxUrl } from "@/lib/solana/explorer";
 
-
 export default function TokenPage({
   params,
 }: {
@@ -104,18 +103,24 @@ async function TokenPageContent({
               <Row label="Launch state">
                 <Badge
                   variant={
-                    project.status === "live"
+                    project.status === "live" && project.managerPubkey
                       ? "success"
                       : project.status === "launch_configured"
                         ? "warning"
-                        : "default"
+                        : project.status === "live"
+                          ? "warning"
+                          : "default"
                   }
                   size="sm"
-                  dot={project.status === "live"}
+                  dot={
+                    project.status === "live" && Boolean(project.managerPubkey)
+                  }
                 >
                   {project.status === "launch_configured"
                     ? "Configured"
-                    : project.status}
+                    : project.status === "live" && !project.managerPubkey
+                      ? "Live · delegation pending"
+                      : project.status}
                 </Badge>
               </Row>
               <Row label="Contributor fee share">
@@ -141,7 +146,10 @@ async function TokenPageContent({
           ) : (
             <p className="text-body-md text-fg-secondary">
               No token launched yet.{" "}
-              <Link href="/launch" className="text-primary-readable hover:underline">
+              <Link
+                href="/launch"
+                className="text-primary-readable hover:underline"
+              >
                 Launch on Bags.fm →
               </Link>
             </p>

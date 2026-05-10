@@ -7,6 +7,7 @@ import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { AppShell } from "../../_components/AppShell";
 import { requireAuthSession } from "@/lib/auth/session";
 import { clusterLabel } from "@/lib/solana/explorer";
+import { SolanaWalletProvider } from "@/components/providers/SolanaWalletProvider";
 
 /**
  * Per-project gate. We re-validate the session here AND check
@@ -83,7 +84,7 @@ async function ProjectLayoutContent({
       }
       footerLeft={`${project.slug} · ${clusterLabel()} · BAGS.fm`}
     >
-      {children}
+      <SolanaWalletProvider>{children}</SolanaWalletProvider>
     </AppShell>
   );
 }

@@ -6,7 +6,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { ChevronUp, LayoutDashboard, LogOut, Settings, User as UserIcon } from "lucide-react";
 import { useSidebar } from "@repo/ui";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@repo/lib";
 import { authClient } from "@/lib/auth/client";
@@ -55,7 +54,6 @@ export function SidebarUserCard({
 }: SidebarUserCardProps) {
   const { collapsed, closeMobile } = useSidebar();
   const router = useRouter();
-  const { disconnect } = useWallet();
   const [open, setOpen] = React.useState(false);
   const [isSigningOut, startSignOutTransition] = React.useTransition();
   const ref = React.useRef<HTMLDivElement>(null);
@@ -94,12 +92,6 @@ export function SidebarUserCard({
 
     startSignOutTransition(() => {
       void (async () => {
-        try {
-          await disconnect();
-        } catch {
-          // Wallet may already be disconnected or unavailable.
-        }
-
         try {
           const result = await authClient.signOut();
           if ("error" in result && result.error) {

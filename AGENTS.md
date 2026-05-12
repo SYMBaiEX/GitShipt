@@ -63,13 +63,13 @@ Stop and tell the user exactly what env var you need in one sentence. Do not inv
 <claude-mem-context>
 # Memory Context
 
-# [gitbags] recent context, 2026-05-10 5:26pm CDT
+# [gitbags] recent context, 2026-05-11 10:42pm CDT
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 5 obs (2,670t read) | 199,084t work | 99% savings
+Stats: 12 obs (6,385t read) | 309,965t work | 98% savings
 
 ### May 9, 2026
 3127 11:01p 🔵 GitBags Repo: 18 Commits Ahead of Origin with Untracked Partner-Fee Files
@@ -77,6 +77,14 @@ Stats: 5 obs (2,670t read) | 199,084t work | 99% savings
 3129 " 🔵 GitShipt Bags-Native Architecture: Full Scope of 91-File Migration Mapped
 3133 11:03p 🔵 GitShipt Quality Gates Pass: TypeCheck Clean, 241 Tests Green, Production Build Succeeds
 3134 " 🔵 Partner Fee Claiming is a Placeholder — Real SDK Integration Not Yet Wired
+### May 11, 2026
+3192 10:20p ✅ GitShipt Core Product Messaging Established
+3196 " 🔵 GitShipt DESIGN.md: Full Visual Design System Discovered
+3197 " 🔵 GitShipt PRD: Full Product Architecture and Requirements Documented
+3198 10:23p 🔵 GitShipt Bags API Integration Surface and Constraints Documented
+3199 " 🔵 GitShipt Canonical Tech Stack Table Confirmed
+3203 10:26p ✅ GitShipt Core Product Messaging Refined
+3204 10:27p 🔵 GitShipt Hackathon Submission Skill Loaded — Colosseum/Superteam Target
 
-Access 199k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 310k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

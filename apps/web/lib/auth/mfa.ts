@@ -148,9 +148,9 @@ export async function decryptSecret(blob: string): Promise<string> {
   const iv = fromB64Url(ivB64);
   const ct = fromB64Url(ctB64);
   const pt = await webcrypto.subtle.decrypt(
-    { name: "AES-GCM", iv },
+    { name: "AES-GCM", iv: iv as BufferSource },
     key,
-    ct,
+    ct as BufferSource,
   );
   return new TextDecoder().decode(pt);
 }

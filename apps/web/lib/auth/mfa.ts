@@ -1,8 +1,9 @@
 import "server-only";
 import * as OTPAuth from "otpauth";
-import { webcrypto } from "node:crypto";
 import { redis } from "@/lib/redis";
 import { serverEnv } from "@/lib/env";
+
+const webcrypto = globalThis.crypto;
 
 /**
  * MFA helpers (TOTP via `otpauth`).

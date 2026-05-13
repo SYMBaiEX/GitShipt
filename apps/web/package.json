@@ -64,6 +64,7 @@
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/react": "^16.3.2",
     "@types/bs58": "^4.0.4",
     "@types/node": "^25",
     "@types/qrcode": "^1.5.6",
@@ -74,6 +75,7 @@
     "drizzle-kit": "^0.31.4",
     "eslint": "^10",
     "eslint-config-next": "16.2.6",
+    "happy-dom": "^20.9.0",
     "pg": "^8.13.1",
     "smee-client": "^5.0.0",
     "tailwindcss": "^4",

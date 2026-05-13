@@ -7,8 +7,13 @@ import { enterDbWorkflowContext } from "@/lib/db-rls";
 /**
  * Step helper — upsert a batch of contributor aggregates for a project.
  * Conflict target is `(project_id, gh_user_id)`. Updates `inputs`,
- * username/avatar, and `last_indexed_at`. Excluded contributors keep
- * their excluded flag (only username/inputs refresh).
+ * username/avatar, `last_indexed_at`, AND re-evaluates `excluded` /
+ * `excluded_reason` so that adding a new pattern to the bot regex
+ * retroactively re-classifies existing rows on the next index pass.
+ *
+ * `manual_override`-style reasons are preserved: rows whose
+ * `excluded_reason` does not start with `bot_detected` are not
+ * automatically un-excluded by a fresh classification.
  */
 export async function stepUpsertContributors(
   projectId: string,
@@ -40,6 +45,27 @@ export async function stepUpsertContributors(
         avatarUrl: sql`excluded.avatar_url`,
         inputs: sql`excluded.inputs`,
         lastIndexedAt: sql`excluded.last_indexed_at`,
+        // Re-evaluate exclusion only when the existing reason is
+        // automatic (bot_detected, treasury_routed_agent) or null —
+        // never override a manual operator decision.
+        excluded: sql`
+          CASE
+            WHEN ${contributors.excludedReason} IS NULL
+              OR ${contributors.excludedReason} = 'bot_detected'
+              OR ${contributors.excludedReason} = 'treasury_routed_agent'
+            THEN excluded.excluded
+            ELSE ${contributors.excluded}
+          END
+        `,
+        excludedReason: sql`
+          CASE
+            WHEN ${contributors.excludedReason} IS NULL
+              OR ${contributors.excludedReason} = 'bot_detected'
+              OR ${contributors.excludedReason} = 'treasury_routed_agent'
+            THEN excluded.excluded_reason
+            ELSE ${contributors.excludedReason}
+          END
+        `,
       },
     });
 

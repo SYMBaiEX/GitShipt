@@ -452,7 +452,9 @@ export function productionReadiness(): ProductionReadiness {
     env.GITHUB_APP_PRIVATE_KEY ||
     env.GITHUB_APP_WEBHOOK_SECRET ||
     env.BETTER_AUTH_SECRET ||
-    env.IDEMPOTENCY_KEY_SECRET;
+    env.IDEMPOTENCY_KEY_SECRET ||
+    env.HELIUS_WEBHOOK_AUTH_TOKEN ||
+    env.CRON_SECRET;
   if (sensitiveConfigured && !env.SECRETS_SENSITIVE_ATTESTED) {
     warnings.push(
       "SECRETS_SENSITIVE_ATTESTED is unset. Manually verify every *_KEYPAIR / *_SECRET env var is flagged Sensitive in the Vercel dashboard, then set SECRETS_SENSITIVE_ATTESTED=true.",

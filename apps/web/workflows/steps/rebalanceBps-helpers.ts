@@ -361,6 +361,25 @@ export async function buildSignAndBroadcastStep(
   if (stub) {
     return { status: "stub", signature: null, error: null };
   }
+  // Step idempotency guard: Vercel Workflows can re-execute a step body on
+  // retry (at-least-once). If a prior execution already persisted a
+  // confirmed signature for this attempt, short-circuit before re-signing
+  // and re-broadcasting a new tx with a fresh blockhash.
+  const [persisted] = await dbHttp
+    .select({
+      status: bagsRebalanceAttempts.status,
+      signatures: bagsRebalanceAttempts.signatures,
+    })
+    .from(bagsRebalanceAttempts)
+    .where(eq(bagsRebalanceAttempts.id, attemptId))
+    .limit(1);
+  if (persisted?.status === "confirmed" && persisted.signatures[0]) {
+    return {
+      status: "confirmed",
+      signature: persisted.signatures[0],
+      error: null,
+    };
+  }
   const env = serverEnv();
   if (!env.HELIUS_RPC_URL) {
     return {

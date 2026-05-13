@@ -8,7 +8,7 @@ import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { dbHttp } from "@/db";
 import { contributors } from "@/db/schema";
 import { audit } from "@/lib/audit";
-import { isAiBot } from "@repo/shared";
+import { isAiVendorAccount } from "@repo/shared";
 
 export interface CandidateRow {
   id: string;
@@ -62,13 +62,20 @@ export async function reclassifyCandidatesStep(
   let flipped = 0;
   const toExclude: string[] = [];
   const toUnExclude: string[] = [];
+  // Scope: only revalidate the AI-vendor hard-deny. Generic CI bot
+  // detection (BOT_REGEX) depends on per-project allowlists which we
+  // don't load here; the indexer path handles re-evaluation for those.
   for (const row of rows) {
-    const ai = isAiBot(row.ghUsername);
+    const ai = isAiVendorAccount(row.ghUsername);
     if (ai && row.excluded !== "true") {
       toExclude.push(row.id);
-    } else if (!ai && row.excluded === "true" && row.excludedReason === "bot_detected") {
+    } else if (
+      !ai &&
+      row.excluded === "true" &&
+      row.excludedReason === "bot_detected"
+    ) {
       // Only flip back to false when the row was auto-excluded by the
-      // bot detector and the current patterns no longer match.
+      // detector and the vendor denylist no longer matches.
       toUnExclude.push(row.id);
     }
   }

@@ -12,18 +12,19 @@
  * `applyTimeDecay` here is the pure helper used by aggregator code.
  */
 
-// Named AI / automation patterns live in @repo/shared so the
-// project-config validator and the indexer share one source of truth.
-// They are hard-denied: allowlist cannot rescue them.
-import { isAiBot } from "@repo/shared";
+// The hard-deny list of vendor-controlled AI accounts lives in
+// @repo/shared so the project-config validator and the indexer share
+// one source of truth. Only these specific GitHub logins are
+// allowlist-unrescuable.
+import { isAiVendorAccount } from "@repo/shared";
 
 /**
  * Broader bot pattern — generic CI / `[bot]` suffix / `*-ci` matches.
- * Unlike `isAiBot()`, results from this regex ARE rescuable via the
- * per-project allowlist. Used only inside `isBot()` after the AI check.
+ * Unlike `isAiVendorAccount()`, results from this regex ARE rescuable
+ * via the per-project allowlist. Used only inside `isBot()` for
+ * unnamed automation (dependabot, renovate, github-actions, *-ci, …).
  */
-export const BOT_REGEX =
-  /(^|[-_./\[])(bot|.*-ci)(\]|[-_./]|$)/i;
+export const BOT_REGEX = /(^|[-_./\[])(bot|.*-ci)(\]|[-_./]|$)/i;
 
 export type ScoreInputs = {
   mergedPRs: number;
@@ -50,12 +51,20 @@ export const DEFAULT_WEIGHTS: ScoreWeights = {
 };
 
 /**
- * Returns true when a login looks bot-like, after applying the
- * per-project allowlist (force include) and blocklist (force exclude).
+ * Returns true when a login is a bot or automation account.
  *
- * Allowlist cannot override the hard-coded AI-bot list — see
- * `isAiBot()`. A project owner can allowlist a human whose handle
- * happens to look bot-like, but cannot allowlist `claude` itself.
+ * Order of checks:
+ *   1. Named vendor AI account (claude, codex, devin, …) — hard-deny,
+ *      cannot be allowlist-rescued.
+ *   2. Per-project allowlist — rescues anything not in (1).
+ *   3. Per-project blocklist — bot.
+ *   4. GitHub API `user.type === "Bot"` — bot (App-installed
+ *      automation account; allowlist-rescuable if listed first).
+ *   5. Generic `bot` / `*-ci` regex — bot (allowlist-rescuable).
+ *
+ * A human handle like `bot-fanatic` is allowlist-rescuable.
+ * Open-source AI agents (OpenClaw, Hermes, aider) commit through their
+ * user's own GitHub account, which is treated as a normal human.
  */
 export function isBot(
   login: string,
@@ -64,16 +73,19 @@ export function isBot(
   githubType?: string | null,
 ): boolean {
   const lower = login.toLowerCase();
-  // GitHub App-installed automation accounts always have type === "Bot".
-  if (githubType === "Bot") return true;
-  // Known-AI guard: allowlist can never un-classify a known-AI login.
-  if (isAiBot(lower)) return true;
+  // 1. Hard-deny: named vendor AI account.
+  if (isAiVendorAccount(lower)) return true;
+  // 2. Allowlist wins for everything else.
   if (allowlist.some((x) => x.toLowerCase() === lower)) return false;
+  // 3. Operator-specified blocklist.
   if (blocklist.some((x) => x.toLowerCase() === lower)) return true;
+  // 4. GitHub App-installed automation account.
+  if (githubType === "Bot") return true;
+  // 5. Generic CI / bot pattern.
   return BOT_REGEX.test(lower);
 }
 
-export { isAiBot };
+export { isAiVendorAccount };
 
 /**
  * Pure scoring function. Treats negative inputs as zero defensively.

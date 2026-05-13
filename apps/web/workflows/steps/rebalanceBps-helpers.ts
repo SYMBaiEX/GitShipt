@@ -388,6 +388,30 @@ export async function buildSignAndBroadcastStep(
       error: "HELIUS_RPC_URL missing",
     };
   }
+  // If a prior execution made it as far as `broadcasting` with a signature
+  // persisted but never reached `confirmed`, try to confirm THAT signature
+  // first. Re-signing with a fresh blockhash would risk a second tx that
+  // also confirms (double-rebalance). Only fall through to re-sign if
+  // confirmation fails (blockhash already expired, dropped tx, etc.).
+  if (persisted?.status === "broadcasting" && persisted.signatures[0]) {
+    const priorSig = persisted.signatures[0];
+    try {
+      const probe = new Connection(env.HELIUS_RPC_URL, "confirmed");
+      await probe.confirmTransaction(priorSig, "confirmed");
+      await dbHttp
+        .update(bagsRebalanceAttempts)
+        .set({
+          status: "confirmed",
+          confirmedAt: new Date(),
+          finalizedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(bagsRebalanceAttempts.id, attemptId));
+      return { status: "confirmed", signature: priorSig, error: null };
+    } catch {
+      // Fall through and re-broadcast.
+    }
+  }
   if (!ctx.managerPubkey) {
     return {
       status: "failed",

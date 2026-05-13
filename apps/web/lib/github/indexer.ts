@@ -9,6 +9,9 @@ export type ContributorAggregate = {
   ghUserId: string;
   ghUsername: string;
   avatarUrl: string | null;
+  /** GitHub API user.type — "User" or "Bot". "Bot" forces isBot=true
+   *  regardless of login regex match. */
+  ghType: string | null;
   inputs: ScoreInputs;
   isBot: boolean;
 };
@@ -61,6 +64,7 @@ export async function fetchCommitsByAuthor(
           ghUserId: id,
           ghUsername: login,
           avatarUrl: c.author.avatar_url ?? null,
+          ghType: c.author.type ?? null,
           inputs: { ...emptyInputs(), commits: 1 },
           isBot: false,
         };
@@ -128,6 +132,7 @@ export async function fetchMergedPRsByAuthor(
           ghUserId: id,
           ghUsername: login,
           avatarUrl: pr.user.avatar_url ?? null,
+          ghType: pr.user.type ?? null,
           inputs: { ...emptyInputs(), mergedPRs: weight },
           isBot: false,
         });
@@ -164,6 +169,7 @@ export async function fetchRepoContributorsLeaderboard(
       ghUserId: String(c.id),
       ghUsername: c.login,
       avatarUrl: c.avatar_url ?? null,
+      ghType: c.type ?? null,
       inputs: { ...emptyInputs(), commits: contributions },
       isBot: false,
     });
@@ -189,6 +195,7 @@ export function mergeAggregates(
           ghUserId: id,
           ghUsername: agg.ghUsername,
           avatarUrl: agg.avatarUrl,
+          ghType: agg.ghType,
           inputs: { ...agg.inputs },
           isBot: agg.isBot,
         });
@@ -196,6 +203,9 @@ export function mergeAggregates(
         bumpInputs(existing.inputs, agg.inputs);
         if (agg.ghUsername) existing.ghUsername = agg.ghUsername;
         if (agg.avatarUrl) existing.avatarUrl = agg.avatarUrl;
+        // "Bot" wins over null/User if any source confirmed it.
+        if (agg.ghType === "Bot") existing.ghType = "Bot";
+        else if (!existing.ghType && agg.ghType) existing.ghType = agg.ghType;
       }
     }
   }
@@ -213,6 +223,6 @@ export function applyBotFlags(
 ): ContributorAggregate[] {
   return aggs.map((a) => ({
     ...a,
-    isBot: isBot(a.ghUsername, allowlist, blocklist),
+    isBot: isBot(a.ghUsername, allowlist, blocklist, a.ghType),
   }));
 }

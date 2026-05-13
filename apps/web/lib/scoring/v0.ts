@@ -12,23 +12,18 @@
  * `applyTimeDecay` here is the pure helper used by aggregator code.
  */
 
-export const BOT_REGEX =
-  /(^|[-_./\[])(bot|dependabot|renovate|.*-ci|github-actions|github-copilot|copilot|coderabbit|claude|claude-code|cursor|codex|chatgpt|openai|perplexity)(\]|[-_./]|$)/i;
+// Named AI / automation patterns live in @repo/shared so the
+// project-config validator and the indexer share one source of truth.
+// They are hard-denied: allowlist cannot rescue them.
+import { isAiBot } from "@repo/shared";
 
-const AUTOMATED_LOGIN_EXACT = new Set([
-  "claude",
-  "claude-code",
-  "cursor",
-  "codex",
-  "chatgpt",
-  "openai",
-  "perplexity",
-  "copilot",
-  "coderabbit",
-  "github-actions[bot]",
-  "dependabot[bot]",
-  "renovate[bot]",
-]);
+/**
+ * Broader bot pattern — generic CI / `[bot]` suffix / `*-ci` matches.
+ * Unlike `isAiBot()`, results from this regex ARE rescuable via the
+ * per-project allowlist. Used only inside `isBot()` after the AI check.
+ */
+export const BOT_REGEX =
+  /(^|[-_./\[])(bot|.*-ci)(\]|[-_./]|$)/i;
 
 export type ScoreInputs = {
   mergedPRs: number;
@@ -57,18 +52,28 @@ export const DEFAULT_WEIGHTS: ScoreWeights = {
 /**
  * Returns true when a login looks bot-like, after applying the
  * per-project allowlist (force include) and blocklist (force exclude).
+ *
+ * Allowlist cannot override the hard-coded AI-bot list — see
+ * `isAiBot()`. A project owner can allowlist a human whose handle
+ * happens to look bot-like, but cannot allowlist `claude` itself.
  */
 export function isBot(
   login: string,
   allowlist: string[],
   blocklist: string[],
+  githubType?: string | null,
 ): boolean {
   const lower = login.toLowerCase();
+  // GitHub App-installed automation accounts always have type === "Bot".
+  if (githubType === "Bot") return true;
+  // Known-AI guard: allowlist can never un-classify a known-AI login.
+  if (isAiBot(lower)) return true;
   if (allowlist.some((x) => x.toLowerCase() === lower)) return false;
   if (blocklist.some((x) => x.toLowerCase() === lower)) return true;
-  if (AUTOMATED_LOGIN_EXACT.has(lower)) return true;
   return BOT_REGEX.test(lower);
 }
+
+export { isAiBot };
 
 /**
  * Pure scoring function. Treats negative inputs as zero defensively.

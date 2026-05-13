@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAiBot } from "./ai-bots";
 
 /**
  * Wizard schemas shared by the client form and the server route handlers.
@@ -50,20 +51,37 @@ export type TokenMetadataInput = z.infer<typeof TokenMetadataSchema>;
 // Step 3: Leaderboard config
 // ============================================================
 
-export const ScoringConfigSchema = z.object({
-  formulaVersion: z.enum(["v0", "v1"]).default("v0"),
-  windowDays: z.number().int().min(7).max(90),
-  weights: z.object({
-    mergedPRs: z.number().min(0),
-    commits: z.number().min(0),
-    reviews: z.number().min(0),
-    issues: z.number().min(0),
-    netLines: z.number().min(0),
-  }),
-  decay: z.enum(["off", "linear", "exponential"]).default("linear"),
-  botBlocklist: z.array(z.string()).default([]),
-  botAllowlist: z.array(z.string()).default([]),
-});
+export const ScoringConfigSchema = z
+  .object({
+    formulaVersion: z.enum(["v0", "v1"]).default("v0"),
+    windowDays: z.number().int().min(7).max(90),
+    weights: z.object({
+      mergedPRs: z.number().min(0),
+      commits: z.number().min(0),
+      reviews: z.number().min(0),
+      issues: z.number().min(0),
+      netLines: z.number().min(0),
+    }),
+    decay: z.enum(["off", "linear", "exponential"]).default("linear"),
+    botBlocklist: z.array(z.string()).default([]),
+    botAllowlist: z.array(z.string()).default([]),
+  })
+  .superRefine((cfg, ctx) => {
+    // Hard-deny: per-project allowlist cannot override the AI-bot list.
+    // GitShipt has no contributor wallet for AI agents and no policy for
+    // routing their share back to a human owner at the rebalance layer,
+    // so AI never receives payout regardless of allowlist contents.
+    for (let i = 0; i < cfg.botAllowlist.length; i++) {
+      const login = cfg.botAllowlist[i]!;
+      if (isAiBot(login)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["botAllowlist", i],
+          message: `'${login}' is a recognized AI agent and cannot be allowlisted. AI agents never receive payouts; their share flows to the active human contributors.`,
+        });
+      }
+    }
+  });
 export type ScoringConfigInput = z.infer<typeof ScoringConfigSchema>;
 
 /**

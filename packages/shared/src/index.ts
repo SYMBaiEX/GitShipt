@@ -3,3 +3,4 @@ export * from "./api-schemas";
 export * from "./api-key-scopes";
 export * from "./github-schemas";
 export * from "./dexscreener-schemas";
+export * from "./ai-bots";

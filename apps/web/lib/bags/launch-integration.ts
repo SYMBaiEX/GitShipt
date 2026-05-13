@@ -29,12 +29,13 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { dbHttp, dbPool } from "@/db";
 import {
   bagsClaimerProviderEnum,
   bagsClaimerSlots,
   bagsFeeShareConfigs,
+  contributors,
   payoutSchedules,
 } from "@/db/schema";
 import { audit } from "@/lib/audit";
@@ -105,6 +106,7 @@ export async function recordLaunch(
   input: RecordLaunchInput,
 ): Promise<RecordLaunchResult> {
   validateLaunchInput(input);
+  await assertNoExcludedClaimers(input);
 
   const baseMintPk = new PublicKey(input.baseMint);
   const [feeShareConfigPda] = deriveFeeShareConfigPda(baseMintPk);
@@ -227,6 +229,41 @@ export async function recordLaunch(
     payoutScheduleId: result.payoutScheduleId,
     feeShareConfigPda: result.feeShareConfigPda,
   };
+}
+
+/**
+ * Reject the launch if any claimer slot references an excluded
+ * (bot-detected or otherwise) contributor row. Belt-and-suspenders
+ * against a regression in `buildLaunchClaimerSet` that lets an AI
+ * agent slip into the on-chain claimer set, where its slot would
+ * persist for the life of the token (the manager role can only
+ * rebalance BPS, not remove claimers).
+ */
+async function assertNoExcludedClaimers(
+  input: RecordLaunchInput,
+): Promise<void> {
+  const ids = input.claimers
+    .map((c) => c.contributorId)
+    .filter((id): id is string => Boolean(id));
+  if (ids.length === 0) return;
+  const rows = await dbHttp
+    .select({
+      id: contributors.id,
+      ghUsername: contributors.ghUsername,
+      excluded: contributors.excluded,
+      excludedReason: contributors.excludedReason,
+    })
+    .from(contributors)
+    .where(inArray(contributors.id, ids));
+  const violators = rows.filter((r) => r.excluded === "true");
+  if (violators.length > 0) {
+    const summary = violators
+      .map((v) => `${v.ghUsername} (${v.excludedReason ?? "excluded"})`)
+      .join(", ");
+    throw new Error(
+      `recordLaunch: refusing to record launch with excluded contributors in claimer set: ${summary}`,
+    );
+  }
 }
 
 function validateLaunchInput(input: RecordLaunchInput): void {

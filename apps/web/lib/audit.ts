@@ -54,7 +54,9 @@ export type AuditAction =
   | "bags.partner_key_created"
   | "bags.partner_fees_claimed"
   | "admin.partner_fees_claimed_manual"
-  | "contributor.bot_flag_revalidated";
+  | "contributor.bot_flag_revalidated"
+  | "fund.reconciliation_warning"
+  | "fund.reconciliation_critical";
 
 export interface AuditEntry {
   actorUserId: string | null;

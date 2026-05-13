@@ -82,6 +82,18 @@ export const AI_VENDOR_DENYLIST = new Set<string>([
   "factory-ai[bot]",
   // Continue.dev (Note: aider is user-run CLI, not in denylist)
   "continue-dev[bot]",
+  // Amazon (Q Developer / CodeWhisperer)
+  "amazon-q-developer-for-github-issues[bot]",
+  "aws-codewhisperer[bot]",
+  // Codium AI — distinct from Codeium; rebranded as Qodo for some surfaces
+  "codium-ai",
+  "codium-ai[bot]",
+  // Bito AI
+  "bito-bot[bot]",
+  // PixieBrix AI
+  "pixiebrix[bot]",
+  // Tabby ML — open-source project but Tabby hosts a vendor bot
+  "tabby-ml[bot]",
 ]);
 
 /**

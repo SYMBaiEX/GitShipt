@@ -1,8 +1,14 @@
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
+import { createHash } from "node:crypto";
 import { serverEnv, hasCredentials } from "@/lib/env";
 
 let _managerSigner: Keypair | null = null;
+let _managerFingerprint: string | null = null;
+
+function fingerprint(secret: string): string {
+  return createHash("sha256").update(secret).digest("hex");
+}
 
 /**
  * Lazily decode the manager keypair from env. Throws if absent — callers
@@ -28,15 +34,19 @@ let _managerSigner: Keypair | null = null;
  *    would have, since the on-chain authority is bounded to BPS rebalance.
  */
 export function managerSigner(): Keypair {
-  if (_managerSigner) return _managerSigner;
   const env = serverEnv();
   if (!env.SOLANA_MANAGER_KEYPAIR) {
     throw new Error(
       "SOLANA_MANAGER_KEYPAIR is not configured. Set it (base58-encoded) in Vercel as Sensitive.",
     );
   }
+  // Fingerprint-keyed cache: a Vercel rotation invalidates the cached
+  // keypair on next call without waiting for a cold start.
+  const fp = fingerprint(env.SOLANA_MANAGER_KEYPAIR);
+  if (_managerSigner && _managerFingerprint === fp) return _managerSigner;
   const decoded = bs58.decode(env.SOLANA_MANAGER_KEYPAIR);
   _managerSigner = Keypair.fromSecretKey(decoded);
+  _managerFingerprint = fp;
   return _managerSigner;
 }
 

@@ -14,29 +14,41 @@
  */
 
 import {
+  acquireLockStep,
   loadCandidateRowsStep,
   reclassifyCandidatesStep,
+  releaseLockStep,
 } from "@/workflows/steps/revalidateBotFlags-helpers";
 
 export async function revalidateBotFlags(): Promise<{
   scanned: number;
   flipped: number;
+  status: "completed" | "skipped_locked";
 }> {
   "use workflow";
-  let scanned = 0;
-  let flipped = 0;
-  let lastId: string | null = null;
-  const pageSize = 500;
-  // Cap the per-run work so a single cron tick is bounded.
-  const maxPages = 50;
-  for (let i = 0; i < maxPages; i++) {
-    const page = await loadCandidateRowsStep(lastId, pageSize);
-    if (page.rows.length === 0) break;
-    const result = await reclassifyCandidatesStep(page.rows);
-    scanned += page.rows.length;
-    flipped += result.flipped;
-    lastId = page.lastId;
-    if (page.rows.length < pageSize) break;
+  // Single-flight: if another instance is mid-revalidation, skip.
+  const lock = await acquireLockStep();
+  if (!lock.acquired) {
+    return { scanned: 0, flipped: 0, status: "skipped_locked" };
   }
-  return { scanned, flipped };
+  try {
+    let scanned = 0;
+    let flipped = 0;
+    let lastId: string | null = null;
+    const pageSize = 500;
+    // Cap the per-run work so a single cron tick is bounded.
+    const maxPages = 50;
+    for (let i = 0; i < maxPages; i++) {
+      const page = await loadCandidateRowsStep(lastId, pageSize);
+      if (page.rows.length === 0) break;
+      const result = await reclassifyCandidatesStep(page.rows);
+      scanned += page.rows.length;
+      flipped += result.flipped;
+      lastId = page.lastId;
+      if (page.rows.length < pageSize) break;
+    }
+    return { scanned, flipped, status: "completed" };
+  } finally {
+    await releaseLockStep(lock);
+  }
 }

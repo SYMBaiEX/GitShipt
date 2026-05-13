@@ -1,13 +1,18 @@
 /**
  * Step helpers for `revalidateBotFlags`. Pages through contributors with
  * automatic exclusion reasons and re-evaluates them against the current
- * `isAiBot()` patterns.
+ * `isAiVendorAccount()` denylist.
  */
 
-import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, gt, inArray, isNull, or } from "drizzle-orm";
 import { dbHttp } from "@/db";
 import { contributors } from "@/db/schema";
 import { audit } from "@/lib/audit";
+import {
+  acquireWorkflowLock,
+  releaseWorkflowLock,
+  type WorkflowLock,
+} from "@/lib/workflow-locks";
 import { isAiVendorAccount } from "@repo/shared";
 
 export interface CandidateRow {
@@ -24,6 +29,17 @@ export interface CandidatePageJson {
 }
 
 const AUTOMATIC_REASONS = ["bot_detected", "treasury_routed_agent"];
+
+export async function acquireLockStep(): Promise<WorkflowLock> {
+  "use step";
+  return acquireWorkflowLock("revalidateBotFlags", "root", 20 * 60);
+}
+
+export async function releaseLockStep(lock: WorkflowLock): Promise<void> {
+  "use step";
+  if (!lock.acquired) return;
+  await releaseWorkflowLock(lock);
+}
 
 export async function loadCandidateRowsStep(
   afterId: string | null,
@@ -59,53 +75,80 @@ export async function reclassifyCandidatesStep(
   rows: CandidateRow[],
 ): Promise<{ flipped: number }> {
   "use step";
-  let flipped = 0;
-  const toExclude: string[] = [];
-  const toUnExclude: string[] = [];
   // Scope: only revalidate the AI-vendor hard-deny. Generic CI bot
   // detection (BOT_REGEX) depends on per-project allowlists which we
   // don't load here; the indexer path handles re-evaluation for those.
+  const toExclude: CandidateRow[] = [];
+  const toUnExclude: CandidateRow[] = [];
   for (const row of rows) {
     const ai = isAiVendorAccount(row.ghUsername);
     if (ai && row.excluded !== "true") {
-      toExclude.push(row.id);
+      toExclude.push(row);
     } else if (
       !ai &&
       row.excluded === "true" &&
       row.excludedReason === "bot_detected"
     ) {
-      // Only flip back to false when the row was auto-excluded by the
-      // detector and the vendor denylist no longer matches.
-      toUnExclude.push(row.id);
+      toUnExclude.push(row);
     }
   }
-  if (toExclude.length > 0) {
+  const excludeIds = toExclude.map((r) => r.id);
+  const unExcludeIds = toUnExclude.map((r) => r.id);
+  let flipped = 0;
+  if (excludeIds.length > 0) {
     await dbHttp
       .update(contributors)
       .set({ excluded: "true", excludedReason: "bot_detected" })
-      .where(inArray(contributors.id, toExclude));
-    flipped += toExclude.length;
+      .where(inArray(contributors.id, excludeIds));
+    flipped += excludeIds.length;
   }
-  if (toUnExclude.length > 0) {
+  if (unExcludeIds.length > 0) {
     await dbHttp
       .update(contributors)
       .set({ excluded: "false", excludedReason: null })
-      .where(inArray(contributors.id, toUnExclude));
-    flipped += toUnExclude.length;
+      .where(inArray(contributors.id, unExcludeIds));
+    flipped += unExcludeIds.length;
   }
   if (flipped > 0) {
-    await audit({
-      actorUserId: null,
-      action: "contributor.bot_flag_revalidated",
-      targetType: "contributor",
-      targetId: rows[0]!.id,
-      metadata: {
-        flipped,
-        excludedCount: toExclude.length,
-        unExcludedCount: toUnExclude.length,
-        sampleLogins: rows.slice(0, 5).map((r) => r.ghUsername),
-      },
-    });
+    // One audit entry per affected project so the trail is queryable
+    // by project rather than collapsing a multi-project batch into a
+    // single (misleading) contributor row.
+    const byProject = new Map<
+      string,
+      { excluded: CandidateRow[]; unExcluded: CandidateRow[] }
+    >();
+    for (const r of toExclude) {
+      const slot = byProject.get(r.projectId) ?? {
+        excluded: [],
+        unExcluded: [],
+      };
+      slot.excluded.push(r);
+      byProject.set(r.projectId, slot);
+    }
+    for (const r of toUnExclude) {
+      const slot = byProject.get(r.projectId) ?? {
+        excluded: [],
+        unExcluded: [],
+      };
+      slot.unExcluded.push(r);
+      byProject.set(r.projectId, slot);
+    }
+    for (const [projectId, group] of byProject) {
+      await audit({
+        actorUserId: null,
+        action: "contributor.bot_flag_revalidated",
+        targetType: "project",
+        targetId: projectId,
+        metadata: {
+          excludedCount: group.excluded.length,
+          unExcludedCount: group.unExcluded.length,
+          excludedLogins: group.excluded.map((r) => r.ghUsername).slice(0, 10),
+          unExcludedLogins: group.unExcluded
+            .map((r) => r.ghUsername)
+            .slice(0, 10),
+        },
+      });
+    }
   }
   return { flipped };
 }

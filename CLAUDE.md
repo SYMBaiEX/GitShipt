@@ -83,8 +83,9 @@ The product flow defines the architecture: **GitHub activity → ranked contribu
 - `indexGithubDeltas` / `indexProjectDeltas` — pull commits/PRs/reviews via Octokit App, write to DB.
 - `computeLeaderboard` — turn activity into ranked contributors using `lib/scoring/`.
 - `takeSnapshot` — freeze daily leaderboard into an immutable period (UNIQUE-indexed; idempotent upsert).
-- `executePayout` — claim Bags fees via `sdk.fee.*`, dispatch SOL to ranked recipients with compare-and-swap status writes.
-- `expireEscrow`, `processClaim`, `publishKpis`, `healthPulse`, `reconcileFunds` — adjacent housekeeping. `reconcileFunds` runs `lib/funds/reconciliation.ts` under `acquireWorkflowLock` to flag drift between Bags-claimed amounts and dispatched payouts.
+- `rebalanceBps` — for each due `payout_schedules` row, build a new BPS plan from the latest snapshot, dedupe via `bags_rebalance_attempts.plan_hash`, sign `manager_update_fee_config` with the manager keypair, broadcast, then advance per-slot weights and `next_run_at`. No SOL is custodied or dispatched — contributors claim from Bags directly.
+- `claimPartnerFees` — claim accumulated partner fees from the Bags partner config via `sdk.fee.*`, keyed by `getStepMetadata().stepId` for idempotency.
+- `publishKpis`, `healthPulse` — adjacent housekeeping. Fund-side reconciliation is invocation-driven (not yet a workflow): `lib/funds/accounting.ts` and `lib/funds/partner-fee-claims.ts` provide read-side surfaces that flag drift between Bags-claimed amounts and dispatched payouts, surfaced through `manual_reconciliation_required*` audit codes from the launch and admin paths.
 - `steps/` — shared step helpers. **Step idempotency is not automatic**; pass `getStepMetadata().stepId` as the key for any external API call.
 
 Cron triggers in `vercel.json` hit `/api/cron/*` handlers (protected by `CRON_SECRET`), which start the corresponding workflow.

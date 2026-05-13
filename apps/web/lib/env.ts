@@ -76,6 +76,14 @@ const serverEnvSchema = z.object({
   // unless explicitly opted in. Read-only Bags calls always work.
   BAGS_ALLOW_PROD_LAUNCH: z.coerce.boolean().default(false),
   ALLOW_STUBS_IN_PROD: z.coerce.boolean().default(false),
+  /**
+   * Operator attestation that all *_KEYPAIR and *_SECRET vars are flagged
+   * Sensitive in the Vercel dashboard (post-April-2026 incident). Cannot
+   * be verified programmatically — must be ticked at deploy time after a
+   * manual review. `productionReadiness()` warns when this is unset and
+   * any sensitive secret is configured.
+   */
+  SECRETS_SENSITIVE_ATTESTED: z.coerce.boolean().default(false),
 
   // Solana
   HELIUS_RPC_URL: optionalUrl,
@@ -431,6 +439,24 @@ export function productionReadiness(): ProductionReadiness {
 
   if (env.ALLOW_STUBS_IN_PROD) {
     warnings.push("ALLOW_STUBS_IN_PROD=true leaves production in stub mode.");
+  }
+
+  // Vercel "Sensitive" attestation: programmatically un-verifiable, so we
+  // warn-only when any sensitive secret is configured but the operator
+  // hasn't ticked the attestation env var.
+  const sensitiveConfigured =
+    env.SOLANA_PAYOUT_KEYPAIR ||
+    env.SOLANA_MANAGER_KEYPAIR ||
+    env.BAGS_API_KEY ||
+    env.BAGS_WEBHOOK_SECRET ||
+    env.GITHUB_APP_PRIVATE_KEY ||
+    env.GITHUB_APP_WEBHOOK_SECRET ||
+    env.BETTER_AUTH_SECRET ||
+    env.IDEMPOTENCY_KEY_SECRET;
+  if (sensitiveConfigured && !env.SECRETS_SENSITIVE_ATTESTED) {
+    warnings.push(
+      "SECRETS_SENSITIVE_ATTESTED is unset. Manually verify every *_KEYPAIR / *_SECRET env var is flagged Sensitive in the Vercel dashboard, then set SECRETS_SENSITIVE_ATTESTED=true.",
+    );
   }
 
   if (env.ALLOW_DEMO_SEED) {

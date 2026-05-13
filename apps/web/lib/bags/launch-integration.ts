@@ -106,13 +106,17 @@ export async function recordLaunch(
   input: RecordLaunchInput,
 ): Promise<RecordLaunchResult> {
   validateLaunchInput(input);
-  await assertNoExcludedClaimers(input);
 
   const baseMintPk = new PublicKey(input.baseMint);
   const [feeShareConfigPda] = deriveFeeShareConfigPda(baseMintPk);
   const [feeShareAuthorityPda] = deriveFeeShareAuthorityPda(baseMintPk);
 
   const result = await dbPool().transaction(async (tx) => {
+    // Check excluded-claimer assertion INSIDE the transaction so a
+    // concurrent exclusion (e.g. the revalidate cron firing mid-launch)
+    // cannot create a TOCTOU window.
+    await assertNoExcludedClaimers(tx, input);
+
     const [existing] = await tx
       .select({
         id: bagsFeeShareConfigs.id,
@@ -231,6 +235,10 @@ export async function recordLaunch(
   };
 }
 
+type RecordLaunchTx = Parameters<
+  Parameters<ReturnType<typeof dbPool>["transaction"]>[0]
+>[0];
+
 /**
  * Reject the launch if any claimer slot references an excluded
  * (bot-detected or otherwise) contributor row. Belt-and-suspenders
@@ -238,15 +246,20 @@ export async function recordLaunch(
  * agent slip into the on-chain claimer set, where its slot would
  * persist for the life of the token (the manager role can only
  * rebalance BPS, not remove claimers).
+ *
+ * Runs inside the recordLaunch transaction so a concurrent exclusion
+ * (e.g. revalidateBotFlags firing mid-launch) cannot land between the
+ * assertion and the claimer-slot inserts.
  */
 async function assertNoExcludedClaimers(
+  tx: RecordLaunchTx,
   input: RecordLaunchInput,
 ): Promise<void> {
   const ids = input.claimers
     .map((c) => c.contributorId)
     .filter((id): id is string => Boolean(id));
   if (ids.length === 0) return;
-  const rows = await dbHttp
+  const rows = await tx
     .select({
       id: contributors.id,
       ghUsername: contributors.ghUsername,
@@ -262,6 +275,16 @@ async function assertNoExcludedClaimers(
       .join(", ");
     throw new Error(
       `recordLaunch: refusing to record launch with excluded contributors in claimer set: ${summary}`,
+    );
+  }
+  // Surface a missing-contributor mismatch loudly. A claimer slot tied
+  // to a contributorId that doesn't exist in the DB indicates upstream
+  // wiring drift and should NOT silent-pass.
+  if (rows.length !== ids.length) {
+    const found = new Set(rows.map((r) => r.id));
+    const missing = ids.filter((id) => !found.has(id));
+    throw new Error(
+      `recordLaunch: claimer set references contributorIds with no DB row: ${missing.join(", ")}`,
     );
   }
 }

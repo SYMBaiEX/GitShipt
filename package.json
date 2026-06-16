@@ -59,6 +59,6 @@
   },
   "dependencies": {
     "@solana/codecs-numbers": "6.9.0",
-    "rpc-websockets": "9.3.9"
+    "rpc-websockets": "10.0.1"
   }
 }

@@ -33,7 +33,7 @@
     "@repo/lib": "workspace:*",
     "@repo/shared": "workspace:*",
     "@repo/ui": "workspace:*",
-    "@solana/codecs-numbers": "6.9.0",
+    "@solana/codecs-numbers": "6.10.0",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",

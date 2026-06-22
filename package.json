@@ -58,7 +58,7 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@solana/codecs-numbers": "6.9.0",
+    "@solana/codecs-numbers": "6.10.0",
     "rpc-websockets": "9.3.9"
   }
 }

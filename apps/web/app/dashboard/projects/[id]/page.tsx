@@ -268,7 +268,7 @@ function AlertsCard({
                   href={`/dashboard/projects/${projectId}/payouts`}
                   className="mt-1 inline-flex text-label-sm text-primary-readable hover:underline"
                 >
-                  Review &amp; retry
+                  Review payouts
                 </Link>
               </li>
             ))}

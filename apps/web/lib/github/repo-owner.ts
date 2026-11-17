@@ -4,6 +4,8 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { dbHttp } from "@/db";
 import { accounts } from "@/db/schema";
+import { withRlsContext } from "@/db/rls-context";
+import "@/db/rls-storage-init";
 
 const RepoSchema = z.object({
   id: z.number().int().positive().safe(),
@@ -40,8 +42,11 @@ export async function requirePersonalRepoOwner(args: {
   ghRepo: string;
   ghRepoId: string;
 }): Promise<{ githubAccountId: string; login: string }> {
-  const linked = await dbHttp.select({ accountId: accounts.accountId, accessToken: accounts.accessToken })
-    .from(accounts).where(and(eq(accounts.userId, args.userId), eq(accounts.providerId, "github"))).limit(2);
+  const linked = await withRlsContext(
+    { mode: "user", userId: args.userId, role: "user", reason: "launch:github-owner" },
+    () => dbHttp.select({ accountId: accounts.accountId, accessToken: accounts.accessToken })
+      .from(accounts).where(and(eq(accounts.userId, args.userId), eq(accounts.providerId, "github"))).limit(2),
+  );
   if (linked.length !== 1 || !linked[0]?.accessToken) {
     throw new RepoOwnerError("github_credentials_required", 401, "Sign in with a linked GitHub account to verify repository ownership.");
   }

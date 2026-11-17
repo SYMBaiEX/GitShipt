@@ -4,8 +4,9 @@ import { headers } from "next/headers";
 import { and, eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { dbHttp } from "@/db";
-import { projects, wallets } from "@/db/schema";
+import { projects } from "@/db/schema";
 import { requirePermission, PermissionError } from "@/lib/auth/permissions";
+import { isWalletBoundToUser } from "@/lib/auth/launch-wallet";
 import { check } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
 import { validateClientKey, withIdempotency } from "@/lib/idempotency";
@@ -17,6 +18,7 @@ import {
 } from "@/lib/env";
 import { bags } from "@/lib/bags/client";
 import { payoutSignerPublicKey } from "@/lib/solana/signer";
+import { assertLaunchPayerFunded, LaunchPayerError } from "@/lib/solana/launch-payer";
 import {
   recordLaunch,
   verifyRecordedFeeShareHeader,
@@ -35,6 +37,7 @@ import { revalidateProjectCaches } from "@/lib/cache";
 import { acquireWorkflowLock, releaseWorkflowLock } from "@/lib/workflow-locks";
 import { platformFeeBps } from "@/lib/platform-fee";
 import { requirePersonalRepoOwner, RepoOwnerError } from "@/lib/github/repo-owner";
+import { launchWebsite } from "@/lib/github/launch-website";
 import { buildOwnerLaunchClaimers } from "@/lib/bags/owner-claimers";
 
 export const maxDuration = 300;
@@ -366,6 +369,9 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
               409,
             );
           }
+          const payoutWallet = payoutSignerPublicKey();
+          if (!willStubMode) await assertLaunchPayerFunded(payoutWallet);
+          const website = launchWebsite(project.ghOwner, project.ghRepo, project.tokenWebsiteUrl);
           await dbHttp
             .update(projects)
             .set({ platformFeeBps: feeBps })
@@ -394,7 +400,7 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
               project.description?.trim() ||
               defaultTokenDescription(project.ghOwner, project.ghRepo),
             imageUrl: project.imageUrl ?? "https://gitshipt.com/og/default.png",
-            website: project.tokenWebsiteUrl ?? undefined,
+            website,
             twitter: project.tokenTwitterUrl ?? undefined,
             telegram: project.tokenTelegramUrl ?? undefined,
           });
@@ -404,7 +410,6 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
           // Payer is the server-side launch/manager signer. When
           // SOLANA_PAYOUT_KEYPAIR is missing we fall back to the resolved pool
           // wallet so the SDK payload still validates in stub mode.
-          const payoutWallet = payoutSignerPublicKey();
           if (!isStub && !payoutWallet) {
             throw new LaunchError(
               "launch_wallet_missing",
@@ -444,6 +449,7 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
                 bagsLaunchWallet: launchWallet,
                 bagsPoolClaimerWallet: poolClaimerWallet,
                 bagsTokenMetadata: tokenInfo.tokenMetadata,
+                tokenWebsiteUrl: website,
                 bagsInitialBuyLamports: initialBuyLamports,
                 platformFeeBps: feeBps,
                 updatedAt: new Date(),
@@ -505,6 +511,7 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
               bagsLaunchWallet: isStub ? null : launchWallet,
               bagsPoolClaimerWallet: poolClaimerWallet,
               bagsTokenMetadata: tokenInfo.tokenMetadata,
+              tokenWebsiteUrl: website,
               bagsInitialBuyLamports: initialBuyLamports,
               status: configuredStatus,
               simulatedAt: isStub ? configuredAt : null,
@@ -657,7 +664,7 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
     return NextResponse.json(result, { status: 200 });
   } catch (e) {
     if (e instanceof RepoOwnerError) return NextResponse.json({ error: e.code, message: e.message }, { status: e.status });
-    if (e instanceof LaunchError) {
+    if (e instanceof LaunchError || e instanceof LaunchPayerError) {
       return NextResponse.json(
         { error: e.code, message: e.message },
         { status: e.status },
@@ -711,18 +718,6 @@ function serverEnvCluster(): string {
     // ignore; we still want the cluster string for the audit log
   }
   return process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet";
-}
-
-async function isWalletBoundToUser(
-  userId: string,
-  walletAddress: string,
-): Promise<boolean> {
-  const [row] = await dbHttp
-    .select({ id: wallets.id })
-    .from(wallets)
-    .where(and(eq(wallets.userId, userId), eq(wallets.address, walletAddress)))
-    .limit(1);
-  return Boolean(row);
 }
 
 interface ConfiguredLaunch {

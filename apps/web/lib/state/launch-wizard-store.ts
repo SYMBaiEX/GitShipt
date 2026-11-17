@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { launchWebsite } from "@/lib/github/launch-website";
 import {
   DEFAULT_CLAIM_THRESHOLD_LAMPORTS,
   DEFAULT_MAX_CLAIMERS,
@@ -165,7 +166,7 @@ export function deriveTokenMetadataDefaults(
     symbol: deriveSymbolFromRepo(repo.name),
     description: defaultDescription(repo),
     imageUrl: repo.ownerAvatarUrl,
-    website: validUrlOrUndefined(repo.homepage),
+    website: launchWebsite(repo.owner, repo.name),
   };
 }
 
@@ -187,23 +188,4 @@ function defaultDescription(repo: GithubRepo): string {
   const description = repo.description?.trim();
   if (description) return description.slice(0, 1000);
   return `Token for ${repo.owner}/${repo.name}.`;
-}
-
-function validUrlOrUndefined(
-  raw: string | null | undefined,
-): string | undefined {
-  if (!raw) return undefined;
-  const trimmed = raw.trim();
-  if (!trimmed) return undefined;
-  // GitHub homepage is often "example.com" without a scheme. The Bags
-  // schema requires a full URL, so prepend https:// when missing.
-  const candidate = /^https?:\/\//i.test(trimmed)
-    ? trimmed
-    : `https://${trimmed}`;
-  try {
-    new URL(candidate);
-    return candidate;
-  } catch {
-    return undefined;
-  }
 }

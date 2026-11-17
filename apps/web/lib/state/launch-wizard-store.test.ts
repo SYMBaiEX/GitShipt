@@ -40,7 +40,7 @@ describe("launch wizard store", () => {
       symbol: "GB",
       description: repo.description,
       imageUrl: repo.ownerAvatarUrl,
-      website: "https://gitshipt.dev",
+      website: "https://github.com/sym/git-bags",
     });
   });
 
@@ -68,7 +68,7 @@ describe("launch wizard store", () => {
       symbol: "OSLK",
       description: "Token for sym/open-source-launch-kit.",
       imageUrl: repo.ownerAvatarUrl,
-      website: "https://gitshipt.dev",
+      website: "https://github.com/sym/open-source-launch-kit",
     });
   });
 
@@ -78,22 +78,24 @@ describe("launch wizard store", () => {
     expect(deriveSymbolFromRepo("singlewordrepo")).toBe("SINGLEWORD");
   });
 
-  test("repo homepage missing a scheme is upgraded to https before becoming the default website", () => {
+  test("the GitHub repo URL takes precedence over an unqualified homepage", () => {
     useLaunchWizardStore.getState().selectRepo({
       ...repo,
       homepage: "example.com",
     });
     expect(useLaunchWizardStore.getState().metadata?.website).toBe(
-      "https://example.com",
+      "https://github.com/sym/git-bags",
     );
   });
 
-  test("repo with no homepage leaves the website field undefined", () => {
+  test("the GitHub repo URL is present even when the repo has no homepage", () => {
     useLaunchWizardStore.getState().selectRepo({
       ...repo,
       homepage: null,
     });
-    expect(useLaunchWizardStore.getState().metadata?.website).toBeUndefined();
+    expect(useLaunchWizardStore.getState().metadata?.website).toBe(
+      "https://github.com/sym/git-bags",
+    );
   });
 
   test("reset clears user-specific launch state", () => {

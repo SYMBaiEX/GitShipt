@@ -20,6 +20,7 @@ import { Button } from "@repo/ui";
 import { Card, CardDescription, CardTitle } from "@repo/ui";
 import { Spinner } from "@repo/ui";
 import { FormError } from "@/components/shared/FormError";
+import { launchWebsite } from "@/lib/github/launch-website";
 import { RepoPicker } from "./RepoPicker";
 import { TokenMetadataForm } from "./TokenMetadataForm";
 import { ReviewAndSign } from "./ReviewAndSign";
@@ -201,7 +202,7 @@ export function WizardShell({
         symbol: draft.symbol ?? "",
         description: draft.description ?? "",
         imageUrl: draft.imageUrl ?? "",
-        website: draft.website ?? "",
+        website: launchWebsite(draft.ghOwner, draft.ghRepo, draft.website),
         twitter: draft.twitter ?? "",
         telegram: draft.telegram ?? "",
       },

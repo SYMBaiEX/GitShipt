@@ -13,7 +13,6 @@ import {
   projects,
   projectMemberships,
   users,
-  wallets,
 } from "@/db/schema";
 import { check } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
@@ -32,6 +31,7 @@ import {
   verifyRecordedFeeShareHeader,
 } from "@/lib/bags/launch-integration";
 import { payoutSignerPublicKey } from "@/lib/solana/signer";
+import { assertLaunchPayerFunded, LaunchPayerError } from "@/lib/solana/launch-payer";
 import {
   loadRecordedLaunchClaimers,
   resolveDirectLaunchClaimers,
@@ -41,6 +41,7 @@ import { verifyLaunchTransaction } from "@/lib/bags/verify-launch";
 import { acquireWorkflowLock, releaseWorkflowLock } from "@/lib/workflow-locks";
 import { captureException } from "@/lib/observability";
 import { requirePermission, PermissionError } from "@/lib/auth/permissions";
+import { isWalletBoundToUser } from "@/lib/auth/launch-wallet";
 import { updateProjectCaches, updateUserCaches } from "@/lib/cache-actions";
 import {
   CreateProjectBodySchema,
@@ -49,12 +50,13 @@ import {
   type CreateProjectBody,
   type UpdateDraftBody,
 } from "@repo/shared";
-import { applyDbRlsContext } from "@/lib/db-rls";
+import { applyDbRlsContext, withRlsContext } from "@/lib/db-rls";
 import { isProjectsGhRepoUniqueViolation } from "@/lib/db-errors";
 import { platformFeeBps } from "@/lib/platform-fee";
 import { requirePersonalRepoOwner, RepoOwnerError } from "@/lib/github/repo-owner";
 import { buildOwnerLaunchClaimers } from "@/lib/bags/owner-claimers";
 import { resolveGitHubInstallationForRepo } from "@/lib/github/installations";
+import { launchWebsite } from "@/lib/github/launch-website";
 
 /**
  * Server action used by `<ReviewAndSign>` to drive the create + launch flow
@@ -484,6 +486,9 @@ export async function createAndLaunchAction(
               projectId,
             );
           }
+          const payoutWallet = payoutSignerPublicKey();
+          if (!willStubLaunch) await assertLaunchPayerFunded(payoutWallet);
+          const website = launchWebsite(project.ghOwner, project.ghRepo, validated.website);
           await dbHttp
             .update(projects)
             .set({ platformFeeBps: feeBps })
@@ -503,13 +508,12 @@ export async function createAndLaunchAction(
             symbol: validated.symbol,
             description: validated.description,
             imageUrl: validated.imageUrl,
-            website: validated.website,
+            website,
             twitter: validated.twitter,
             telegram: validated.telegram,
           });
           const isStub = Boolean(tokenInfo.__stub);
 
-          const payoutWallet = payoutSignerPublicKey();
           if (!isStub && !payoutWallet) {
             throw new ActionError(
               "launch_wallet_missing",
@@ -550,6 +554,7 @@ export async function createAndLaunchAction(
                 bagsLaunchWallet: launchWallet,
                 bagsPoolClaimerWallet: poolClaimerWallet,
                 bagsTokenMetadata: tokenInfo.tokenMetadata,
+                tokenWebsiteUrl: website,
                 bagsInitialBuyLamports: initialBuyLamports,
                 platformFeeBps: feeBps,
                 updatedAt: new Date(),
@@ -613,6 +618,7 @@ export async function createAndLaunchAction(
               bagsLaunchWallet: isStub ? null : launchWallet,
               bagsPoolClaimerWallet: poolClaimerWallet,
               bagsTokenMetadata: tokenInfo.tokenMetadata,
+              tokenWebsiteUrl: website,
               bagsInitialBuyLamports: initialBuyLamports,
               status: configuredStatus,
               simulatedAt: isStub ? configuredAt : null,
@@ -774,7 +780,9 @@ export async function createAndLaunchAction(
     );
     return result;
   } catch (e) {
-    if (e instanceof RepoOwnerError) return { ok: false, error: e.code, message: e.message, status: e.status };
+    if (e instanceof RepoOwnerError || e instanceof LaunchPayerError) {
+      return { ok: false, error: e.code, message: e.message, status: e.status };
+    }
     if (e instanceof ActionError) {
       return {
         ok: false,
@@ -1229,13 +1237,14 @@ async function verifyRepoAdmin(args: {
   ghOwner: string;
   ghRepo: string;
 }): Promise<VerifyOk | VerifyErr> {
-  const [account] = await dbHttp
-    .select({ accessToken: accounts.accessToken })
-    .from(accounts)
-    .where(
-      and(eq(accounts.userId, args.userId), eq(accounts.providerId, "github")),
-    )
-    .limit(1);
+  const [account] = await withRlsContext(
+    { mode: "user", userId: args.userId, role: "user", reason: "launch:github-admin" },
+    () => dbHttp
+      .select({ accessToken: accounts.accessToken })
+      .from(accounts)
+      .where(and(eq(accounts.userId, args.userId), eq(accounts.providerId, "github")))
+      .limit(1),
+  );
 
   if (!account?.accessToken) {
     return {
@@ -1271,18 +1280,6 @@ async function verifyRepoAdmin(args: {
       status: 502,
     };
   }
-}
-
-async function isWalletBoundToUser(
-  userId: string,
-  walletAddress: string,
-): Promise<boolean> {
-  const [row] = await dbHttp
-    .select({ id: wallets.id })
-    .from(wallets)
-    .where(and(eq(wallets.userId, userId), eq(wallets.address, walletAddress)))
-    .limit(1);
-  return Boolean(row);
 }
 
 async function ensureGitHubInstallation(args: {

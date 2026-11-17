@@ -102,13 +102,6 @@ export function TokenMetadataForm({
           });
         }
 
-        if (!current.website && parsed.data.ownerTwitterUsername === null) {
-          // Fall back to owner blog if no homepage and no twitter (rare combo,
-          // but blog is real owner-curated metadata when present).
-          const blog = normalizeUrlOrEmpty(parsed.data.ownerBlog);
-          if (blog) setValue("website", blog, { shouldValidate: true });
-        }
-
         if (!current.twitter && parsed.data.ownerTwitterUsername) {
           setValue(
             "twitter",
@@ -329,24 +322,6 @@ function safeImageUrl(value: string | undefined, fallback: string): string {
       : fallback;
   } catch {
     return fallback;
-  }
-}
-
-// GitHub `homepage` is often "example.com" without a scheme; the Zod URL check
-// rejects that. Prepend https when missing, and return "" instead of null so
-// react-hook-form's optional-or-empty-string handling stays happy.
-function normalizeUrlOrEmpty(raw: string | null | undefined): string {
-  if (!raw) return "";
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-  const candidate = /^https?:\/\//i.test(trimmed)
-    ? trimmed
-    : `https://${trimmed}`;
-  try {
-    new URL(candidate);
-    return candidate;
-  } catch {
-    return "";
   }
 }
 

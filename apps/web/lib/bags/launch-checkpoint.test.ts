@@ -17,5 +17,13 @@ describe("live fee configuration checkpoint", () => {
       expect(source.slice(checkpoint, broadcast)).toContain("bagsConfigKey: null");
       expect(source.slice(checkpoint, broadcast)).toContain("isInitFinalized: false");
     });
+
+    it(`${path} checks the setup wallet before creating Bags metadata`, () => {
+      const source = readFileSync(path, "utf8");
+      const payerCheck = source.indexOf("await assertLaunchPayerFunded(");
+      const metadata = source.indexOf("await bags.createTokenInfo({");
+      expect(payerCheck).toBeGreaterThan(-1);
+      expect(metadata).toBeGreaterThan(payerCheck);
+    });
   }
 });

@@ -301,6 +301,17 @@ export async function getProjectPayoutHistory(
   return await getProjectPayoutHistoryUncached(projectId, safeLimit(limit, 50));
 }
 
+// Only call after checking the signed-in user's payouts.read permission.
+export async function getOwnedProjectPayoutHistory(
+  projectId: string,
+  userId: string,
+): Promise<PayoutHistoryRow[]> {
+  return withRlsContext(
+    { mode: "user", userId, role: "user", reason: "payouts:project-history" },
+    () => getProjectPayoutHistoryUncached(projectId),
+  );
+}
+
 export interface MyEarnings {
   totalLifetimeLamports: bigint;
   pendingEscrowLamports: bigint;

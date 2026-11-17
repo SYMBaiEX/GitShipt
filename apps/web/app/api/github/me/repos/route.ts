@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { dbHttp } from "@/db";
 import { accounts, projects } from "@/db/schema";
+import { withRlsContext } from "@/db/rls-context";
 import { check } from "@/lib/rate-limit";
 import { hasCredentials } from "@/lib/env";
 import { redis } from "@/lib/redis";
@@ -103,14 +104,14 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   // Look up the GitHub access token from the better-auth `accounts` table.
-  const [account] = await dbHttp
-    .select({
-      accessToken: accounts.accessToken,
-      scope: accounts.scope,
-    })
-    .from(accounts)
-    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "github")))
-    .limit(1);
+  const [account] = await withRlsContext(
+    { mode: "user", userId, role: "user", reason: "launch:github-repos" },
+    () => dbHttp
+      .select({ accessToken: accounts.accessToken })
+      .from(accounts)
+      .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "github")))
+      .limit(1),
+  );
 
   if (!account?.accessToken) {
     return privateNoStoreJson(

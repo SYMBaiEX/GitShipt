@@ -58,6 +58,21 @@ async function ProjectPayoutsPageContent({
   if (!data) notFound();
 
   const { header } = data;
+  if (
+    !header.tokenMint ||
+    header.status === "tracked" ||
+    header.status === "draft" ||
+    header.status === "launch_configured"
+  ) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-headline-lg">Payouts</h1>
+        <p className="text-body-md text-fg-secondary">
+          No token has launched for this repository.
+        </p>
+      </div>
+    );
+  }
   if (rewardModeOf(header.payoutConfig) === "owner") {
     return (
       <div className="space-y-4">
@@ -122,9 +137,7 @@ async function ProjectPayoutsPageContent({
               The first leaderboard cycle starts at midnight UTC. Trading fees
               on{" "}
               <span className="text-mono-sm text-fg">
-                {header.tokenMint
-                  ? "the launched token"
-                  : "this repo's token (once launched)"}
+                the launched token
               </span>{" "}
               become claimable through Bags for the active contributor set.
             </p>

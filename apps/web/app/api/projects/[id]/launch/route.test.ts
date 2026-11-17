@@ -5,7 +5,7 @@ vi.mock("server-only", () => ({}));
 const state = vi.hoisted(() => ({
   project: {} as Record<string, unknown>, selectCount: 0, walletLinked: true,
   ownerCheck: vi.fn(), partnerCheck: vi.fn(), resolveContributors: vi.fn(), record: vi.fn(), verify: vi.fn(), load: vi.fn(),
-  info: vi.fn(), feeConfig: vi.fn(), launchTx: vi.fn(), modeGuard: vi.fn(), payer: "", treasury: "",
+  info: vi.fn(), feeConfig: vi.fn(), launchTx: vi.fn(), modeGuard: vi.fn(), balance: vi.fn(), payer: "", treasury: "",
 }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/auth", () => ({ auth: () => ({ api: { getSession: async () => ({ user: { id: "user" } }) } }) }));
@@ -13,7 +13,6 @@ vi.mock("@/db", () => ({ dbHttp: {
   select: () => ({ from: () => ({ where: () => ({ limit: async () => {
     state.selectCount++;
     if (state.selectCount === 1) return [{ status: state.project.status, simulatedAt: null }];
-    if (state.selectCount === 2) return state.walletLinked ? [{ id: "wallet" }] : [];
     return [state.project];
   } }) }) }),
   update: () => ({ set: (values: Record<string, unknown>) => ({ where: () => {
@@ -22,12 +21,17 @@ vi.mock("@/db", () => ({ dbHttp: {
   } }) }),
 } }));
 vi.mock("@/lib/auth/permissions", () => ({ requirePermission: async () => undefined, PermissionError: class extends Error {} }));
+vi.mock("@/lib/auth/launch-wallet", () => ({ isWalletBoundToUser: async () => state.walletLinked }));
 vi.mock("@/lib/rate-limit", () => ({ check: async () => ({ success: true }) }));
 vi.mock("@/lib/audit", () => ({ audit: async () => undefined }));
 vi.mock("@/lib/idempotency", () => ({ validateClientKey: (key: string) => key, withIdempotency: async (_key: unknown, fn: () => Promise<unknown>) => fn() }));
 vi.mock("@/lib/env", () => ({ hasCredentials: { db: () => true, bags: () => true }, canLaunchOnBags: state.modeGuard, serverEnv: () => ({ SOLANA_TREASURY_ADDRESS: state.treasury, BAGS_INITIAL_BUY_LAMPORTS: 0 }), stubsAllowed: () => false }));
 vi.mock("@/lib/bags/client", () => ({ bags: { createTokenInfo: state.info, createFeeShareConfig: state.feeConfig, createLaunchTransactionForWallet: state.launchTx } }));
 vi.mock("@/lib/solana/signer", () => ({ payoutSignerPublicKey: () => state.payer }));
+vi.mock("@/lib/solana/connection", () => ({
+  solanaConnection: () => ({ getBalance: state.balance }),
+  withRpcRetry: (fn: () => Promise<number>) => fn(),
+}));
 vi.mock("@/lib/bags/launch-integration", () => ({ recordLaunch: state.record, verifyRecordedFeeShareHeader: state.verify }));
 vi.mock("@/lib/bags/launch-claimers", () => ({ loadRecordedLaunchClaimers: state.load, resolveDirectLaunchClaimers: state.resolveContributors, assertLaunchPartnerReady: state.partnerCheck }));
 vi.mock("@/lib/github/repo-owner", () => ({ requirePersonalRepoOwner: state.ownerCheck, RepoOwnerError: class extends Error { code = "not_repo_owner"; status = 403; } }));
@@ -52,6 +56,7 @@ describe("owner rewards launch API", () => {
     state.treasury = Keypair.generate().publicKey.toBase58();
     state.project = { id: "project", status: "draft", ghOwner: "alice", ghRepo: "repo", ghRepoId: "123", ghInstallationId: null, name: "Repo", symbol: "REPO", description: "test", imageUrl: "https://example.test/image.png", payoutConfig: { rewardMode: "owner" }, platformFeeBps: 1000 };
     state.info.mockResolvedValue({ tokenMint: mint, tokenMetadata: "https://example.test/metadata" });
+    state.balance.mockResolvedValue(100_000_000);
     state.feeConfig.mockResolvedValue({ configKey, txSignatures: [] });
     state.launchTx.mockResolvedValue({ transactionBase64: "prepared" });
   });
@@ -62,6 +67,9 @@ describe("owner rewards launch API", () => {
     expect(state.ownerCheck).toHaveBeenCalledWith({ userId: "user", ghOwner: "alice", ghRepo: "repo", ghRepoId: "123" });
     expect(state.modeGuard).toHaveBeenCalledWith("owner");
     expect(state.resolveContributors).not.toHaveBeenCalled();
+    expect(state.balance).toHaveBeenCalledBefore(state.info);
+    expect(state.info).toHaveBeenCalledWith(expect.objectContaining({ website: "https://github.com/alice/repo" }));
+    expect(state.project.tokenWebsiteUrl).toBe("https://github.com/alice/repo");
     expect(state.record).toHaveBeenCalledWith(expect.objectContaining({ rewardMode: "owner", adminPubkey: owner, claimers: [expect.objectContaining({ claimerPubkey: owner, initialBps: 9000 }), expect.objectContaining({ claimerPubkey: state.treasury, initialBps: 1000 })] }));
     expect(state.verify).toHaveBeenCalledBefore(state.launchTx);
     expect(state.feeConfig).toHaveBeenCalledWith(expect.objectContaining({ payer: state.payer, admin: owner, shareFee: 0 }));
@@ -70,6 +78,32 @@ describe("owner rewards launch API", () => {
   it("refuses an unlinked wallet before creating token metadata", async () => {
     state.walletLinked = false;
     expect((await post()).status).toBe(403);
+    expect(state.info).not.toHaveBeenCalled();
+  });
+
+  it("keeps an explicitly chosen website", async () => {
+    state.project.tokenWebsiteUrl = "https://example.test/project";
+    expect((await post()).status).toBe(200);
+    expect(state.info).toHaveBeenCalledWith(expect.objectContaining({ website: "https://example.test/project" }));
+    expect(state.project.tokenWebsiteUrl).toBe("https://example.test/project");
+  });
+
+  it("leaves the draft unchanged when the setup wallet is unfunded", async () => {
+    state.balance.mockResolvedValue(0);
+    const response = await post();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: "launch_wallet_unfunded" });
+    expect(state.project.status).toBe("draft");
+    expect(state.info).not.toHaveBeenCalled();
+    expect(state.feeConfig).not.toHaveBeenCalled();
+    expect(state.launchTx).not.toHaveBeenCalled();
+  });
+
+  it("does not start a new launch when Solana RPC cannot verify the setup balance", async () => {
+    state.balance.mockRejectedValueOnce(new Error("RPC unavailable"));
+    const response = await post();
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: "launch_wallet_balance_unavailable" });
     expect(state.info).not.toHaveBeenCalled();
   });
 
@@ -92,6 +126,7 @@ describe("owner rewards launch API", () => {
     expect(state.ownerCheck).toHaveBeenCalled();
     expect(state.load).toHaveBeenCalledBefore(state.verify);
     expect(state.verify).toHaveBeenCalledBefore(state.launchTx);
+    expect(state.balance).not.toHaveBeenCalled();
     expect(state.info).not.toHaveBeenCalled();
   });
 

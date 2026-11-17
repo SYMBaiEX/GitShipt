@@ -60,7 +60,7 @@ async function ProjectPayoutsPageContent({
   const { header } = data;
   if (
     !header.tokenMint ||
-    header.status === "tracked" ||
+    header.status === "simulated_live" ||
     header.status === "draft" ||
     header.status === "launch_configured"
   ) {

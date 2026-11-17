@@ -67,6 +67,9 @@ automation still needs a separately verified authorization design.
 - Verify the config payer has sufficient SOL for config/deployer accounts and
   transaction costs. The user's linked wallet signs the final launch and funds
   any initial buy. Public balances do not establish permission to spend.
+  On November 17, the deployed signer public key
+  `Cj8mnM3kWH4pxZm81gA4oGMAgJTkQ8kwQ2GhiNV4UAEK` had a finalized balance of
+  zero lamports. Funding remains required; no agent transferred funds.
 - No funded launch, real delegation, rebalance, or fee claim was executed.
 - Deployer balances are reported, but automatic deployer claiming is not
   implemented. Use Bags' dedicated deployer claim flow, not contributor claims.
@@ -146,9 +149,13 @@ acceptance. Host Bun is 1.4.2; the pinned
 Production logs contained 12 missing-`jose` module errors from Queue's OIDC
 helper on GitHub webhook and cron routes. The app now provides compatible
 `jose` 5.10, explicitly traces its runtime files, and checks all affected route
-traces after each build. An isolated clean production build and unauthenticated
-route smoke checks passed. Deployment must be checked separately; a successful
-local build alone is not evidence that old production errors are resolved.
+traces after each build. Initial local checks passed, but production smoke
+checks still returned 500: nested OIDC copies of `jose` shadow the root copy,
+and Bun chooses their browser export while Node traces their CJS export. The
+initial includes covered the root browser files only. The follow-up includes
+the full nested packages and tests relocated traced files under Bun, including
+the actual workflow execution route. Deployment must be checked separately;
+local trace membership alone is not proof that live imports work.
 
 Two older partner-claim failures came from different payer/partner wallets.
 That state now reports manual claims rather than repeatedly failing automation.

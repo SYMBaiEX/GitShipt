@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 import { withWorkflow } from "workflow/next";
 
 /**
@@ -25,6 +26,13 @@ const sharedSecurityHeaders = [
     key: "Reporting-Endpoints",
     value: 'csp-endpoint="/api/security/csp-report"',
   },
+];
+
+const joseTraceIncludes = [
+  "./node_modules/jose/**/*",
+  "../../node_modules/jose/**/*",
+  "./node_modules/@vercel/*/node_modules/@vercel/oidc/node_modules/jose/**/*",
+  "../../node_modules/@vercel/*/node_modules/@vercel/oidc/node_modules/jose/**/*",
 ];
 
 const nextConfig: NextConfig = {
@@ -60,9 +68,11 @@ const nextConfig: NextConfig = {
   },
   devIndicators: { position: "top-right" },
   allowedDevOrigins: ["127.0.0.1"],
-  // Workflow's externalized Vercel OIDC helper resolves jose at runtime.
+  // Bun resolves OIDC's nested jose browser export before the root package.
+  outputFileTracingRoot: path.resolve(process.cwd(), "../.."),
   outputFileTracingIncludes: {
-    "/*": ["./node_modules/jose/**/*", "../../node_modules/jose/**/*"],
+    "/*": joseTraceIncludes,
+    "/.well-known/workflow/**/*": joseTraceIncludes,
   },
   transpilePackages: ["@repo/lib", "@repo/shared", "@repo/ui"],
 

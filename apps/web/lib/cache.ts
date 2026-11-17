@@ -29,6 +29,7 @@ export const cacheTags = {
   adminUsers: "gitshipt:admin-users",
   platformConfig: "gitshipt:platform-config",
   user: (userId: string) => `gitshipt:user:${userId}`,
+  linkedWallets: (userId: string) => `gitshipt:linked-wallets:${userId}`,
   dashboardUser: (userId: string) => `gitshipt:dashboard-user:${userId}`,
   dashboardProject: (projectId: string) =>
     `gitshipt:dashboard-project:${projectId}`,
@@ -75,6 +76,11 @@ export function revalidateUserCaches(userId: string): void {
     cacheTags.user(userId),
     cacheTags.dashboardUser(userId),
   ]);
+}
+
+export function revalidateLinkedWallets(userId: string): void {
+  revalidateTag(cacheTags.linkedWallets(userId), { expire: 0 });
+  revalidateUserCaches(userId);
 }
 
 export async function revalidateProjectCaches(

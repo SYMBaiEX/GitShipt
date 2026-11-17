@@ -17,6 +17,21 @@ Reviewed against [WCAG 2.2 AA](https://www.w3.org/TR/WCAG22/). The [WCAG 3.0 Wor
 - Automated layout coverage spans 20 public routes or entry states, two themes and six screen sizes from 320 to 1440 CSS pixels, including landscape. Run axe at phone and desktop sizes. Use mobile WebKit over HTTPS to exercise safe-area layouts, navigation and the populated snapshot disclosure.
 - Before production promotion, verify authenticated owner and admin pages with staging accounts, complete the GitHub and wallet flows with test credentials, and test VoiceOver and TalkBack on real devices. Automated checks do not replace these steps or establish conformance.
 
+### Signed-in release checks
+
+The candidate was exercised over local HTTPS with disposable Better Auth
+sessions, Redis, and a migrated PostgreSQL database using a non-owner role
+with row-level security active. The owner opened project settings, an unrelated
+account was denied, and the admin could open the operations, fees and audit
+pages. A disposable Wallet Standard wallet signed an Ed25519 message, linked
+successfully, appeared on the next wallet-list visit, and could not replay the
+signed nonce. No transaction was signed or sent.
+
+There is no separate hosted staging environment. The currently deployed owner
+and admin consoles and authenticated wallet entry were checked read-only.
+Hosted OAuth and real-extension signing on the release candidate remain
+unverified; the version-based dependency audit still prevents promotion.
+
 ## Framework and Dependency Notes
 
 - [Next.js viewport settings](https://nextjs.org/docs/app/api-reference/functions/generate-viewport) keep browser zoom enabled and let the UI account for device insets. Page headings support Next.js route announcements. The proxy redirects anonymous visits; server pages continue to authenticate and authorize protected content.

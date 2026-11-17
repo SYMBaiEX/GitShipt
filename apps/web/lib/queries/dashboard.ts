@@ -18,6 +18,7 @@ import type { ProjectRole } from "@/lib/auth/permissions";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { cacheTags } from "@/lib/cache";
+import { withRlsContext } from "@/lib/db-rls";
 import { and, desc, eq, sql, isNotNull, or, inArray } from "drizzle-orm";
 import { PayoutConfigSchema, ScoringConfigSchema } from "@repo/shared";
 import { z } from "zod";
@@ -412,11 +413,15 @@ export interface LinkedWallet {
 async function getMyLinkedWalletsUncached(
   userId: string,
 ): Promise<LinkedWallet[]> {
-  const rows = await dbHttp
-    .select()
-    .from(wallets)
-    .where(eq(wallets.userId, userId))
-    .orderBy(desc(wallets.verifiedAt));
+  const rows = await withRlsContext(
+    { mode: "user", userId, role: "user", reason: "wallet:list-own" },
+    () =>
+      dbHttp
+        .select()
+        .from(wallets)
+        .where(eq(wallets.userId, userId))
+        .orderBy(desc(wallets.verifiedAt)),
+  );
   return rows.map((r) => ({
     id: r.id,
     address: r.address,
@@ -432,6 +437,7 @@ export async function getMyLinkedWallets(
 ): Promise<LinkedWallet[]> {
   "use cache";
   cacheLife("auth");
+  cacheTag(cacheTags.linkedWallets(userId));
   cacheTag(cacheTags.dashboard);
   cacheTag(cacheTags.user(userId));
   cacheTag(cacheTags.dashboardUser(userId));

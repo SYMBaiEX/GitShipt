@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Sparkles } from "lucide-react";
 import { getAuthSession } from "@/lib/auth/session";
 import { SignInWithSolanaFlow } from "@/components/wallet/SignInWithSolanaFlow";
@@ -24,6 +25,8 @@ export default function WalletAuthPage() {
 }
 
 async function WalletAuthPageContent() {
+  // A build without DB credentials must not prerender a login redirect.
+  await connection();
   const session = await getAuthSession();
   if (!session?.user) {
     redirect("/auth/signin?next=/auth/wallet");

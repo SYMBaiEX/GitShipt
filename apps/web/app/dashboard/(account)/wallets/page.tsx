@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { connection } from "next/server";
 import { ExternalLink, Plus, Sparkles, Wallet } from "lucide-react";
 import { hasCredentials } from "@/lib/env";
 import { requireAuthSession } from "@/lib/auth/session";
@@ -27,6 +28,7 @@ export default function WalletsPage() {
 }
 
 async function WalletsPageContent() {
+  await connection();
   if (!hasCredentials.db()) {
     return (
       <div className="mx-auto w-full max-w-content">

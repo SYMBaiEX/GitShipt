@@ -3,6 +3,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { verifySiws, SiwsMessageSchema } from "@/lib/auth/siws";
 import { auth } from "@/lib/auth";
+import { PermissionError, requirePermission } from "@/lib/auth/permissions";
 import { dbHttp } from "@/db";
 import { users, wallets } from "@/db/schema";
 import { check } from "@/lib/rate-limit";
@@ -12,10 +13,10 @@ import { validateClientKey, withIdempotency } from "@/lib/idempotency";
 import { getMfaConfirmedAt } from "@/lib/auth/mfa";
 import { headers } from "next/headers";
 import { WalletVerifyResponseSchema } from "@repo/shared";
-import { revalidateUserCaches } from "@/lib/cache";
+import { revalidateLinkedWallets } from "@/lib/cache";
+import { withRlsContext } from "@/lib/db-rls";
 
 const MFA_WALLET_LINK_WINDOW_MS = 5 * 60_000;
-
 
 const BodySchema = z.object({
   message: SiwsMessageSchema,
@@ -67,7 +68,28 @@ export async function POST(req: Request): Promise<Response> {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  const userId = session.user.id;
+  try {
+    await requirePermission("account.update", { userId });
+  } catch (error) {
+    if (error instanceof PermissionError) {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    throw error;
+  }
 
+  return withRlsContext(
+    { mode: "user", userId, role: "user", reason: "wallet:verify" },
+    () => verifyAndLinkWallet(req, parsed.data, userId, ip),
+  );
+}
+
+async function verifyAndLinkWallet(
+  req: Request,
+  body: z.infer<typeof BodySchema>,
+  userId: string,
+  ip: string,
+): Promise<Response> {
   const env = serverEnv();
   const expectedDomain = new URL(
     env.BETTER_AUTH_URL ?? clientEnv().NEXT_PUBLIC_APP_URL,
@@ -75,8 +97,8 @@ export async function POST(req: Request): Promise<Response> {
   const expectedChainId = `solana:${clientEnv().NEXT_PUBLIC_SOLANA_CLUSTER}`;
 
   const result = await verifySiws({
-    message: parsed.data.message,
-    signatureBase58: parsed.data.signature,
+    message: body.message,
+    signatureBase58: body.signature,
     expectedDomain,
     expectedChainId,
   });
@@ -96,17 +118,20 @@ export async function POST(req: Request): Promise<Response> {
   const [userRow] = await dbHttp
     .select({ id: users.id, mfaSecretEnc: users.mfaSecretEnc })
     .from(users)
-    .where(eq(users.id, session.user.id))
+    .where(eq(users.id, userId))
     .limit(1);
-  const hasMfaEnrolled = Boolean(userRow?.mfaSecretEnc);
+  if (!userRow) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403 });
+  }
+  const hasMfaEnrolled = Boolean(userRow.mfaSecretEnc);
   if (hasMfaEnrolled) {
-    const confirmedAtMs = await getMfaConfirmedAt(session.user.id);
+    const confirmedAtMs = await getMfaConfirmedAt(userId);
     if (
       confirmedAtMs == null ||
       Date.now() - confirmedAtMs >= MFA_WALLET_LINK_WINDOW_MS
     ) {
       await audit({
-        actorUserId: session.user.id,
+        actorUserId: userId,
         action: "auth.wallet_link",
         targetType: "wallet",
         targetId: result.address!,
@@ -148,7 +173,7 @@ export async function POST(req: Request): Promise<Response> {
       await dbHttp
         .insert(wallets)
         .values({
-          userId: session.user.id,
+          userId,
           address: result.address!,
           chain: "solana",
           verifiedAt: new Date(),
@@ -158,7 +183,7 @@ export async function POST(req: Request): Promise<Response> {
         });
 
       await audit({
-        actorUserId: session.user.id,
+        actorUserId: userId,
         action: "auth.wallet_link",
         targetType: "wallet",
         targetId: result.address!,
@@ -172,10 +197,10 @@ export async function POST(req: Request): Promise<Response> {
         address: result.address,
       });
     },
-    { scope: `wallet:verify:${session.user.id}` },
+    { scope: `wallet:verify:${userId}` },
   );
 
-  revalidateUserCaches(session.user.id);
+  revalidateLinkedWallets(userId);
 
   return NextResponse.json(persisted);
 }

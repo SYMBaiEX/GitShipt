@@ -63,28 +63,79 @@ Stop and tell the user exactly what env var you need in one sentence. Do not inv
 <claude-mem-context>
 # Memory Context
 
-# [gitbags] recent context, 2026-05-11 10:42pm CDT
+# [gitbags] recent context, 2026-06-04 10:05pm CDT
 
-Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 12 obs (6,385t read) | 309,965t work | 98% savings
+Stats: 50 obs (19,598t read) | 505,543t work | 96% savings
 
-### May 9, 2026
-3127 11:01p 🔵 GitBags Repo: 18 Commits Ahead of Origin with Untracked Partner-Fee Files
-3128 11:02p 🔵 GitShipt Local Main: 18 Commits of Bags-Native Architecture Not Pushed to GitHub
-3129 " 🔵 GitShipt Bags-Native Architecture: Full Scope of 91-File Migration Mapped
-3133 11:03p 🔵 GitShipt Quality Gates Pass: TypeCheck Clean, 241 Tests Green, Production Build Succeeds
-3134 " 🔵 Partner Fee Claiming is a Placeholder — Real SDK Integration Not Yet Wired
-### May 11, 2026
-3192 10:20p ✅ GitShipt Core Product Messaging Established
-3196 " 🔵 GitShipt DESIGN.md: Full Visual Design System Discovered
-3197 " 🔵 GitShipt PRD: Full Product Architecture and Requirements Documented
-3198 10:23p 🔵 GitShipt Bags API Integration Surface and Constraints Documented
-3199 " 🔵 GitShipt Canonical Tech Stack Table Confirmed
-3203 10:26p ✅ GitShipt Core Product Messaging Refined
-3204 10:27p 🔵 GitShipt Hackathon Submission Skill Loaded — Colosseum/Superteam Target
+### May 12, 2026
+S257 Gitbags Mainnet Readiness Gap Analysis — Full audit of what remains before the system can accept real money on Solana mainnet (May 12 at 9:24 PM)
+S255 Gitbags Mainnet Security Audit — Implement all suggestions from S253 security review (May 12 at 9:24 PM)
+S637 Fix healthpulse and publishkpis Vercel crons from every-minute to weekly Sunday schedule (May 12 at 9:37 PM)
+3480 9:48p 🔵 indexer.ts applyBotFlags() Is the Sole Bot Classification Point — GitHub user.type Field Not Captured
+3482 " 🔵 buildLaunchClaimerSet — Launch Creates Pool+Treasury 2-Slot Structure, Not Per-Contributor Slots
+3485 " 🟣 BOT_REGEX and AUTOMATED_LOGIN_EXACT Massively Expanded — 30+ AI Agents Added
+3487 9:49p 🟣 isBot() Hardened — Allowlist Can No Longer Whitelist Known AI Agents; isAiBot() Exported
+3488 " 🟣 ContributorAggregate Extended with ghType — GitHub Native Bot Type Now Captured at Ingest
+3491 " 🟣 indexer.ts Fully Wired — ghType Propagates Through All 3 Fetchers, mergeAggregates, and applyBotFlags
+3493 9:50p 🔴 contributors-upsert.ts — excluded/excludedReason Now Re-Evaluated on Every Index Pass
+3494 " 🟣 packages/shared/src/ai-bots.ts Created — Canonical AI Bot List Extracted to Shared Package
+3496 " ✅ launch-schemas.ts Imports isAiBot — ScoringConfigSchema botAllowlist Validation Wired
+3498 9:51p 🟣 ScoringConfigSchema.botAllowlist Hardened — AI Agents Rejected at Zod Validation Layer
+3500 " 🔄 scoring/v0.ts Deduplicates Bot Lists — Now Imports from @repo/shared as Single Source of Truth
+3502 " ✅ launch-integration.ts Adds contributors and inArray Imports — Contributor Validation Incoming
+3504 " 🟣 assertNoExcludedClaimers() Added to recordLaunch — Belt-and-Suspenders DB Guard Against Bot Claimers
+3508 9:56p ⚖️ AI Bot Exclusion — Named Account List Instead of Hard-Deny Pattern Matching
+3510 9:57p 🔄 ai-bots.ts — AI_BOT_REGEX + AI_BOT_EXACT Replaced with AI_VENDOR_DENYLIST + isAiVendorAccount
+3511 " 🔄 isAiBot → isAiVendorAccount Propagated Across v0.ts and launch-schemas.ts
+3514 9:58p 🔄 isAiBot → isAiVendorAccount Propagated to launch-schemas.ts superRefine and revalidateBotFlags-helpers.ts
+3516 " ✅ indexer.test.ts — Bot Detection Tests Updated for New Allowlist Semantics
+3519 9:59p ✅ AI Vendor Denylist Refactor Committed — commit b82219c
+3520 10:09p 🔵 Gitbags Repo State — Clean Except Uncommitted AGENTS.md
+3521 " ✅ AGENTS.md Committed and Pushed to origin/main
+3522 10:10p 🔵 buildSignAndBroadcastStep — Full Idempotency and Manager Key Validation Logic
+3523 " 🔵 productionReadiness() — Full Required Env Surface and Warning Conditions
+3528 10:11p 🔵 AI_VENDOR_DENYLIST — Full Exact-Match Set of ~30 Vendor Accounts
+3529 " 🔵 revalidateBotFlags Workflow — Weekly Paginated Bot Re-Classification Architecture
+3530 " 🔵 contributors-upsert.ts — CASE Logic Preserves Manual Overrides on Conflict
+3531 " 🔵 assertNoExcludedClaimers — Launch Guard Against Excluded Contributors
+3532 " 🔵 Vercel Cron Schedule — Full 8-Job Inventory in vercel.json
+3533 " 🔵 RelativeTime.test.tsx — Known Failing Test Due to Missing @testing-library/react
+3541 10:12p 🔵 Security Audit — 5 New Findings from Solana Skills Review of Recent 11 Commits
+3580 10:53p 🔵 buildSignAndBroadcastStep — Full On-Chain Transaction Execution Architecture
+3581 10:54p 🔴 buildSignAndBroadcastStep — Broadcasting State Recovery Added to Prevent Double-Rebalance
+3582 " 🔴 productionReadiness() — HELIUS_WEBHOOK_AUTH_TOKEN and CRON_SECRET Added to Sensitive Attestation Check
+3583 " 🔴 assertNoExcludedClaimers — TOCTOU Race Closed, Missing-Contributor Guard Added
+3584 10:55p 🟣 revalidateBotFlags — Single-Flight Lock Added via acquireLockStep/releaseLockStep
+3585 " 🔵 workflow-locks.ts — Redis-Backed Single-Flight Lock Architecture
+3586 " 🔄 revalidateBotFlags-helpers — Lock Steps Added, Audit Refactored Per-Project
+3587 " 🟣 AI_VENDOR_DENYLIST — 7 New Vendor Accounts Added
+3588 " 🔵 RelativeTime Test Failure Root Cause — vitest env is "node", @testing-library/react Not Installed
+3592 10:57p 🔴 RelativeTime Test — happy-dom Installed, Per-File Environment Override Added
+3593 " 🔄 solanaConnection — Singleton Bug Fixed, Per-Commitment Cache + withRpcRetry Added
+3594 10:59p 🔵 API Rate-Limit Coverage Audit — Routes Without check() Identified
+3595 " 🔵 Fund Reconciliation System — Schema and Pure-Function Architecture Mapped
+3596 11:00p 🟣 reconcileFunds Workflow — New Fund Reconciliation Vercel Workflow Created
+3597 " 🟣 reconcileFunds — Full Workflow Stack Implemented: Steps, Cron Route, and Vercel Schedule
+3598 11:01p 🔴 reconcileFunds-helpers — Query Fixed for Actual partnerFeeClaimStatus Enum Values
+3599 " ✅ Typecheck Passes — 12 Workflows and 67 Steps in Manifest After All Phase Changes
+3600 " ✅ Test Suite Green + Phase 1/2/3 Fixes Committed — 249 Tests Pass, 3 Commits Pushed
+3601 11:02p ✅ Phase 1/2/3 — All 7 Commits Pushed to origin/main
+### Jun 2, 2026
+11975 10:36p ✅ GitHub Actions Workflow Schedules Fixed for healthpulse and publishkpis
+### Jun 4, 2026
+S702 Production setup checklist — what do we need to configure to go to live production for GitShipt (Next.js 16 + Bags.fm + Solana launchpad-leaderboard)? (Jun 4 at 4:02 PM)
+**Investigated**: Examined gitshipt-prd.md, DESIGN.md, vercel.json, apps/web/lib/env.ts, apps/web/app/api/health/route.ts, .env.production.example, .env.production.local, scripts/check-production-env.mjs, docs/adr/0001-bags-native-payout.md, docs/architecture/bags-native/PARTNER-KEY-IMPLEMENTATION.md, apps/web/lib/solana/manager-signer.ts, apps/web/lib/solana/signer.ts, apps/web/lib/redis.ts, apps/web/lib/rate-limit.ts, apps/web/lib/bags/webhook.ts, apps/web/app/api/webhooks/github/route.ts, README.md, and package.json scripts. Ran `bun run env:check -- --env-file=.env.production.local` to get the live state of the production env file.
 
-Access 310k tokens of past work via get_observations([IDs]) or mem-search skill.
+**Learned**: GitShipt uses a Bags-native payout architecture with three on-chain authority layers: manager role (delegated to GitShipt via SOLANA_MANAGER_KEYPAIR for BPS rebalancing), admin role (held by project owner), and partner role (GitShipt receives 25% of trading fees via BAGS_PARTNER_CONFIG_KEY). The health endpoint at /api/health?strict=1 is the runtime readiness gate — it returns 503 if any integration is stubbed or missing. productionReadiness() in env.ts checks 20 required vars, enforces NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta, and warns if SECRETS_SENSITIVE_ATTESTED is unset. The production env check script (scripts/check-production-env.mjs) validates .env files without printing secret values. BAGS_ALLOW_PROD_LAUNCH is a safety guard that defaults false; mainnet launches proceed when cluster=mainnet-beta. Partner fee claims require SOLANA_PAYOUT_KEYPAIR public key to match BAGS_PARTNER_WALLET exactly. All *_KEYPAIR, *_SECRET, *PRIVATE_KEY must be marked Sensitive in Vercel (post-April 2026 security incident).
+
+**Completed**: Production readiness audit completed. Ran bun run env:check against .env.production.local and confirmed 13 required Sensitive variables are currently empty/missing: BETTER_AUTH_SECRET, GITHUB_CLIENT_SECRET, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_WEBHOOK_SECRET, BAGS_API_KEY, BAGS_WEBHOOK_SECRET, BAGS_PARTNER_CONFIG_KEY, HELIUS_RPC_URL, HELIUS_WEBHOOK_AUTH_TOKEN, SOLANA_PAYOUT_KEYPAIR, SOLANA_MANAGER_KEYPAIR, CRON_SECRET, IDEMPOTENCY_KEY_SECRET. Claude delivered a full 10-step production setup checklist covering Vercel project linking, env var configuration, Neon+Redis provisioning, GitHub OAuth/App wiring, Bags+Solana keypair setup, Helius webhook configuration, DB migrations, admin bootstrap, and the verification gates (env:check → typecheck → lint → test → e2e → build → health?strict=1).
+
+**Next Steps**: User would need to provision the missing secrets and configure external services (GitHub OAuth App, GitHub App webhooks, Bags partner config, Helius mainnet RPC + webhook, Neon prod database, Redis/Upstash, Vercel env vars). After populating .env.production.local, re-run bun run env:check to confirm all pass, then run the full quality gate suite before deploying.
+
+
+Access 506k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

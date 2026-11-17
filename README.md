@@ -125,12 +125,17 @@ Core variables:
   The production GitHub App webhook URL is
   `https://gitshipt.com/api/webhooks/github`.
 - `BAGS_API_KEY` enables live Bags SDK calls.
-- `BAGS_PARTNER_WALLET`, `BAGS_PARTNER_CONFIG_KEY`, and `BAGS_CONFIG_TYPE` are
-  optional Bags partner/config controls.
+- `BAGS_PARTNER_WALLET` and `BAGS_PARTNER_CONFIG_KEY` are required for live
+  launches. The on-chain partner rate must be 2,500 BPS and the partner wallet
+  must match the server fee-claim signer. `BAGS_CONFIG_TYPE` is optional.
 - `HELIUS_RPC_URL`, `SOLANA_MANAGER_KEYPAIR`, and the legacy
   `SOLANA_PAYOUT_KEYPAIR` gate are required before live Bags fee-share config
   transactions can be signed.
-- `SOLANA_TREASURY_ADDRESS` receives the GitShipt platform fee share.
+- GitShipt platform revenue is claimed by `BAGS_PARTNER_WALLET` through Bags.
+  Keep the legacy `PLATFORM_FEE_BPS_DEFAULT=0`; contributor fees are never pooled
+  in a GitShipt wallet.
+- `BAGS_ALLOW_PROD_LAUNCH=true` explicitly enables mainnet token creation once
+  the required services are configured. Its default is false.
 - `CRON_SECRET` protects cron/admin automation endpoints.
 
 Every `*_KEY`, `*_SECRET`, `*PRIVATE_KEY`, and `*KEYPAIR` value must be marked
@@ -148,6 +153,8 @@ cluster and canonical origin:
 - `GITHUB_APP_SLUG` set to the short GitHub App URL slug, not the full app URL.
 
 ## Route Map
+
+For the GitShipt repository's debut token, follow [the launch runbook](docs/debut-launch.md).
 
 Public app:
 
@@ -238,8 +245,7 @@ The current live Bags path is centralized in
    `sdk.tokenLaunch.createTokenInfoAndMetadata()` and validates the returned
    `tokenMint` and `tokenMetadata`.
 2. `bags.createFeeShareConfig()` resolves social claimers through
-   `sdk.state.getLaunchWalletV2Bulk()`, merges duplicate wallets, adds the
-   GitShipt platform fee wallet, and calls
+   `sdk.state.getLaunchWalletV2Bulk()` and calls
    `sdk.config.createBagsFeeShareConfig()`.
 3. Fee-share config transactions returned by Bags are signed through the
    server-side signer only after instruction-policy checks.
@@ -248,9 +254,9 @@ The current live Bags path is centralized in
 
 GitShipt deliberately keeps two revenue rails separate:
 
-- Contributor/pool accounting is expressed through fee claimers that total
+- Direct contributor allocations are expressed through fee claimers that total
   exactly 10,000 bps.
-- Bags partner config is optional and controlled through `BAGS_PARTNER_*` env
+- Bags partner config is required for live launches and controlled through `BAGS_PARTNER_*` env
   values, not mixed into contributor payout math.
 
 The final Bags launch transaction is still gated behind launch-wallet and

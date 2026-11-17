@@ -49,6 +49,7 @@ export type TokenInfoResponse = z.infer<typeof TokenInfoResponseSchema>;
 
 export const FeeShareConfigInputSchema = z.object({
   payer: z.string().min(32),
+  admin: SolanaAddressSchema.optional(),
   baseMint: z.string().min(32),
   feeClaimers: z.array(FeeClaimerSchema).min(1).max(100),
   /**

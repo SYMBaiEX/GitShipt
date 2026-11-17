@@ -162,8 +162,12 @@ export function ReviewAndSign({
               }
             />
             <StatusLine
-              label="GitShipt treasury"
+              label="Contributor-envelope deduction"
               value={<span className="text-mono-sm">{platformFeePct}%</span>}
+            />
+            <StatusLine
+              label="Bags partner rate"
+              value={<span className="text-mono-sm">25%</span>}
             />
             <StatusLine
               label="Initial buy"
@@ -277,7 +281,12 @@ export function ReviewAndSign({
           <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
             <Row k="Scoring window" v={`${leaderboard.windowDays} days`} mono />
             <Row k="Paid ranks" v={String(leaderboard.topN)} mono />
-            <Row k="Platform fee" v={`${platformFeePct}%`} mono />
+            <Row
+              k="Contributor-envelope deduction"
+              v={`${platformFeePct}%`}
+              mono
+            />
+            <Row k="Bags partner rate" v="25%" mono />
             <Row k="Contributor pool" v={`${contributorPoolPct}%`} mono />
             <Row
               k="Rank split"

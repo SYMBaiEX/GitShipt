@@ -266,6 +266,8 @@ export function WizardShell({
         topN: leaderboard.topN,
         tierWeights: leaderboard.tierWeights,
         claimThresholdLamports: leaderboard.claimThresholdLamports,
+        steadyStateCadenceHours: leaderboard.steadyStateCadenceHours,
+        maxClaimers: leaderboard.maxClaimers,
       },
       platformFeeBps: leaderboard.platformFeeBps,
     };
@@ -392,6 +394,8 @@ export function WizardShell({
         topN: leaderboard.topN,
         tierWeights: leaderboard.tierWeights,
         claimThresholdLamports: leaderboard.claimThresholdLamports,
+        steadyStateCadenceHours: leaderboard.steadyStateCadenceHours,
+        maxClaimers: leaderboard.maxClaimers,
       },
       platformFeeBps: leaderboard.platformFeeBps,
     };

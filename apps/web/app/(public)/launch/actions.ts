@@ -29,9 +29,14 @@ import {
   recordLaunch,
   prepareManagerDelegationTransaction,
   confirmManagerDelegation,
-  type LaunchClaimerInput,
 } from "@/lib/bags/launch-integration";
 import { payoutSignerPublicKey } from "@/lib/solana/signer";
+import {
+  loadRecordedLaunchClaimers,
+  resolveDirectLaunchClaimers,
+} from "@/lib/bags/launch-claimers";
+import { verifyLaunchTransaction } from "@/lib/bags/verify-launch";
+import { acquireWorkflowLock, releaseWorkflowLock } from "@/lib/workflow-locks";
 import { captureException } from "@/lib/observability";
 import { requirePermission, PermissionError } from "@/lib/auth/permissions";
 import { updateProjectCaches, updateUserCaches } from "@/lib/cache-actions";
@@ -321,329 +326,378 @@ export async function createAndLaunchAction(
         // Authoritative permission check before launching.
         await requirePermission("project.update", { userId, projectId });
 
-        const [project] = await dbHttp
-          .select()
-          .from(projects)
-          .where(eq(projects.id, projectId))
-          .limit(1);
-        if (!project) {
-          throw new ActionError("not_found", "Project not found.", 404);
-        }
-
-        if (!willStubLaunch) {
-          const installationId = await ensureGitHubInstallation({
-            userId,
+        const lock = await acquireWorkflowLock("token-launch", projectId, 600);
+        if (!lock.acquired)
+          throw new ActionError(
+            "launch_in_progress",
+            "Another launch attempt is in progress. Wait and retry.",
+            409,
             projectId,
-            ghOwner: validated.ghOwner,
-            ghRepo: validated.ghRepo,
-            currentInstallationId: project.ghInstallationId,
-          });
-          if (!installationId) {
+          );
+        try {
+          const [project] = await dbHttp
+            .select()
+            .from(projects)
+            .where(eq(projects.id, projectId))
+            .limit(1);
+          if (!project) {
+            throw new ActionError("not_found", "Project not found.", 404);
+          }
+
+          if (!willStubLaunch) {
+            const installationId = await ensureGitHubInstallation({
+              userId,
+              projectId,
+              ghOwner: validated.ghOwner,
+              ghRepo: validated.ghRepo,
+              currentInstallationId: project.ghInstallationId,
+            });
+            if (!installationId) {
+              throw new ActionError(
+                "github_app_required",
+                "Install the GitShipt GitHub App for this repo before the on-chain launch. Save the draft, install the app, then return to launch.",
+                409,
+                projectId,
+              );
+            }
+            project.ghInstallationId = installationId;
+          }
+
+          if (project.status === "launch_configured") {
+            const ready = readConfiguredLaunch(project);
+            if (!ready.ok) {
+              throw new ActionError(
+                "launch_config_incomplete",
+                ready.message,
+                409,
+              );
+            }
+
+            const guard = canLaunchOnBags();
+            if (!guard.ok) {
+              throw new ActionError(
+                "launch_refused",
+                `Refusing on-chain launch: ${guard.reason}`,
+                409,
+              );
+            }
+            if (launchWalletAddress !== ready.config.launchWallet) {
+              throw new ActionError(
+                "launch_wallet_mismatch",
+                "The connected wallet no longer matches the prepared launch wallet. Reconnect the wallet shown in the launch manifest.",
+                409,
+                projectId,
+              );
+            }
+            await loadRecordedLaunchClaimers(projectId);
+            const prepared = await bags.createLaunchTransactionForWallet({
+              tokenMint: ready.config.tokenMint,
+              metadataUrl: ready.config.metadataUrl,
+              configKey: ready.config.configKey,
+              launchWallet: ready.config.launchWallet,
+              initialBuyLamports: ready.config.initialBuyLamports,
+            });
+
+            return {
+              ok: true,
+              projectId,
+              tokenMint: ready.config.tokenMint,
+              status: "launch_configured",
+              stub: false,
+              configKey: ready.config.configKey,
+              txSig: null,
+              requiresSignature: true,
+              transactionBase64: prepared.transactionBase64,
+              launchWalletAddress: ready.config.launchWallet,
+              initialBuyLamports: ready.config.initialBuyLamports,
+              ghOwner: validated.ghOwner,
+              ghRepo: validated.ghRepo,
+              note: "Launch transaction prepared. Review it in your wallet to broadcast the token launch.",
+            } satisfies LaunchActionResult;
+          }
+
+          if (project.status !== "draft") {
+            if (project.tokenMint) {
+              const statusLabel =
+                project.status === "simulated_live"
+                  ? "Not Live"
+                  : project.status;
+              return {
+                ok: true,
+                projectId,
+                tokenMint: project.tokenMint,
+                status:
+                  project.status === "simulated_live"
+                    ? "simulated_live"
+                    : "live",
+                stub: project.status === "simulated_live",
+                configKey: project.bagsConfigKey ?? undefined,
+                txSig: null,
+                ghOwner: validated.ghOwner,
+                ghRepo: validated.ghRepo,
+                note: `Project status is ${statusLabel}; returning persisted token mint.`,
+              } satisfies LaunchActionResult;
+            }
+            const statusLabel =
+              project.status === "simulated_live" ? "Not Live" : project.status;
             throw new ActionError(
-              "github_app_required",
-              "Install the GitShipt GitHub App for this repo before the on-chain launch. Save the draft, install the app, then return to launch.",
+              "bad_status",
+              `Project is in ${statusLabel} status; cannot launch.`,
+              409,
+            );
+          }
+
+          const directClaimers = willStubLaunch
+            ? null
+            : await resolveDirectLaunchClaimers(
+                projectId,
+                project.payoutConfig.maxClaimers ?? 50,
+              );
+          if (!willStubLaunch && project.platformFeeBps !== 0) {
+            throw new ActionError(
+              "legacy_platform_fee",
+              "Set the legacy platform fee to zero. GitShipt revenue comes from the Bags partner configuration.",
               409,
               projectId,
             );
           }
-          project.ghInstallationId = installationId;
-        }
 
-        if (project.status === "launch_configured") {
-          const ready = readConfiguredLaunch(project);
-          if (!ready.ok) {
+          // Bags step 1: token info
+          const tokenInfo = await bags.createTokenInfo({
+            name: validated.name,
+            symbol: validated.symbol,
+            description: validated.description,
+            imageUrl: validated.imageUrl,
+            website: validated.website,
+            twitter: validated.twitter,
+            telegram: validated.telegram,
+          });
+          const isStub = Boolean(tokenInfo.__stub);
+
+          const payoutWallet = payoutSignerPublicKey();
+          if (!isStub && !payoutWallet) {
             throw new ActionError(
-              "launch_config_incomplete",
-              ready.message,
+              "launch_wallet_missing",
+              "SOLANA_PAYOUT_KEYPAIR is required before live Bags launch.",
               409,
             );
           }
-
-          const guard = canLaunchOnBags();
-          if (!guard.ok) {
+          const stubPoolWallet = isStub
+            ? (await bags.resolveWallet("github", PLATFORM_GH_USERNAME)).wallet
+            : null;
+          const poolClaimerWallet = payoutWallet ?? stubPoolWallet;
+          if (!poolClaimerWallet) {
             throw new ActionError(
-              "launch_refused",
-              `Refusing on-chain launch: ${guard.reason}`,
+              "pool_wallet_missing",
+              "Unable to derive the Bags pool claimer wallet.",
               409,
             );
           }
-          if (launchWalletAddress !== ready.config.launchWallet) {
+          const payer = poolClaimerWallet;
+          const launchWallet = isStub ? payer : launchWalletAddress;
+          if (!launchWallet) {
             throw new ActionError(
-              "launch_wallet_mismatch",
-              "The connected wallet no longer matches the prepared launch wallet. Reconnect the wallet shown in the launch manifest.",
-              409,
+              "wallet_required",
+              "Connect and link a Solana wallet before launching.",
+              400,
               projectId,
             );
           }
-          const prepared = await bags.createLaunchTransactionForWallet({
-            tokenMint: ready.config.tokenMint,
-            metadataUrl: ready.config.metadataUrl,
-            configKey: ready.config.configKey,
-            launchWallet: ready.config.launchWallet,
-            initialBuyLamports: ready.config.initialBuyLamports,
+
+          // Bags step 2: fee-share config
+          const feeShareConfig = await bags.createFeeShareConfig({
+            payer,
+            admin: isStub ? undefined : launchWallet,
+            baseMint: tokenInfo.tokenMint,
+            feeClaimers: directClaimers
+              ? directClaimers.map((c) => ({
+                  wallet: c.claimerPubkey,
+                  bps: c.initialBps,
+                }))
+              : [
+                  {
+                    wallet: poolClaimerWallet,
+                    bps: 10_000 - validated.platformFeeBps,
+                  },
+                ],
+            platformFeeWallet: serverEnv().SOLANA_TREASURY_ADDRESS,
+            shareFee: validated.platformFeeBps,
           });
+
+          const configuredAt = new Date();
+          const configuredStatus = isStub
+            ? "simulated_live"
+            : "launch_configured";
+          const initialBuyLamports = serverEnv().BAGS_INITIAL_BUY_LAMPORTS;
+          const [configured] = await dbHttp
+            .update(projects)
+            .set({
+              tokenMint: tokenInfo.tokenMint,
+              bagsLaunchId: isStub ? feeShareConfig.configKey : null,
+              bagsConfigKey: feeShareConfig.configKey,
+              bagsLaunchSignature: null,
+              bagsLaunchWallet: isStub ? null : launchWallet,
+              bagsPoolClaimerWallet: poolClaimerWallet,
+              bagsTokenMetadata: tokenInfo.tokenMetadata,
+              bagsInitialBuyLamports: initialBuyLamports,
+              status: configuredStatus,
+              simulatedAt: isStub ? configuredAt : null,
+              updatedAt: configuredAt,
+            })
+            .where(eq(projects.id, projectId))
+            .returning({ id: projects.id });
+
+          if (!configured) {
+            throw new ActionError(
+              "launch_config_persist_failed",
+              "Failed to persist Bags launch configuration before final launch.",
+              500,
+            );
+          }
+
+          if (directClaimers) {
+            await recordLaunch({
+              projectId,
+              baseMint: tokenInfo.tokenMint,
+              adminPubkey: launchWallet,
+              claimers: directClaimers,
+              steadyStateCadenceHours:
+                project.payoutConfig.steadyStateCadenceHours ?? 72,
+            });
+          }
+
+          await audit({
+            actorUserId: userId,
+            action: "project.launch",
+            targetType: "project",
+            targetId: projectId,
+            metadata: {
+              phase: "configured",
+              tokenMint: tokenInfo.tokenMint,
+              bagsConfigKey: feeShareConfig.configKey,
+              stub: isStub,
+              platformFeeBps: validated.platformFeeBps,
+              feeShareConfigSignatures: feeShareConfig.txSignatures,
+              launchWallet: isStub ? null : launchWallet,
+              poolClaimerWallet,
+              initialBuyLamports,
+              cluster: serverEnvCluster(),
+            },
+          });
+
+          // Bags step 3: create the final launch transaction for the user's
+          // linked wallet. The browser wallet signs and broadcasts it; the
+          // follow-up complete action persists the on-chain signature.
+          const txSig = isStub
+            ? (feeShareConfig.txSignatures.at(-1) ?? null)
+            : null;
+          const launchSignature: string | null = null;
+          let note: string | undefined;
+          let preparedTransactionBase64: string | undefined;
+          if (isStub) {
+            note =
+              "Stub mode — token mint is fake; no on-chain transaction sent.";
+          } else {
+            const guard = canLaunchOnBags();
+            if (!guard.ok) {
+              throw new ActionError(
+                "launch_refused",
+                `Refusing on-chain launch: ${guard.reason}`,
+                409,
+              );
+            }
+            const prepared = await bags.createLaunchTransactionForWallet({
+              tokenMint: tokenInfo.tokenMint,
+              metadataUrl: tokenInfo.tokenMetadata,
+              configKey: feeShareConfig.configKey,
+              launchWallet,
+              initialBuyLamports,
+            });
+            preparedTransactionBase64 = prepared.transactionBase64;
+            note =
+              "Launch transaction prepared. Review it in your wallet to broadcast the token launch.";
+          }
+
+          // Persist terminal launch state. Real mode only reaches this point
+          // after the Bags launch transaction is broadcast; the configured
+          // checkpoint above prevents retries from regenerating token/config.
+          const persistNow = new Date();
+          const [updated] = await dbHttp
+            .update(projects)
+            .set({
+              tokenMint: tokenInfo.tokenMint,
+              bagsLaunchId: isStub ? feeShareConfig.configKey : null,
+              bagsConfigKey: feeShareConfig.configKey,
+              bagsLaunchSignature: launchSignature,
+              bagsLaunchWallet: isStub ? null : launchWallet,
+              bagsPoolClaimerWallet: poolClaimerWallet,
+              bagsTokenMetadata: tokenInfo.tokenMetadata,
+              bagsInitialBuyLamports: initialBuyLamports,
+              status: isStub ? "simulated_live" : "launch_configured",
+              simulatedAt: isStub ? persistNow : null,
+              updatedAt: persistNow,
+            })
+            .where(eq(projects.id, projectId))
+            .returning({ id: projects.id });
+
+          if (!updated) {
+            throw new ActionError(
+              "update_failed",
+              isStub
+                ? "Failed to persist simulated launch."
+                : "Final Bags launch was submitted, but the live state could not be persisted. Manual review is required before retrying.",
+              500,
+            );
+          }
+
+          await audit({
+            actorUserId: userId,
+            action: "project.launch_complete",
+            targetType: "project",
+            targetId: projectId,
+            metadata: {
+              phase: "complete",
+              tokenMint: tokenInfo.tokenMint,
+              bagsConfigKey: feeShareConfig.configKey,
+              stub: isStub,
+              platformFeeBps: validated.platformFeeBps,
+              feeShareConfigSignatures: feeShareConfig.txSignatures,
+              launchSignature,
+              launchWallet: isStub ? null : launchWallet,
+              poolClaimerWallet,
+              initialBuyLamports,
+              cluster: process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet",
+            },
+          });
+
+          // Wake up the env validator so misconfig surfaces here, not on the
+          // first cron tick. Kept inside the action so it doesn't bloat the
+          // hot path on subsequent calls.
+          try {
+            serverEnv();
+          } catch {
+            /* tolerated; non-fatal at this stage */
+          }
 
           return {
             ok: true,
             projectId,
-            tokenMint: ready.config.tokenMint,
-            status: "launch_configured",
-            stub: false,
-            configKey: ready.config.configKey,
-            txSig: null,
-            requiresSignature: true,
-            transactionBase64: prepared.transactionBase64,
-            launchWalletAddress: ready.config.launchWallet,
-            initialBuyLamports: ready.config.initialBuyLamports,
+            tokenMint: tokenInfo.tokenMint,
+            status: isStub ? "simulated_live" : "launch_configured",
+            stub: isStub,
+            configKey: feeShareConfig.configKey,
+            txSig,
+            requiresSignature: !isStub,
+            transactionBase64: preparedTransactionBase64,
+            launchWalletAddress: isStub ? undefined : launchWallet,
+            initialBuyLamports,
             ghOwner: validated.ghOwner,
             ghRepo: validated.ghRepo,
-            note: "Launch transaction prepared. Review it in your wallet to broadcast the token launch.",
+            note,
           } satisfies LaunchActionResult;
+        } finally {
+          await releaseWorkflowLock(lock);
         }
-
-        if (project.status !== "draft") {
-          if (project.tokenMint) {
-            const statusLabel =
-              project.status === "simulated_live" ? "Not Live" : project.status;
-            return {
-              ok: true,
-              projectId,
-              tokenMint: project.tokenMint,
-              status:
-                project.status === "simulated_live" ? "simulated_live" : "live",
-              stub: project.status === "simulated_live",
-              configKey: project.bagsConfigKey ?? undefined,
-              txSig: null,
-              ghOwner: validated.ghOwner,
-              ghRepo: validated.ghRepo,
-              note: `Project status is ${statusLabel}; returning persisted token mint.`,
-            } satisfies LaunchActionResult;
-          }
-          const statusLabel =
-            project.status === "simulated_live" ? "Not Live" : project.status;
-          throw new ActionError(
-            "bad_status",
-            `Project is in ${statusLabel} status; cannot launch.`,
-            409,
-          );
-        }
-
-        // Bags step 1: token info
-        const tokenInfo = await bags.createTokenInfo({
-          name: validated.name,
-          symbol: validated.symbol,
-          description: validated.description,
-          imageUrl: validated.imageUrl,
-          website: validated.website,
-          twitter: validated.twitter,
-          telegram: validated.telegram,
-        });
-        const isStub = Boolean(tokenInfo.__stub);
-
-        const payoutWallet = payoutSignerPublicKey();
-        if (!isStub && !payoutWallet) {
-          throw new ActionError(
-            "launch_wallet_missing",
-            "SOLANA_PAYOUT_KEYPAIR is required before live Bags launch.",
-            409,
-          );
-        }
-        const stubPoolWallet = isStub
-          ? (await bags.resolveWallet("github", PLATFORM_GH_USERNAME)).wallet
-          : null;
-        const poolClaimerWallet = payoutWallet ?? stubPoolWallet;
-        if (!poolClaimerWallet) {
-          throw new ActionError(
-            "pool_wallet_missing",
-            "Unable to derive the Bags pool claimer wallet.",
-            409,
-          );
-        }
-        const payer = poolClaimerWallet;
-        const launchWallet = isStub ? payer : launchWalletAddress;
-        if (!launchWallet) {
-          throw new ActionError(
-            "wallet_required",
-            "Connect and link a Solana wallet before launching.",
-            400,
-            projectId,
-          );
-        }
-
-        // Bags step 2: fee-share config
-        const feeShareConfig = await bags.createFeeShareConfig({
-          payer,
-          baseMint: tokenInfo.tokenMint,
-          feeClaimers: [
-            {
-              wallet: poolClaimerWallet,
-              bps: 10_000 - validated.platformFeeBps,
-            },
-          ],
-          platformFeeWallet: serverEnv().SOLANA_TREASURY_ADDRESS,
-          shareFee: validated.platformFeeBps,
-        });
-
-        const configuredAt = new Date();
-        const configuredStatus = isStub
-          ? "simulated_live"
-          : "launch_configured";
-        const initialBuyLamports = serverEnv().BAGS_INITIAL_BUY_LAMPORTS;
-        const [configured] = await dbHttp
-          .update(projects)
-          .set({
-            tokenMint: tokenInfo.tokenMint,
-            bagsLaunchId: isStub ? feeShareConfig.configKey : null,
-            bagsConfigKey: feeShareConfig.configKey,
-            bagsLaunchSignature: null,
-            bagsLaunchWallet: isStub ? null : launchWallet,
-            bagsPoolClaimerWallet: poolClaimerWallet,
-            bagsTokenMetadata: tokenInfo.tokenMetadata,
-            bagsInitialBuyLamports: initialBuyLamports,
-            status: configuredStatus,
-            simulatedAt: isStub ? configuredAt : null,
-            updatedAt: configuredAt,
-          })
-          .where(eq(projects.id, projectId))
-          .returning({ id: projects.id });
-
-        if (!configured) {
-          throw new ActionError(
-            "launch_config_persist_failed",
-            "Failed to persist Bags launch configuration before final launch.",
-            500,
-          );
-        }
-
-        await audit({
-          actorUserId: userId,
-          action: "project.launch",
-          targetType: "project",
-          targetId: projectId,
-          metadata: {
-            phase: "configured",
-            tokenMint: tokenInfo.tokenMint,
-            bagsConfigKey: feeShareConfig.configKey,
-            stub: isStub,
-            platformFeeBps: validated.platformFeeBps,
-            feeShareConfigSignatures: feeShareConfig.txSignatures,
-            launchWallet: isStub ? null : launchWallet,
-            poolClaimerWallet,
-            initialBuyLamports,
-            cluster: serverEnvCluster(),
-          },
-        });
-
-        // Bags step 3: create the final launch transaction for the user's
-        // linked wallet. The browser wallet signs and broadcasts it; the
-        // follow-up complete action persists the on-chain signature.
-        const txSig = isStub
-          ? (feeShareConfig.txSignatures.at(-1) ?? null)
-          : null;
-        const launchSignature: string | null = null;
-        let note: string | undefined;
-        let preparedTransactionBase64: string | undefined;
-        if (isStub) {
-          note =
-            "Stub mode — token mint is fake; no on-chain transaction sent.";
-        } else {
-          const guard = canLaunchOnBags();
-          if (!guard.ok) {
-            throw new ActionError(
-              "launch_refused",
-              `Refusing on-chain launch: ${guard.reason}`,
-              409,
-            );
-          }
-          const prepared = await bags.createLaunchTransactionForWallet({
-            tokenMint: tokenInfo.tokenMint,
-            metadataUrl: tokenInfo.tokenMetadata,
-            configKey: feeShareConfig.configKey,
-            launchWallet,
-            initialBuyLamports,
-          });
-          preparedTransactionBase64 = prepared.transactionBase64;
-          note =
-            "Launch transaction prepared. Review it in your wallet to broadcast the token launch.";
-        }
-
-        // Persist terminal launch state. Real mode only reaches this point
-        // after the Bags launch transaction is broadcast; the configured
-        // checkpoint above prevents retries from regenerating token/config.
-        const persistNow = new Date();
-        const [updated] = await dbHttp
-          .update(projects)
-          .set({
-            tokenMint: tokenInfo.tokenMint,
-            bagsLaunchId: isStub ? feeShareConfig.configKey : null,
-            bagsConfigKey: feeShareConfig.configKey,
-            bagsLaunchSignature: launchSignature,
-            bagsLaunchWallet: isStub ? null : launchWallet,
-            bagsPoolClaimerWallet: poolClaimerWallet,
-            bagsTokenMetadata: tokenInfo.tokenMetadata,
-            bagsInitialBuyLamports: initialBuyLamports,
-            status: isStub ? "simulated_live" : "launch_configured",
-            simulatedAt: isStub ? persistNow : null,
-            updatedAt: persistNow,
-          })
-          .where(eq(projects.id, projectId))
-          .returning({ id: projects.id });
-
-        if (!updated) {
-          throw new ActionError(
-            "update_failed",
-            isStub
-              ? "Failed to persist simulated launch."
-              : "Final Bags launch was submitted, but the live state could not be persisted. Manual review is required before retrying.",
-            500,
-          );
-        }
-
-        await audit({
-          actorUserId: userId,
-          action: "project.launch_complete",
-          targetType: "project",
-          targetId: projectId,
-          metadata: {
-            phase: "complete",
-            tokenMint: tokenInfo.tokenMint,
-            bagsConfigKey: feeShareConfig.configKey,
-            stub: isStub,
-            platformFeeBps: validated.platformFeeBps,
-            feeShareConfigSignatures: feeShareConfig.txSignatures,
-            launchSignature,
-            launchWallet: isStub ? null : launchWallet,
-            poolClaimerWallet,
-            initialBuyLamports,
-            cluster: process.env.NEXT_PUBLIC_SOLANA_CLUSTER ?? "devnet",
-          },
-        });
-
-        // Wake up the env validator so misconfig surfaces here, not on the
-        // first cron tick. Kept inside the action so it doesn't bloat the
-        // hot path on subsequent calls.
-        try {
-          serverEnv();
-        } catch {
-          /* tolerated; non-fatal at this stage */
-        }
-
-        return {
-          ok: true,
-          projectId,
-          tokenMint: tokenInfo.tokenMint,
-          status: isStub ? "simulated_live" : "launch_configured",
-          stub: isStub,
-          configKey: feeShareConfig.configKey,
-          txSig,
-          requiresSignature: !isStub,
-          transactionBase64: preparedTransactionBase64,
-          launchWalletAddress: isStub ? undefined : launchWallet,
-          initialBuyLamports,
-          ghOwner: validated.ghOwner,
-          ghRepo: validated.ghRepo,
-          note,
-        } satisfies LaunchActionResult;
       },
       { scope: `launch:${userId}:${validated.ghRepoId}` },
     );
@@ -684,11 +738,14 @@ export async function createAndLaunchAction(
   }
 }
 
-export async function completeLaunchAction(input: {
-  projectId: string;
-  signature: string;
-  launchWalletAddress: string;
-}): Promise<LaunchActionResult | LaunchActionError> {
+export async function completeLaunchAction(
+  input: {
+    projectId: string;
+    signature: string;
+    launchWalletAddress: string;
+  },
+  idempotencyKey?: string,
+): Promise<LaunchActionResult | LaunchActionError> {
   if (!hasCredentials.db()) {
     return {
       ok: false,
@@ -784,11 +841,18 @@ export async function completeLaunchAction(input: {
       );
     }
 
+    await verifyLaunchTransaction({
+      signature,
+      tokenMint: ready.config.tokenMint,
+      launchWallet: launchWalletAddress,
+      configKey: ready.config.configKey,
+    });
+
     // Record the launch in the Bags-native data layer before switching the
     // visible project state to `live`. If this fails after the wallet
     // broadcast, the project remains `launch_configured` and the user/admin
     // can safely retry completion without a half-live rebalance gap.
-    const claimers = buildLaunchClaimerSet(project);
+    const claimers = await loadRecordedLaunchClaimers(projectId);
     if (!claimers) {
       throw new ActionError(
         "launch_record_missing_claimers",
@@ -805,14 +869,19 @@ export async function completeLaunchAction(input: {
         projectId,
       );
     }
-    await recordLaunch({
-      projectId,
-      baseMint: project.tokenMint,
-      adminPubkey: launchWalletAddress,
-      claimers,
-      steadyStateCadenceHours:
-        project.payoutConfig?.steadyStateCadenceHours ?? 72,
-    });
+    await withIdempotency(
+      idempotencyKey ?? `complete:${projectId}:${signature}`,
+      () =>
+        recordLaunch({
+          projectId,
+          baseMint: ready.config.tokenMint,
+          adminPubkey: launchWalletAddress,
+          claimers,
+          steadyStateCadenceHours:
+            project.payoutConfig?.steadyStateCadenceHours ?? 72,
+        }),
+      { scope: `launch:complete:${userId}:${projectId}` },
+    );
 
     const now = new Date();
     const [updated] = await dbHttp
@@ -909,52 +978,6 @@ export async function completeLaunchAction(input: {
       projectId,
     };
   }
-}
-
-/**
- * Build the launch claimers array from a successfully-launched project's
- * persisted state. The current launch flow creates a single contributor-
- * pool claimer + an optional treasury claimer (the platform-fee cut),
- * both recorded as 'wallet'-provider slots so the rebalance workflow can
- * manipulate their BPS later.
- *
- * Returns null if the project is missing fields needed to build a valid
- * claimer set; the caller throws in that case rather than recording a
- * partial launch.
- */
-function buildLaunchClaimerSet(project: {
-  bagsPoolClaimerWallet: string | null;
-  payoutConfig: { platformFeeBps?: number } | null;
-}): LaunchClaimerInput[] | null {
-  const pool = project.bagsPoolClaimerWallet?.trim();
-  if (!pool) return null;
-  const platformFeeBps = project.payoutConfig?.platformFeeBps ?? 0;
-  const treasury = serverEnv().SOLANA_TREASURY_ADDRESS?.trim();
-  const claimers: LaunchClaimerInput[] = [
-    {
-      slotIndex: 0,
-      claimerPubkey: pool,
-      provider: "wallet",
-      socialHandle: null,
-      contributorId: null,
-      initialBps: 10_000 - platformFeeBps,
-    },
-  ];
-  if (platformFeeBps > 0 && treasury && treasury !== pool) {
-    claimers.push({
-      slotIndex: 1,
-      claimerPubkey: treasury,
-      provider: "wallet",
-      socialHandle: null,
-      contributorId: null,
-      initialBps: platformFeeBps,
-    });
-  } else if (platformFeeBps > 0) {
-    // Treasury missing or collides with pool — fold into the pool slot
-    // so the bps still sums to 10000. Surfaces as an audit warning.
-    claimers[0]!.initialBps = 10_000;
-  }
-  return claimers;
 }
 
 /**

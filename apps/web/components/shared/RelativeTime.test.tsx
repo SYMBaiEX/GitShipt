@@ -6,7 +6,7 @@ import React from "react";
 
 // Mock @repo/lib since we're testing the interval logic in the component
 vi.mock("@repo/lib", () => ({
-  cn: (...args: any[]) => args.filter(Boolean).join(" "),
+  cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
   formatRelativeTime: () => "just now",
 }));
 

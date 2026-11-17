@@ -154,6 +154,7 @@ type BagsSdk = {
   config: {
     createBagsFeeShareConfig: (input: {
       payer: unknown;
+      admin?: unknown;
       baseMint: unknown;
       feeClaimers: Array<{ user: unknown; userBps: number }>;
       partner?: unknown;
@@ -794,6 +795,7 @@ export const bags = {
     const payer = new PublicKey(validated.payer);
     const result = await sdk.config.createBagsFeeShareConfig({
       payer,
+      admin: validated.admin ? new PublicKey(validated.admin) : undefined,
       baseMint: new PublicKey(validated.baseMint),
       feeClaimers,
       partner: partnerWallet ? new PublicKey(partnerWallet) : undefined,

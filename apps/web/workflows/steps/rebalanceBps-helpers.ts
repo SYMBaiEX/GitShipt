@@ -28,6 +28,7 @@ import {
   bagsRebalanceAttempts,
   payoutSchedules,
   snapshots,
+  projects,
 } from "@/db/schema";
 import { hasCredentials, serverEnv, stubsAllowed } from "@/lib/env";
 import { audit } from "@/lib/audit";
@@ -110,8 +111,10 @@ export async function loadDueSchedulesStep(
       bagsFeeShareConfigs,
       eq(bagsFeeShareConfigs.projectId, payoutSchedules.projectId),
     )
+    .innerJoin(projects, eq(projects.id, payoutSchedules.projectId))
     .where(
       and(
+        eq(projects.status, "live"),
         lte(payoutSchedules.nextRunAt, now),
         isNull(payoutSchedules.pausedAt),
         isNull(payoutSchedules.archivedAt),

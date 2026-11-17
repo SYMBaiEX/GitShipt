@@ -18,8 +18,6 @@ const TOP_N_MIN = 3; // server-side Zod minimum (PayoutConfigSchema.topN)
 const TOP_N_MAX = 50;
 const WINDOW_MIN = 7;
 const WINDOW_MAX = 90;
-const PLATFORM_FEE_BPS_MIN = 0;
-const PLATFORM_FEE_BPS_PROTOCOL_MAX = 10_000;
 
 export interface LeaderboardConfigFormProps {
   initial: LeaderboardConfig;
@@ -38,7 +36,7 @@ export function LeaderboardConfigForm({
   const [thresholdSol, setThresholdSol] = useState(
     initial.claimThresholdLamports / LAMPORTS_PER_SOL_NUMBER,
   );
-  const [platformFeeBps, setPlatformFeeBps] = useState(initial.platformFeeBps);
+  const platformFeeBps = 0;
   const [steadyStateCadenceHours, setSteadyStateCadenceHours] =
     useState<SteadyStateCadenceHours>(initial.steadyStateCadenceHours);
   const [maxClaimers, setMaxClaimers] = useState(initial.maxClaimers);
@@ -50,7 +48,6 @@ export function LeaderboardConfigForm({
 
   const tierSumOk = tierSum > 0 && tierSum <= 1.0001;
 
-  const platformFeePercent = (platformFeeBps / 100).toFixed(2);
   const contributorPoolBps = Math.max(0, 10_000 - platformFeeBps);
   const contributorPoolPercent = (contributorPoolBps / 100).toFixed(2);
   const claimThresholdLamports = Math.max(
@@ -73,19 +70,12 @@ export function LeaderboardConfigForm({
     !Number.isFinite(thresholdSol) || thresholdSol < 0
       ? "Threshold must be 0 or greater"
       : undefined;
-  const feeError =
-    platformFeeBps < PLATFORM_FEE_BPS_MIN
-      ? "Legacy platform fee cannot be negative"
-      : platformFeeBps > PLATFORM_FEE_BPS_PROTOCOL_MAX
-        ? "Legacy platform fee cannot exceed 100% of trading fees"
-        : undefined;
 
   const isValid =
     !windowError &&
     !topNError &&
     !tierError &&
     !thresholdError &&
-    !feeError &&
     tierWeights.length === topN;
 
   function handleSubmit(e: React.FormEvent) {
@@ -219,23 +209,10 @@ export function LeaderboardConfigForm({
 
         <aside className="space-y-3 rounded-lg border border-border bg-surface-elevated/40 p-3 lg:sticky lg:top-4">
           <FormField
-            label={`Legacy treasury rail: ${platformFeePercent}%`}
-            hint="Production revenue uses the Bags partner rail."
-            error={feeError}
+            label="Bags partner rate"
+            hint="GitShipt revenue is configured through Bags, separately from the contributor BPS allocation."
           >
-            <input
-              type="number"
-              min={0}
-              step={0.25}
-              value={platformFeeBps / 100}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                if (Number.isFinite(v)) {
-                  setPlatformFeeBps(Math.round(v * 100));
-                }
-              }}
-              className={cn(inputClass, "text-mono-md")}
-            />
+            <span className="text-mono-md text-fg">25%</span>
           </FormField>
 
           <div className="space-y-2 border-t border-border pt-3">

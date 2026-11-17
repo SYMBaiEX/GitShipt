@@ -10,6 +10,7 @@ type FeeShareArgs = {
 
 type FeeShareConfigCall = {
   payer: PublicKey;
+  admin?: PublicKey;
   baseMint: PublicKey;
   feeClaimers: Array<{ user: PublicKey; userBps: number }>;
   partner?: PublicKey;
@@ -97,9 +98,11 @@ describe("bags.createFeeShareConfig", () => {
       partnerConfig,
     });
     const baseMint = Keypair.generate().publicKey.toBase58();
+    const admin = Keypair.generate().publicKey.toBase58();
 
     const result = await bags.createFeeShareConfig({
       payer: signer.publicKey.toBase58(),
+      admin,
       baseMint,
       feeClaimers: [{ wallet: poolClaimer, bps: 10_000 }],
       shareFee: 0,
@@ -120,6 +123,7 @@ describe("bags.createFeeShareConfig", () => {
     const call = calls[0][0];
     expect(call).toMatchObject({
       payer: signer.publicKey,
+      admin: new PublicKey(admin),
       baseMint: new PublicKey(baseMint),
       partner: new PublicKey(partner),
       partnerConfig: new PublicKey(partnerConfig),

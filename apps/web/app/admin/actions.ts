@@ -156,6 +156,12 @@ export async function directLaunchProject(input: unknown): Promise<{
   await requirePermission("admin.direct_launch", { userId: ctx.userId });
 
   const willStubMode = !canLaunchOnBags().ok || !hasCredentials.bags();
+  // Live launches must use owner wallet signing and the direct contributor manifest.
+  if (!willStubMode) {
+    throw new Error(
+      "Use /launch for live token creation. The legacy admin launch does not support the Bags-direct contributor manifest.",
+    );
+  }
   if (willStubMode && !stubsAllowed()) {
     throw new Error("live_credentials_required");
   }

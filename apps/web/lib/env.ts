@@ -16,6 +16,15 @@ const optionalString = z.preprocess(
   z.string().min(1).optional(),
 );
 
+const envBoolean = z.preprocess((value) => {
+  if (value === undefined || value === "") return false;
+  if (typeof value === "string") {
+    if (value.trim().toLowerCase() === "true") return true;
+    if (value.trim().toLowerCase() === "false") return false;
+  }
+  return value;
+}, z.boolean());
+
 const serverEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -72,10 +81,9 @@ const serverEnvSchema = z.object({
     .default(DEFAULT_BAGS_REF_CODE),
   BAGS_CONFIG_TYPE: optionalString,
   BAGS_INITIAL_BUY_LAMPORTS: z.coerce.number().int().min(0).default(0),
-  // Safety guard: refuse real launch txns when devnet cluster + prod key
-  // unless explicitly opted in. Read-only Bags calls always work.
-  BAGS_ALLOW_PROD_LAUNCH: z.coerce.boolean().default(false),
-  ALLOW_STUBS_IN_PROD: z.coerce.boolean().default(false),
+  // Explicit mainnet token-creation opt-in. Read-only Bags calls remain available.
+  BAGS_ALLOW_PROD_LAUNCH: envBoolean,
+  ALLOW_STUBS_IN_PROD: envBoolean,
   /**
    * Operator attestation that all *_KEYPAIR and *_SECRET vars are flagged
    * Sensitive in the Vercel dashboard (post-April-2026 incident). Cannot
@@ -83,7 +91,7 @@ const serverEnvSchema = z.object({
    * manual review. `productionReadiness()` warns when this is unset and
    * any sensitive secret is configured.
    */
-  SECRETS_SENSITIVE_ATTESTED: z.coerce.boolean().default(false),
+  SECRETS_SENSITIVE_ATTESTED: envBoolean,
 
   // Solana
   HELIUS_RPC_URL: optionalUrl,
@@ -140,20 +148,20 @@ const serverEnvSchema = z.object({
     .max(10_000)
     .default(0),
   ADMIN_EMAIL_ALLOWLIST: z.string().optional(),
-  KILL_SWITCH_ENABLED: z.coerce.boolean().default(false),
+  KILL_SWITCH_ENABLED: envBoolean,
 
   // Out-of-band emergency stop. When true, every entry into trading-controls
   // returns halted=true regardless of the platform_config DB row. Use during
   // an incident when the DB itself may be unhealthy.
-  EMERGENCY_KILL_SWITCH: z.coerce.boolean().default(false),
+  EMERGENCY_KILL_SWITCH: envBoolean,
 
   // Hard gate on the demo seeder. Refuses to run unless explicitly allowed
   // AND NODE_ENV is non-production.
-  ALLOW_DEMO_SEED: z.coerce.boolean().default(false),
+  ALLOW_DEMO_SEED: envBoolean,
 
   // Allow non-Neon DATABASE_URL in production (RLS becomes app-only). Off by
   // default; set true only with a documented mitigation plan.
-  ALLOW_NON_NEON_RLS_OFF: z.coerce.boolean().default(false),
+  ALLOW_NON_NEON_RLS_OFF: envBoolean,
 });
 
 const clientEnvSchema = z.object({
@@ -313,8 +321,7 @@ export function stubsAllowed(): boolean {
 
 /**
  * Safety check: should we allow a real Bags launch transaction?
- * Refuses when the cluster is devnet AND the key looks production-y,
- * unless BAGS_ALLOW_PROD_LAUNCH=true is explicitly set.
+ * Mainnet creation requires explicit opt-in and the platform partner rail.
  */
 export function canLaunchOnBags():
   | { ok: true }
@@ -326,13 +333,32 @@ export function canLaunchOnBags():
   if (!env.SOLANA_PAYOUT_KEYPAIR) {
     return { ok: false, reason: "SOLANA_PAYOUT_KEYPAIR missing" };
   }
+  if (!env.BAGS_PARTNER_CONFIG_KEY) {
+    return { ok: false, reason: "BAGS_PARTNER_CONFIG_KEY missing" };
+  }
+  if (!env.SOLANA_MANAGER_KEYPAIR) {
+    return { ok: false, reason: "SOLANA_MANAGER_KEYPAIR missing" };
+  }
+  if (env.EMERGENCY_KILL_SWITCH || env.KILL_SWITCH_ENABLED) {
+    return {
+      ok: false,
+      reason: "Token creation is paused by the kill switch.",
+    };
+  }
   const cluster = clientEnv().NEXT_PUBLIC_SOLANA_CLUSTER;
   const isProdKey = env.BAGS_API_KEY.startsWith("bags_prod_");
-  if (cluster !== "mainnet-beta" && isProdKey && !env.BAGS_ALLOW_PROD_LAUNCH) {
+  if (cluster === "mainnet-beta" && !env.BAGS_ALLOW_PROD_LAUNCH) {
     return {
       ok: false,
       reason:
-        "Refusing prod-key launch on non-mainnet cluster. Set BAGS_ALLOW_PROD_LAUNCH=true to override.",
+        "Set BAGS_ALLOW_PROD_LAUNCH=true to enable mainnet token creation.",
+    };
+  }
+  if (cluster !== "mainnet-beta" && isProdKey) {
+    return {
+      ok: false,
+      reason:
+        "Production Bags keys require NEXT_PUBLIC_SOLANA_CLUSTER=mainnet-beta. Devnet cannot be overridden for a production-key launch.",
     };
   }
   return { ok: true };
@@ -395,6 +421,10 @@ export function productionReadiness(): ProductionReadiness {
 
   for (const [name, value] of requiredServer) {
     if (!value) missing.push(name);
+  }
+
+  if (!env.BAGS_ALLOW_PROD_LAUNCH) {
+    missing.push("BAGS_ALLOW_PROD_LAUNCH=true");
   }
 
   const publicDatabaseVars = Object.keys(process.env).filter(
@@ -467,15 +497,9 @@ export function productionReadiness(): ProductionReadiness {
 
   const provider = databaseProvider();
   if (provider !== "neon" && provider !== "none") {
-    if (env.ALLOW_NON_NEON_RLS_OFF) {
-      warnings.push(
-        "ALLOW_NON_NEON_RLS_OFF=true: RLS is disabled, app-layer requirePermission is the only authorization boundary.",
-      );
-    } else {
-      missing.push(
-        `DATABASE_URL must be a Neon URL for RLS (got provider=${provider}); set ALLOW_NON_NEON_RLS_OFF=true to override`,
-      );
-    }
+    missing.push(
+      `DATABASE_URL must be a Neon URL; the runtime does not support provider=${provider}.`,
+    );
   }
 
   if (env.BAGS_API_KEY && !env.BAGS_API_KEY.startsWith("bags_prod_")) {

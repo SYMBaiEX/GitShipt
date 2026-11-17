@@ -94,6 +94,13 @@ const REQUIRED = [
     note: "Production Bags API key.",
   },
   {
+    name: "BAGS_ALLOW_PROD_LAUNCH",
+    scope: "Bags",
+    sensitive: false,
+    expected: "true",
+    note: "Explicit opt-in required for mainnet token creation.",
+  },
+  {
     name: "BAGS_WEBHOOK_SECRET",
     scope: "Bags",
     sensitive: true,
@@ -134,12 +141,6 @@ const REQUIRED = [
     scope: "Solana",
     sensitive: true,
     note: "Base58 keypair holding the on-chain fee-share-config admin role per project. manager — BPS-rebalance authority only.",
-  },
-  {
-    name: "SOLANA_TREASURY_ADDRESS",
-    scope: "Solana",
-    sensitive: false,
-    note: "Cold treasury public address for platform fee share.",
   },
   {
     name: "CRON_SECRET",
@@ -304,17 +305,48 @@ function validate(env) {
     warnings.push("BAGS_API_KEY does not look like a production key.");
   }
 
-  const platformBps = Number(valueOf(env, "PLATFORM_FEE_BPS_DEFAULT") || "500");
-  if (
-    platformBps > 0 &&
-    isPlaceholder(valueOf(env, "SOLANA_TREASURY_ADDRESS"))
-  ) {
+  const platformBps = Number(valueOf(env, "PLATFORM_FEE_BPS_DEFAULT") || "0");
+  if (platformBps !== 0) {
     addMissing({
-      name: "SOLANA_TREASURY_ADDRESS",
-      scope: "Solana",
+      name: "PLATFORM_FEE_BPS_DEFAULT=0",
+      scope: "Bags",
       sensitive: false,
-      note: "Required because PLATFORM_FEE_BPS_DEFAULT is greater than 0.",
+      note: "Platform revenue uses the Bags partner config, not a contributor deduction.",
     });
+  }
+
+  const dbUrl = valueOfAny(
+    env,
+    REQUIRED.find((item) => item.scope === "Database").names,
+  );
+  if (dbUrl) {
+    let neon = false;
+    try {
+      neon = new URL(dbUrl).hostname.endsWith(".neon.tech");
+    } catch {
+      /* reported without exposing the URL */
+    }
+    if (!neon)
+      addMissing({
+        name: "DATABASE_URL (Neon)",
+        scope: "Database",
+        sensitive: true,
+        note: "The current runtime only supports Neon Postgres.",
+      });
+  }
+  for (const name of [
+    "ALLOW_STUBS_IN_PROD",
+    "ALLOW_DEMO_SEED",
+    "KILL_SWITCH_ENABLED",
+    "EMERGENCY_KILL_SWITCH",
+  ]) {
+    if (valueOf(env, name) === "true")
+      addMissing({
+        name: `${name}=false`,
+        scope: "Launch safety",
+        sensitive: false,
+        note: "Disable simulation, demo seeding, and kill switches before a live launch.",
+      });
   }
 
   for (const item of RECOMMENDED) {

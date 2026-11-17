@@ -17,7 +17,8 @@ import { serverEnv } from "@/lib/env";
  * call `isKillSwitchEnabled()` before signing and abort if true.
  */
 export async function isKillSwitchEnabled(): Promise<boolean> {
-  if (serverEnv().EMERGENCY_KILL_SWITCH) return true;
+  if (serverEnv().EMERGENCY_KILL_SWITCH || serverEnv().KILL_SWITCH_ENABLED)
+    return true;
   const [row] = await dbHttp
     .select({ value: platformConfig.value })
     .from(platformConfig)

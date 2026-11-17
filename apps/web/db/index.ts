@@ -25,8 +25,14 @@ function isNeonUrl(url: string): boolean {
 }
 
 function nonNeonMessage(url: string): string {
+  let hostname = "invalid host";
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    /* never include connection credentials in errors */
+  }
   return (
-    `[db] DATABASE_URL must be a Neon (.neon.tech) host; got "${url}". ` +
+    `[db] DATABASE_URL must be a Neon (.neon.tech) host; got "${hostname}". ` +
     "Non-Neon Postgres support was removed when Workflow DevKit integration " +
     "blocked the static `postgres` import. Provision a Neon database via " +
     "Vercel Marketplace or re-add the postgres-js path with a lazy import."
@@ -63,9 +69,7 @@ export function dbPool(): DbPool {
   if (_dbPool) return _dbPool;
   const connectionString = databaseUrlUnpooled();
   if (!connectionString) {
-    throw new Error(
-      "DATABASE_URL_UNPOOLED or DATABASE_URL is not configured.",
-    );
+    throw new Error("DATABASE_URL_UNPOOLED or DATABASE_URL is not configured.");
   }
   if (!isNeonUrl(connectionString)) {
     throw new Error(nonNeonMessage(connectionString));

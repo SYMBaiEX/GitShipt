@@ -5,8 +5,9 @@ listed here and in `scripts/check-bun-audit.mjs` with an owner and expiry.
 
 | Package | Advisory | Path | Severity | Owner | Expires | Reason |
 | --- | --- | --- | --- | --- | --- | --- |
+| `picomatch@2.3.2`, `picomatch@4.0.7` | GHSA-fc5q-39xc-vjpf | All package-manager-installed copies | High | SYMBaiEX | 2026-12-17 UTC | Checked-in repeated-extglob hardening; exact patch and installed parser hashes required |
 
-There are currently no exceptions. The Bags/Solana dependency on
+The Bags/Solana dependency on
 `bigint-buffer` is overridden by `packages/bigint-buffer`, a pure-JavaScript
 implementation of its conversion API. It does not load the native binding
 affected by GHSA-3gc7-fjrx-p6mg; the upstream package has no patched release.
@@ -29,6 +30,9 @@ on every package-manager-installed copy.
 This does not replace copies bundled internally by frameworks. Next.js's
 bundled copy is used with repository-controlled image and build patterns;
 do not feed user-provided glob patterns into those configurations. The
-version-based audit still reports the advisory and the release gate remains
-closed. Remove these patches and their verification when a compatible
-upstream fix is available.
+version-based audit still reports the advisory. The exception applies only
+when the exact versions and patch paths in the manifest and lockfile match
+and every installed parser passes hash and behavior checks. A different
+version, changed patch, missing installation, or expired exception fails the
+audit. Remove the exception, patches, and checks when a compatible upstream
+fix is available.

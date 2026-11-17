@@ -9,6 +9,12 @@ import {
   WalletNonceResponseSchema,
   WalletVerifyResponseSchema,
 } from "@repo/shared";
+import {
+  ProjectTradeQuoteRequestSchema,
+  ProjectTradeQuoteResponseSchema,
+  ProjectTradeSwapRequestSchema,
+  ProjectTradeSwapResponseSchema,
+} from "@/lib/bags/types";
 
 /**
  * OpenAPI 3.1 spec for the public HTTP surface. Generated from Zod schemas
@@ -80,6 +86,10 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
         WalletNonceRequest: schema(WalletNonceRequestSchema),
         WalletNonceResponse: schema(WalletNonceResponseSchema),
         WalletVerifyResponse: schema(WalletVerifyResponseSchema),
+        ProjectTradeQuoteRequest: schema(ProjectTradeQuoteRequestSchema),
+        ProjectTradeQuoteResponse: schema(ProjectTradeQuoteResponseSchema),
+        ProjectTradeSwapRequest: schema(ProjectTradeSwapRequestSchema),
+        ProjectTradeSwapResponse: schema(ProjectTradeSwapResponseSchema),
         ProjectLeaderboardResponse: schema(ProjectLeaderboardResponseSchema),
         MfaEnrollResponse: schema(MfaEnrollResponseSchema),
         MfaVerifyResponse: schema(MfaVerifyResponseSchema),
@@ -126,8 +136,8 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
         post: {
           summary: "Mint a SIWS nonce for wallet linking",
           description:
-            "Allocates a single-use, Redis-backed nonce bound to the requesting session and address. Required before signing the SIWS challenge in `/api/wallets/verify`.",
-          security: [{ session: [] }],
+            "Allocates a single-use, Redis-backed nonce bound to the wallet address. Required before signing the SIWS challenge in `/api/wallets/verify`.",
+          security: [],
           requestBody: {
             required: true,
             content: {
@@ -146,7 +156,6 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
               },
             },
             "400": INVALID_BODY,
-            "401": NOT_AUTHENTICATED,
             "429": RATE_LIMITED,
           },
         },
@@ -199,6 +208,7 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
                 "Unauthenticated, or `mfa_required` when the user has MFA enrolled but no fresh confirmation.",
               content: { "application/json": { schema: ErrorResponse } },
             },
+            "403": { description: "The session cannot update the account." },
             "429": RATE_LIMITED,
             "503": {
               description: "DB not configured (stub mode).",
@@ -397,9 +407,10 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
 
       "/api/projects/{id}/incorporation/start": {
         post: {
-          summary: "Start project incorporation request",
+          summary: "Deprecated incorporation endpoint",
           description:
-            "Creates an audited incorporation intake request for a launched project. Requires project-owner permission and `Idempotency-Key`.",
+            "Bags no longer documents public incorporation endpoints. The route is retained for compatibility but does not create an intake request.",
+          deprecated: true,
           security: [{ session: [] }],
           parameters: [
             {
@@ -408,19 +419,11 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
               required: true,
               schema: { type: "string" },
             },
-            {
-              in: "header",
-              name: "Idempotency-Key",
-              required: true,
-              schema: { type: "string", pattern: "^[A-Za-z0-9_\\-:.]{8,128}$" },
-            },
           ],
           responses: {
-            "200": { description: "Incorporation intake started." },
-            "400": INVALID_BODY,
             "401": NOT_AUTHENTICATED,
             "403": { description: "Permission denied." },
-            "429": RATE_LIMITED,
+            "503": { description: "Incorporation unavailable." },
           },
         },
       },
@@ -430,7 +433,7 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
           summary: "Request a Bags trading quote",
           description:
             "Returns a Bags quote for the project token. This endpoint never broadcasts transactions and is rate-limited per project and user/IP.",
-          security: [{ session: [] }],
+          security: [],
           parameters: [
             {
               in: "path",
@@ -439,12 +442,32 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
               schema: { type: "string" },
             },
           ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ProjectTradeQuoteRequest",
+                },
+              },
+            },
+          },
           responses: {
-            "200": { description: "Quote returned." },
+            "200": {
+              description: "Quote returned.",
+              content: {
+                "application/json": {
+                  schema: {
+                    $ref: "#/components/schemas/ProjectTradeQuoteResponse",
+                  },
+                },
+              },
+            },
             "400": INVALID_BODY,
-            "401": NOT_AUTHENTICATED,
             "404": { description: "Project or token not found." },
+            "409": { description: "Token is not tradeable." },
             "429": RATE_LIMITED,
+            "503": { description: "Trading is unavailable or paused." },
           },
         },
       },
@@ -453,8 +476,8 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
         post: {
           summary: "Prepare a Bags swap transaction",
           description:
-            "Builds a wallet-reviewed swap transaction for the project token. Requires `Idempotency-Key`; the user wallet signs and broadcasts.",
-          security: [{ session: [] }],
+            "Prepares an unsigned swap for wallet review. GitShipt never signs or broadcasts the swap.",
+          security: [],
           parameters: [
             {
               in: "path",
@@ -462,22 +485,34 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
               required: true,
               schema: { type: "string" },
             },
-            {
-              in: "header",
-              name: "Idempotency-Key",
-              required: true,
-              schema: { type: "string", pattern: "^[A-Za-z0-9_\\-:.]{8,128}$" },
-            },
           ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ProjectTradeSwapRequest",
+                },
+              },
+            },
+          },
           responses: {
             "200": {
               description:
                 "Unsigned or partially prepared swap payload returned.",
+              content: {
+                "application/json": {
+                  schema: {
+                    $ref: "#/components/schemas/ProjectTradeSwapResponse",
+                  },
+                },
+              },
             },
             "400": INVALID_BODY,
-            "401": NOT_AUTHENTICATED,
             "404": { description: "Project or token not found." },
+            "409": { description: "Token is not tradeable." },
             "429": RATE_LIMITED,
+            "503": { description: "Trading is unavailable or paused." },
           },
         },
       },

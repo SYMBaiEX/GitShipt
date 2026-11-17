@@ -3,7 +3,6 @@ import { PublicKey } from "@solana/web3.js";
 
 /** Bags fee-claimer social providers for identity-based wallet resolution. */
 export const BagsProviderSchema = z.enum([
-  "moltbook",
   "github",
   "twitter",
   "kick",
@@ -274,13 +273,73 @@ export const TradeQuoteResponseSchema = z
     outAmount: z.string(),
     outputMint: SolanaAddressSchema,
     priceImpactPct: z.string(),
-    routePlan: z.array(z.record(z.string(), z.unknown())),
+    routePlan: z.array(
+      z.looseObject({
+        venue: z.string(),
+        inAmount: z.string(),
+        outAmount: z.string(),
+        inputMint: SolanaAddressSchema,
+        outputMint: SolanaAddressSchema,
+        inputMintDecimals: z.number().int().nonnegative(),
+        outputMintDecimals: z.number().int().nonnegative(),
+        marketKey: z.string(),
+        data: z.string(),
+      }),
+    ),
+    outTransferFee: z.string().optional(),
+    platformFee: z
+      .looseObject({
+        amount: z.string(),
+        feeAccount: z.string(),
+        feeBps: z.number().int(),
+        segmenterFeeAmount: z.string(),
+        segmenterFeePct: z.number(),
+      })
+      .optional(),
     slippageBps: z.number().int(),
     requestId: z.string().min(1),
     simulatedComputeUnits: z.number().int().nullable(),
   })
   .passthrough();
 export type TradeQuoteResponse = z.infer<typeof TradeQuoteResponseSchema>;
+
+export const ProjectTradeQuoteRequestSchema = z.object({
+  side: z.enum(["buy", "sell"]).default("buy"),
+  amount: z.number().int().positive().max(1_000_000_000_000),
+  slippageBps: z.number().int().min(1).max(1_000).default(100),
+});
+export type ProjectTradeQuoteRequest = z.infer<
+  typeof ProjectTradeQuoteRequestSchema
+>;
+
+export const ProjectTradeQuoteResponseSchema = z.object({
+  tokenMint: SolanaAddressSchema,
+  side: z.enum(["buy", "sell"]),
+  quote: TradeQuoteResponseSchema,
+  inputDecimals: z.number().int().min(0).max(18),
+  outputDecimals: z.number().int().min(0).max(18),
+});
+export type ProjectTradeQuoteResponse = z.infer<
+  typeof ProjectTradeQuoteResponseSchema
+>;
+
+export const ProjectTradeSwapRequestSchema = z.object({
+  quoteResponse: TradeQuoteResponseSchema,
+  userPublicKey: SolanaAddressSchema,
+});
+export type ProjectTradeSwapRequest = z.infer<
+  typeof ProjectTradeSwapRequestSchema
+>;
+
+export const ProjectTradeSwapResponseSchema = z.object({
+  transactionBase64: z.string().min(1),
+  computeUnitLimit: z.number().int().nonnegative(),
+  lastValidBlockHeight: z.number().int().positive(),
+  prioritizationFeeLamports: z.number().int().nonnegative(),
+});
+export type ProjectTradeSwapResponse = z.infer<
+  typeof ProjectTradeSwapResponseSchema
+>;
 
 export const TradeSwapInputSchema = z.object({
   quoteResponse: TradeQuoteResponseSchema,
@@ -316,27 +375,46 @@ const AdminUpdatePublicKeySchema = z.string().refine((value) => {
   }
 }, "Invalid Solana public key");
 
-export const FeeShareAdminUpdateConfigInputSchema = z.object({
-  baseMint: AdminUpdatePublicKeySchema,
-  payer: AdminUpdatePublicKeySchema,
-  feeClaimers: z
-    .array(
-      z.object({
-        wallet: AdminUpdatePublicKeySchema,
-        bps: z.number().int().min(0).max(10_000),
-      }),
-    )
-    .min(1)
-    .max(100),
-  additionalLookupTables: z.array(AdminUpdatePublicKeySchema).transform((tables) => [...new Set(tables)]).optional(),
-}).superRefine((value, ctx) => {
-  if (value.feeClaimers.reduce((total, claimer) => total + claimer.bps, 0) !== 10_000) {
-    ctx.addIssue({ code: "custom", path: ["feeClaimers"], message: "Fee claimer BPS must total 10000." });
-  }
-  if (new Set(value.feeClaimers.map((claimer) => claimer.wallet)).size !== value.feeClaimers.length) {
-    ctx.addIssue({ code: "custom", path: ["feeClaimers"], message: "Fee claimer wallets must be unique." });
-  }
-});
+export const FeeShareAdminUpdateConfigInputSchema = z
+  .object({
+    baseMint: AdminUpdatePublicKeySchema,
+    payer: AdminUpdatePublicKeySchema,
+    feeClaimers: z
+      .array(
+        z.object({
+          wallet: AdminUpdatePublicKeySchema,
+          bps: z.number().int().min(0).max(10_000),
+        }),
+      )
+      .min(1)
+      .max(100),
+    additionalLookupTables: z
+      .array(AdminUpdatePublicKeySchema)
+      .transform((tables) => [...new Set(tables)])
+      .optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.feeClaimers.reduce((total, claimer) => total + claimer.bps, 0) !==
+      10_000
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["feeClaimers"],
+        message: "Fee claimer BPS must total 10000.",
+      });
+    }
+    if (
+      new Set(value.feeClaimers.map((claimer) => claimer.wallet)).size !==
+      value.feeClaimers.length
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["feeClaimers"],
+        message: "Fee claimer wallets must be unique.",
+      });
+    }
+  });
 export type FeeShareAdminUpdateConfigInput = z.infer<
   typeof FeeShareAdminUpdateConfigInputSchema
 >;

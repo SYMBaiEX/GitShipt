@@ -79,8 +79,8 @@ describe("normalizeBagsTransaction", () => {
     const sdkWeb3 = bagsRequire(
       "@solana/web3.js",
     ) as typeof import("@solana/web3.js");
-    expect(sdkWeb3.VersionedTransaction).not.toBe(VersionedTransaction);
-    expect(sdkWeb3.Transaction).not.toBe(Transaction);
+    expect(sdkWeb3.VersionedTransaction).toBe(VersionedTransaction);
+    expect(sdkWeb3.Transaction).toBe(Transaction);
 
     const payer = sdkWeb3.Keypair.generate();
     const cosigner = sdkWeb3.Keypair.generate();
@@ -111,16 +111,25 @@ describe("normalizeBagsTransaction", () => {
             })
           : tx.serialize();
       const normalized = await normalizeBagsTransaction(tx);
-      expect(normalized).toBeInstanceOf(VersionedTransaction);
-      expect(Buffer.from(normalized.serialize())).toEqual(Buffer.from(bytes));
+      expect(normalized).toBe(tx);
+      const normalizedBytes =
+        normalized instanceof Transaction
+          ? normalized.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false,
+            })
+          : normalized.serialize();
+      expect(Buffer.from(normalizedBytes)).toEqual(Buffer.from(bytes));
       const originalSignature =
         tx instanceof sdkWeb3.Transaction
           ? tx.signatures[0]?.signature
           : tx.signatures[0];
       expect(originalSignature).toBeTruthy();
-      expect(
-        Buffer.from((normalized as VersionedTransaction).signatures[0]!),
-      ).toEqual(Buffer.from(originalSignature!));
+      const normalizedSignature =
+        normalized instanceof Transaction
+          ? normalized.signatures[0]?.signature
+          : normalized.signatures[0];
+      expect(normalizedSignature).toEqual(originalSignature);
     }
   });
 
@@ -149,7 +158,10 @@ describe("normalizeBagsTransaction", () => {
         lamports: 1,
       }),
     );
-    const normalized = await normalizeBagsTransaction(tx);
+    const normalized = await normalizeBagsTransaction({
+      serialize: () =>
+        tx.serialize({ requireAllSignatures: false, verifySignatures: false }),
+    });
     await expect(
       assertBagsTransactionSafeToSign(
         normalized,

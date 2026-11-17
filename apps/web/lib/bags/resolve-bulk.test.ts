@@ -112,7 +112,7 @@ describe("bags.resolveLaunchWalletsBulk", () => {
 
     expect(sdkBulk).toHaveBeenCalledOnce();
     expect(sdkBulk).toHaveBeenCalledWith([
-      { provider: "github", username: "octocat" },
+      { provider: "github", username: "octocat", chain: "SOL" },
     ]);
     expect(result).toHaveLength(1);
     expect(result[0]?.wallet).toBe("11111111111111111111111111111111");

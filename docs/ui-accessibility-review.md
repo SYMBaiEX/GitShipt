@@ -30,11 +30,11 @@ signed nonce. No transaction was signed or sent.
 There is no separate hosted staging environment. The currently deployed owner
 and admin consoles and authenticated wallet entry were checked read-only.
 Hosted OAuth and real-extension signing on the release candidate remain
-unverified; the version-based dependency audit still prevents promotion.
+unverified.
 
 ## Framework and Dependency Notes
 
 - [Next.js viewport settings](https://nextjs.org/docs/app/api-reference/functions/generate-viewport) keep browser zoom enabled and let the UI account for device insets. Page headings support Next.js route announcements. The proxy redirects anonymous visits; server pages continue to authenticate and authorize protected content.
 - [Vercel's Next.js integration](https://vercel.com/docs/frameworks/full-stack/nextjs) supports the existing build and runtime setup. Keep production CSP in preview checks by serving production builds over HTTPS; HTTP is supported for local development.
 - Keep Solana web3.js on the Bags SDK-compatible major and preserve the Vercel Queue/Workflow JOSE compatibility pin. This pass did not upgrade dependencies.
-- The security audit reported a high-severity [transitive picomatch advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf). The release gate remains open pending a fix or a documented risk decision.
+- The only accepted high-severity finding is the [picomatch advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) for the two verified patched versions. The [temporary exception](security-audit-exceptions.md) expires December 17, 2026 UTC.

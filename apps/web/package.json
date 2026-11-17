@@ -35,7 +35,6 @@
     "@repo/ui": "workspace:*",
     "@solana/wallet-adapter-base": "^0.9.28",
     "@solana/wallet-adapter-react": "^0.15.40",
-    "@solana/wallet-adapter-react-ui": "^0.9.40",
     "@solana/web3.js": "^1.99.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.1.0",
@@ -56,7 +55,7 @@
     "react-hook-form": "^7.92.0",
     "sonner": "^2.0.8",
     "tweetnacl": "^1.0.3",
-    "workflow": "^5.5.0",
+    "workflow": "^5.6.1",
     "zod": "^4.6.7",
     "zustand": "^5.1.0"
   },

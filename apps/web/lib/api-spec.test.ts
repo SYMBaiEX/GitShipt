@@ -46,17 +46,21 @@ describe("buildOpenApiSpec", () => {
     expect(json).toContain("#/components/schemas/");
   });
 
-  it("every operation declares a 200/2xx response", () => {
+  it("active operations declare a 2xx response; deprecated endpoints document their replacement status", () => {
     for (const [path, ops] of Object.entries(spec.paths)) {
       for (const [method, op] of Object.entries(
         ops as Record<string, unknown>,
       )) {
-        const responses = (op as { responses?: Record<string, unknown> })
-          .responses;
+        const { responses, deprecated } = op as {
+          responses?: Record<string, unknown>;
+          deprecated?: boolean;
+        };
         expect(responses, `${method} ${path} has no responses`).toBeDefined();
         const codes = Object.keys(responses ?? {});
         expect(
-          codes.some((c) => c.startsWith("2")),
+          deprecated
+            ? codes.includes("503")
+            : codes.some((c) => c.startsWith("2")),
           `${method} ${path} has no 2xx response`,
         ).toBe(true);
       }

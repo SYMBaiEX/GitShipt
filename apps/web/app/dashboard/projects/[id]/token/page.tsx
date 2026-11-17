@@ -23,8 +23,6 @@ import { Button } from "@repo/ui";
 import { CopyButton } from "@/components/shared";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-import { StartIncorporationButton } from "./_components/StartIncorporationButton";
-import { IncorporationStatusCard } from "@/components/bags/IncorporationStatusCard";
 import { DexscreenerUpsellCard } from "@/components/bags/DexscreenerUpsellCard";
 import { getActiveDexscreenerOrderForProject } from "@/lib/queries/dexscreener-orders";
 import { solscanTokenUrl, solscanTxUrl } from "@/lib/solana/explorer";
@@ -53,10 +51,6 @@ async function TokenPageContent({
   const payouts = await getProjectPayoutHistory(id, 20);
   const completed = payouts.filter((p) => p.status === "completed");
   const contributorBps = 10_000 - project.platformFeeBps;
-  const incorporation =
-    project.tokenMint && hasCredentials.bags()
-      ? await bags.getIncorporationDetails(project.tokenMint).catch(() => null)
-      : null;
   const dexscreenerOrder = await getActiveDexscreenerOrderForProject(id);
 
   return (
@@ -156,20 +150,6 @@ async function TokenPageContent({
           )}
         </CardContent>
       </Card>
-
-      <IncorporationStatusCard
-        tokenMint={project.tokenMint}
-        incorporation={incorporation}
-        action={
-          <StartIncorporationButton
-            projectId={id}
-            disabled={
-              project.status !== "live" ||
-              incorporation?.incorporationStarted === true
-            }
-          />
-        }
-      />
 
       <DexscreenerUpsellCard
         projectId={id}

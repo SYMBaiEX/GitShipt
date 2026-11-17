@@ -1,100 +1,25 @@
 import "server-only";
 import { Buffer } from "node:buffer";
-import { z } from "zod";
 import { hasCredentials } from "@/lib/env";
 import { bags } from "@/lib/bags/client";
 import { normalizeBagsTransaction } from "@/lib/bags/transactions";
+import {
+  ProjectTradeQuoteResponseSchema,
+  ProjectTradeSwapResponseSchema,
+  TradeQuoteResponseSchema,
+  type ProjectTradeQuoteResponse,
+  type ProjectTradeSwapResponse,
+  type TradeQuoteResponse,
+} from "@/lib/bags/types";
+export {
+  ProjectTradeQuoteRequestSchema,
+  ProjectTradeSwapRequestSchema,
+} from "@/lib/bags/types";
 
 export const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 
-const SolanaAddressSchema = z.string().min(32).max(64);
-const NumericStringSchema = z.string().regex(/^\d+$/);
-
-const TradeQuotePlatformFeeSchema = z
-  .object({
-    amount: NumericStringSchema,
-    feeAccount: SolanaAddressSchema,
-    feeBps: z.number().int().min(0).max(10_000),
-    segmenterFeeAmount: NumericStringSchema,
-    segmenterFeePct: z.number().min(0),
-  })
-  .passthrough();
-
-const TradeQuoteRoutePlanLegSchema = z
-  .object({
-    data: z.string().optional(),
-    inAmount: NumericStringSchema,
-    inputMint: SolanaAddressSchema,
-    inputMintDecimals: z.number().int().min(0).max(18).optional(),
-    marketKey: z.string().min(1).optional(),
-    outAmount: NumericStringSchema,
-    outputMint: SolanaAddressSchema,
-    outputMintDecimals: z.number().int().min(0).max(18).optional(),
-    venue: z.string().min(1),
-  })
-  .passthrough();
-
-export const TradeQuoteResponseSchema = z
-  .object({
-    contextSlot: z.number().int().nonnegative(),
-    inAmount: NumericStringSchema,
-    inputMint: SolanaAddressSchema,
-    minOutAmount: NumericStringSchema,
-    otherAmountThreshold: NumericStringSchema,
-    outAmount: NumericStringSchema,
-    outputMint: SolanaAddressSchema,
-    priceImpactPct: z.string().min(1),
-    routePlan: z.array(TradeQuoteRoutePlanLegSchema),
-    slippageBps: z.number().int().min(0).max(10_000),
-    outTransferFee: NumericStringSchema.optional(),
-    platformFee: TradeQuotePlatformFeeSchema.optional(),
-    requestId: z.string().min(1),
-    simulatedComputeUnits: z.number().int().nonnegative().nullable(),
-  })
-  .passthrough();
-export type TradeQuoteResponse = z.infer<typeof TradeQuoteResponseSchema>;
-
-export const ProjectTradeQuoteRequestSchema = z.object({
-  side: z.enum(["buy", "sell"]).default("buy"),
-  amount: z.number().int().positive().max(1_000_000_000_000),
-  slippageBps: z.number().int().min(1).max(1_000).default(100),
-});
-export type ProjectTradeQuoteRequest = z.infer<
-  typeof ProjectTradeQuoteRequestSchema
->;
-
-export const ProjectTradeQuoteResponseSchema = z.object({
-  tokenMint: SolanaAddressSchema,
-  side: z.enum(["buy", "sell"]),
-  quote: TradeQuoteResponseSchema,
-  inputDecimals: z.number().int().min(0).max(18),
-  outputDecimals: z.number().int().min(0).max(18),
-});
-export type ProjectTradeQuoteResponse = z.infer<
-  typeof ProjectTradeQuoteResponseSchema
->;
-
-export const ProjectTradeSwapRequestSchema = z.object({
-  quoteResponse: TradeQuoteResponseSchema,
-  userPublicKey: SolanaAddressSchema,
-});
-export type ProjectTradeSwapRequest = z.infer<
-  typeof ProjectTradeSwapRequestSchema
->;
-
-export const ProjectTradeSwapResponseSchema = z.object({
-  transactionBase64: z.string().min(1),
-  computeUnitLimit: z.number().int().nonnegative(),
-  lastValidBlockHeight: z.number().int().positive(),
-  prioritizationFeeLamports: z.number().int().nonnegative(),
-});
-export type ProjectTradeSwapResponse = z.infer<
-  typeof ProjectTradeSwapResponseSchema
->;
-
 export function tradingCredentialsReady():
-  | { ok: true }
-  | { ok: false; code: string; message: string } {
+  { ok: true } | { ok: false; code: string; message: string } {
   if (!hasCredentials.bags()) {
     return {
       ok: false,

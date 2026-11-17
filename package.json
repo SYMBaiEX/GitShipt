@@ -12,6 +12,7 @@
     "packages/*"
   ],
   "overrides": {
+    "@bagsfm/bags-sdk": { "@solana/web3.js": "1.99.0" },
     "@neondatabase/serverless": "^1.1.0",
     "axios": "^1.15.2",
     "bigint-buffer": "file:./packages/bigint-buffer",
@@ -49,7 +50,7 @@
     "env:check": "NODE_ENV=production bun scripts/check-production-env.mjs",
     "env:template": "bun scripts/check-production-env.mjs --print-template",
     "security:patches": "node scripts/check-picomatch-patches.mjs",
-    "security:audit": "bun run security:patches && bun scripts/check-bun-audit.mjs",
+    "security:audit": "bun scripts/check-bun-audit.mjs",
     "bun:http3:check": "bun scripts/check-bun-http3.mjs",
     "theme:export": "bun scripts/theme-export.mjs",
     "theme:lint": "bun scripts/theme-lint.mjs",

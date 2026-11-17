@@ -7,6 +7,7 @@ import {
 import { payoutSigner } from "@/lib/solana/signer";
 import bs58 from "bs58";
 import { z } from "zod";
+import type { BagsSDK } from "@bagsfm/bags-sdk";
 import {
   TokenInfoInputSchema,
   SolanaAddressSchema,
@@ -34,10 +35,6 @@ import {
   DexscreenerAvailabilitySchema,
   DexscreenerOrderInputSchema,
   DexscreenerOrderSchema,
-  IncorporationInputSchema,
-  IncorporationPaymentSchema,
-  IncorporationProjectSchema,
-  StartIncorporationResponseSchema,
   SubmitTransactionResponseSchema,
   LaunchTransactionInputSchema,
   LaunchTransactionResultSchema,
@@ -68,10 +65,6 @@ import {
   type DexscreenerAvailability,
   type DexscreenerOrderInput,
   type DexscreenerOrder,
-  type IncorporationInput,
-  type IncorporationPayment,
-  type IncorporationProject,
-  type StartIncorporationResponse,
   type BagsProvider,
   type FeeClaimer,
   type LaunchTransactionResult,
@@ -105,170 +98,7 @@ import { decodePartnerConfig } from "./partner-config";
  * Bags shape across version drift.
  */
 
-type BagsSdk = {
-  tokenLaunch: {
-    createTokenInfoAndMetadata: (input: {
-      name: string;
-      symbol: string;
-      description: string;
-      imageUrl: string;
-      website?: string;
-      twitter?: string;
-      telegram?: string;
-    }) => Promise<{
-      tokenMint: string;
-      tokenMetadata: string;
-    }>;
-    createLaunchTransaction: (input: {
-      metadataUrl: string;
-      tokenMint: unknown;
-      launchWallet: unknown;
-      initialBuyLamports: number;
-      configKey: unknown;
-    }) => Promise<unknown>;
-  };
-  state: {
-    getConnection: () => unknown;
-    getTokenLifetimeFees: (tokenMint: unknown) => Promise<number>;
-    getLaunchWalletV2Bulk: (
-      items: Array<{ username: string; provider: BagsProvider }>,
-    ) => Promise<
-      Array<{
-        username: string;
-        provider: string;
-        wallet: unknown | null;
-        platformData: unknown | null;
-      }>
-    >;
-    getTokenCreators: (tokenMint: unknown) => Promise<unknown[]>;
-    getTopTokensByLifetimeFees: () => Promise<unknown[]>;
-    getPoolConfigKeysByFeeClaimerVaults: (
-      feeClaimerVaults: unknown[],
-    ) => Promise<unknown[]>;
-    getTokenClaimStats: (tokenMint: unknown) => Promise<unknown[]>;
-    getTokenClaimEvents: (
-      tokenMint: unknown,
-      options?: { limit?: number; offset?: number },
-    ) => Promise<unknown[]>;
-  };
-  config: {
-    createBagsFeeShareConfig: (input: {
-      payer: unknown;
-      admin?: unknown;
-      baseMint: unknown;
-      feeClaimers: Array<{ user: unknown; userBps: number }>;
-      partner?: unknown;
-      partnerConfig?: unknown;
-      bagsConfigType?: string;
-    }) => Promise<{
-      transactions?: unknown[];
-      bundles?: unknown[][];
-      meteoraConfigKey: unknown;
-    }>;
-  };
-  fee: {
-    getAllClaimablePositions: (wallet: unknown) => Promise<unknown[]>;
-    getClaimTransactions: (
-      wallet: unknown,
-      mint: unknown,
-    ) => Promise<unknown[]>;
-  };
-  partner: {
-    getPartnerConfig: (wallet: unknown) => Promise<unknown>;
-    getPartnerConfigCreationTransaction: (
-      partner: unknown,
-    ) => Promise<{ transaction: unknown; blockhash: unknown }>;
-    getPartnerConfigClaimStats: (partner: unknown) => Promise<unknown>;
-    getPartnerConfigClaimTransactions: (
-      partner: unknown,
-    ) => Promise<Array<{ transaction: unknown; blockhash: unknown }>>;
-  };
-  trade: {
-    getQuote: (params: {
-      inputMint: unknown;
-      outputMint: unknown;
-      amount: number;
-      slippageMode?: "manual" | "auto";
-      slippageBps?: number;
-    }) => Promise<unknown>;
-    createSwapTransaction: (params: {
-      quoteResponse: TradeQuoteResponse;
-      userPublicKey: unknown;
-    }) => Promise<unknown>;
-  };
-  feeShareAdmin: {
-    getAdminTokenMints: (wallet: unknown) => Promise<string[]>;
-    getTransferAdminTransaction: (params: {
-      baseMint: unknown;
-      currentAdmin: unknown;
-      newAdmin: unknown;
-      payer: unknown;
-    }) => Promise<{ transaction: unknown; blockhash: unknown }>;
-    getUpdateConfigTransactions: (params: {
-      baseMint: unknown;
-      payer: unknown;
-      feeClaimers: Array<{ user: unknown; userBps: number }>;
-      additionalLookupTables?: unknown[];
-    }) => Promise<Array<{ transaction: unknown; blockhash: unknown }>>;
-  };
-  dexscreener: {
-    checkOrderAvailability: (params: {
-      tokenAddress: unknown;
-    }) => Promise<unknown>;
-    createOrder: (params: {
-      tokenAddress: unknown;
-      description: string;
-      iconImageUrl: string;
-      headerImageUrl: string;
-      payerWallet: unknown;
-      links?: Array<{ url: string; label?: string }>;
-      payWithSol?: boolean;
-    }) => Promise<unknown>;
-    submitPayment: (params: {
-      orderUUID: string;
-      paymentSignature: string;
-    }) => Promise<string>;
-  };
-  incorporation: {
-    startPayment: (input: {
-      payerWallet: unknown;
-      payWithSol?: boolean;
-    }) => Promise<unknown>;
-    incorporate: (input: {
-      orderUUID: string;
-      paymentSignature: string;
-      projectName: string;
-      tokenAddress: unknown;
-      founders: Array<{
-        firstName: string;
-        lastName: string;
-        email: string;
-        nationalityCountry: string;
-        taxResidencyCountry: string;
-        residentialAddress: string;
-        shareBasisPoint: number;
-      }>;
-      incorporationShareBasisPoint: number;
-      preferredCompanyNames: string[];
-      category?: string;
-      twitterHandle?: string;
-    }) => Promise<unknown>;
-    getDetails: (input: { tokenAddress: unknown }) => Promise<unknown>;
-    list: () => Promise<unknown[]>;
-    startIncorporation: (input: { tokenAddress: unknown }) => Promise<unknown>;
-  };
-};
-
-type BagsSdkModule = {
-  BagsSDK: new (
-    apiKey: string,
-    connection: unknown,
-    commitment: "processed",
-  ) => BagsSdk;
-};
-
-let _sdk: BagsSdk | null = null;
-let _sdkModule: BagsSdkModule | null = null;
+let _sdk: BagsSDK | null = null;
 
 const DEMO_TOKEN_MINT = "GShiptDemoMint111111111111111111111111111111";
 const STUB_TOKEN_SUFFIX = "ags1111111111111111111111111111111111111";
@@ -294,7 +124,7 @@ function bagsFmUrl(path = ""): string {
   return new URL(path, "https://bags.fm/").toString();
 }
 
-async function getSdk(): Promise<BagsSdk> {
+async function getSdk(): Promise<BagsSDK> {
   if (_sdk) return _sdk;
   const env = serverEnv();
   if (!env.BAGS_API_KEY) {
@@ -303,17 +133,16 @@ async function getSdk(): Promise<BagsSdk> {
   if (!env.HELIUS_RPC_URL) {
     throw new Error("HELIUS_RPC_URL is required for Bags SDK.");
   }
-  const [sdkModule, { Connection }] = await Promise.all([
+  const [{ BagsSDK }, { Connection }] = await Promise.all([
     import("@bagsfm/bags-sdk"),
     import("@solana/web3.js"),
   ]);
-  _sdkModule = sdkModule as unknown as BagsSdkModule;
   const conn = new Connection(env.HELIUS_RPC_URL, "processed");
-  _sdk = new _sdkModule.BagsSDK(env.BAGS_API_KEY, conn, "processed");
+  _sdk = new BagsSDK(env.BAGS_API_KEY, conn, "processed");
   return _sdk;
 }
 
-async function tryGetSdk(): Promise<BagsSdk | null> {
+async function tryGetSdk(): Promise<BagsSDK | null> {
   try {
     return await getSdk();
   } catch (error) {
@@ -696,7 +525,9 @@ export const bags = {
   async getAdminTokenMints(wallet: string): Promise<string[]> {
     const { PublicKey } = await import("@solana/web3.js");
     const sdk = await getSdk();
-    const result = await sdk.feeShareAdmin.getAdminTokenMints(new PublicKey(wallet));
+    const result = await sdk.feeShareAdmin.getAdminTokenMints(
+      new PublicKey(wallet),
+    );
     return z.array(z.string().min(32).max(44)).parse(result);
   },
   hasCredentials: hasCredentials.bags,
@@ -799,6 +630,15 @@ export const bags = {
       env,
     );
     const payer = new PublicKey(validated.payer);
+    const requestedConfig = validated.bagsConfigType ?? env.BAGS_CONFIG_TYPE;
+    const bagsConfigType = requestedConfig
+      ? Object.values((await import("@bagsfm/bags-sdk")).BAGS_CONFIG_TYPE).find(
+          (value) => value === requestedConfig,
+        )
+      : undefined;
+    if (requestedConfig && !bagsConfigType) {
+      throw new Error("Unsupported Bags fee configuration type.");
+    }
     const result = await sdk.config.createBagsFeeShareConfig({
       payer,
       admin: validated.admin ? new PublicKey(validated.admin) : undefined,
@@ -808,7 +648,7 @@ export const bags = {
       partnerConfig: partnerConfigKey
         ? new PublicKey(partnerConfigKey)
         : undefined,
-      bagsConfigType: validated.bagsConfigType ?? env.BAGS_CONFIG_TYPE,
+      bagsConfigType,
     });
 
     const signer = payoutSigner();
@@ -935,7 +775,7 @@ export const bags = {
       );
     }
     return bagsRest("token-launch/fee-share/wallet/v2", ResolvedWalletSchema, {
-      query: { provider, username },
+      query: { provider, username, chain: "SOL" },
     });
   },
 
@@ -967,6 +807,7 @@ export const bags = {
     const items = handles.map(({ provider, username }) => ({
       provider,
       username,
+      chain: "SOL" as const,
     }));
     const raw = await sdk.state.getLaunchWalletV2Bulk(items);
     return raw.map((entry) =>
@@ -1458,7 +1299,11 @@ export const bags = {
     const { PublicKey } = await import("@solana/web3.js");
     const sdk = await tryGetSdk();
     return sdk
-      ? z.array(SolanaAddressSchema).parse(await sdk.feeShareAdmin.getAdminTokenMints(new PublicKey(wallet)))
+      ? z
+          .array(SolanaAddressSchema)
+          .parse(
+            await sdk.feeShareAdmin.getAdminTokenMints(new PublicKey(wallet)),
+          )
       : (
           await bagsRest(
             "fee-share/admin/list",
@@ -1500,7 +1345,8 @@ export const bags = {
   async getUpdateFeeShareConfigTransactions(
     input: FeeShareAdminUpdateConfigInput,
   ): Promise<TransactionWithBlockhash[]> {
-    if (!hasCredentials.bags()) throw new Error("BAGS_API_KEY is required for fee-share admin updates.");
+    if (!hasCredentials.bags())
+      throw new Error("BAGS_API_KEY is required for fee-share admin updates.");
     const validated = FeeShareAdminUpdateConfigInputSchema.parse(input);
     const { PublicKey } = await import("@solana/web3.js");
     const sdk = await tryGetSdk();
@@ -1595,81 +1441,6 @@ export const bags = {
           method: "POST",
           body: JSON.stringify(args),
         });
-  },
-
-  async startIncorporationPayment(args: {
-    payerWallet: string;
-    payWithSol?: boolean;
-  }): Promise<IncorporationPayment> {
-    if (!hasCredentials.bags()) {
-      throw new Error("BAGS_API_KEY is required for incorporation payments.");
-    }
-    const [{ PublicKey }, sdk] = await Promise.all([
-      import("@solana/web3.js"),
-      getSdk(),
-    ]);
-    const raw = await sdk.incorporation.startPayment({
-      payerWallet: new PublicKey(args.payerWallet),
-      payWithSol: args.payWithSol,
-    });
-    return IncorporationPaymentSchema.parse(raw);
-  },
-
-  async submitIncorporation(
-    input: IncorporationInput,
-  ): Promise<IncorporationProject> {
-    if (!hasCredentials.bags()) {
-      throw new Error("BAGS_API_KEY is required for incorporation.");
-    }
-    const validated = IncorporationInputSchema.parse(input);
-    const [{ PublicKey }, sdk] = await Promise.all([
-      import("@solana/web3.js"),
-      getSdk(),
-    ]);
-    const raw = await sdk.incorporation.incorporate({
-      ...validated,
-      tokenAddress: new PublicKey(validated.tokenAddress),
-    });
-    return IncorporationProjectSchema.parse(raw);
-  },
-
-  async getIncorporationDetails(
-    tokenAddress: string,
-  ): Promise<IncorporationProject | null> {
-    if (!hasCredentials.bags() || isPlaceholderTokenMint(tokenAddress)) {
-      return null;
-    }
-    const [{ PublicKey }, sdk] = await Promise.all([
-      import("@solana/web3.js"),
-      getSdk(),
-    ]);
-    const raw = await sdk.incorporation.getDetails({
-      tokenAddress: new PublicKey(tokenAddress),
-    });
-    return IncorporationProjectSchema.parse(raw);
-  },
-
-  async listIncorporations(): Promise<IncorporationProject[]> {
-    if (!hasCredentials.bags()) return [];
-    const sdk = await getSdk();
-    const raw = await sdk.incorporation.list();
-    return raw.map((project) => IncorporationProjectSchema.parse(project));
-  },
-
-  async startIncorporation(
-    tokenAddress: string,
-  ): Promise<StartIncorporationResponse> {
-    if (!hasCredentials.bags()) {
-      throw new Error("BAGS_API_KEY is required for incorporation.");
-    }
-    const [{ PublicKey }, sdk] = await Promise.all([
-      import("@solana/web3.js"),
-      getSdk(),
-    ]);
-    const raw = await sdk.incorporation.startIncorporation({
-      tokenAddress: new PublicKey(tokenAddress),
-    });
-    return StartIncorporationResponseSchema.parse(raw);
   },
 };
 

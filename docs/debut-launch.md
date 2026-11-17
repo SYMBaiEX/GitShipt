@@ -119,14 +119,22 @@ creator-side rate is zero. Referral attribution remains `symbiex`.
 
 Core versions: Bun 1.4.4, Node 26 LTS, Next 16.4.6, React 19.3.1,
 TypeScript compiler 7.0.2, ESLint 10.15, Better Auth 1.7.25, Bags SDK 1.4.4,
-Workflow 5.5.0. TypeScript's version-6 API runs alongside the native v7 compiler
+Workflow 5.6.1. TypeScript's version-6 API runs alongside the native v7 compiler
 for compatible framework/lint integrations. Solana web3 stays on its v1 family
 for Bags compatibility. HTTP/3 remains experimental and is not enabled.
 
-The high/critical dependency audit passes without exceptions. A pure-JavaScript
+The high/critical audit allows only the documented, expiring exception for
+the two verified patched versions of `picomatch`. A pure-JavaScript
 `bigint-buffer` replacement avoids the unpatched vulnerable native binding;
 clean frozen installation and SDK resolution were checked. Moderate transitive
 advisories remain. See [security notes](security-audit-exceptions.md).
+
+The Bags client uses the SDK's exported TypeScript types and validates its
+responses at the boundary. Existing SOL launches, fee shares, and trading use
+the documented SOL endpoints; newer custom-quote and Trade V2 contracts are
+not wire-compatible drop-in replacements. The incorporation route remains
+authenticated but returns `503` without contacting Bags: the public SDK and
+current API index do not expose incorporation.
 
 Verified locally for the owner-rewards release:
 

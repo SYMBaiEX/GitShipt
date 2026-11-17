@@ -63,7 +63,7 @@ function ThemeAwareImage({
 }
 
 /**
- * Landing page — viewport-locked bento on lg+, scrollable column on mobile.
+ * Landing page — two-column on wide screens, single reading order on mobile.
  *
  *   Row 1 (flex-1): Hero (cols 1-8) | Featured project: GitShipt (cols 9-12)
  *   Row 2 (auto):   4 live KPI cells, full width
@@ -96,71 +96,55 @@ async function LandingPageContent() {
   const tickerCellKeys = getLandingTickerCellKeys(ticker);
 
   return (
-    <div className="gitshipt-landing-page flex flex-col gap-3 lg:h-[calc(100vh-4.5rem)] lg:gap-3 lg:overflow-visible lg:pt-8 lg:pb-7">
+    <div className="gitshipt-landing-page flex min-w-0 flex-col gap-5 lg:gap-6 lg:py-7">
       <TokenLaunchCarousel launches={latestLaunches} />
 
-      {/* ── Row 1: two columns ─────────────────────────────────────
-              Left  (cols 1-7): hero text on top, featured project below
-              Right (cols 8-12): mia visual
-        */}
-      {/*
-          Two-column layout uses `lg:contents` on each column wrapper so
-          children flow as direct grid items below lg. That lets us reorder
-          via `order-*` so the mobile reading flow is: text → visual →
-          featured-project → CTAs, instead of text → featured → visual → CTAs.
-        */}
-      <div className="mx-auto grid w-full grid-cols-1 gap-4 overflow-visible lg:min-h-0 lg:max-w-[1128px] lg:grid-cols-[minmax(480px,520px)_minmax(0,608px)] lg:items-center lg:justify-center lg:gap-0 2xl:max-w-[1420px] 2xl:grid-cols-[minmax(420px,560px)_minmax(0,860px)]">
-        <div className="contents lg:flex lg:min-h-0 lg:flex-col lg:items-center lg:justify-center lg:gap-6 lg:py-4">
-          <section className="order-1 flex flex-col items-start gap-4 lg:order-none lg:w-[480px] lg:gap-5">
-            <h1 className="text-display text-fg">
-              Your repo, <span className="text-fg-muted">tokenized.</span>
-            </h1>
+      <div className="mx-auto grid w-full max-w-[1340px] grid-cols-[minmax(0,1fr)] items-center gap-5 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] xl:gap-x-8">
+        <section className="flex min-w-0 flex-col items-start gap-4 xl:col-start-1 xl:row-start-1 xl:self-end">
+          <h1 className="text-display text-fg">
+            Your repo, <span className="text-fg-muted">tokenized.</span>
+          </h1>
 
-            <p className="max-w-xl text-body-md text-fg-secondary">
-              Launch a Bags.fm token for an eligible personal GitHub repository.
-              The linked owner wallet receives creator rewards through Bags.
-              Contribution rankings are informational.
-            </p>
+          <p className="max-w-xl text-body-md text-fg-secondary">
+            Launch a Bags.fm token for an eligible personal GitHub repository.
+            The linked owner wallet receives creator rewards through Bags.
+            Contribution rankings are informational.
+          </p>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-caption">
-              <Link
-                href="https://github.com/SYMBaiEX/gitshipt"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex items-center gap-1.5 text-fg-muted transition-colors hover:text-fg"
-              >
-                <Github className="size-3.5" aria-hidden />
-                SYMBaiEX/gitshipt
-                <ArrowUpRight className="size-3" />
-              </Link>
-              <LiveIndicator lastSyncAt={indexerHeartbeat} label="Indexer" />
-            </div>
-          </section>
-
-          <div className="order-3 flex w-full flex-col gap-10 lg:order-none lg:w-[480px]">
-            <div className="w-full lg:max-h-[240px] lg:min-h-0">
-              <FeaturedProjectCard
-                header={featuredHeader}
-                contributors={featuredContribs}
-              />
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Button asChild variant="primary" size="lg">
-                <Link href="/launch">
-                  Launch a token
-                  <ArrowUpRight className="size-4" aria-hidden />
-                </Link>
-              </Button>
-              <Button asChild variant="secondary" size="lg">
-                <Link href="/explore">Browse projects</Link>
-              </Button>
-            </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-caption">
+            <Link
+              href="https://github.com/SYMBaiEX/gitshipt"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex items-center gap-1.5 text-fg-muted transition-colors hover:text-fg"
+            >
+              <Github className="size-3.5" aria-hidden />
+              SYMBaiEX/gitshipt
+              <ArrowUpRight className="size-3" />
+            </Link>
+            <LiveIndicator lastSyncAt={indexerHeartbeat} label="Indexer" />
           </div>
-        </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Button asChild variant="primary" size="lg">
+              <Link href="/launch">
+                Launch a token
+                <ArrowUpRight className="size-4" aria-hidden />
+              </Link>
+            </Button>
+            <Button asChild variant="secondary" size="lg">
+              <Link href="/explore">Browse projects</Link>
+            </Button>
+          </div>
+        </section>
 
-        <div className="contents lg:flex lg:min-h-0 lg:flex-col lg:justify-center lg:gap-0 lg:overflow-visible">
+        <div className="min-w-0 xl:col-start-2 xl:row-span-2 xl:row-start-1">
           <HeroArtwork />
+        </div>
+        <div className="min-w-0 xl:col-start-1 xl:row-start-2 xl:self-start">
+          <FeaturedProjectCard
+            header={featuredHeader}
+            contributors={featuredContribs}
+          />
         </div>
       </div>
 
@@ -189,7 +173,7 @@ function TokenLaunchCarousel({ launches }: { launches: LandingLaunchToken[] }) {
   return (
     <section
       aria-label="Newest token launches"
-      className="mx-auto overflow-x-auto lg:w-[1088px] 2xl:w-[1120px]"
+      className="mx-auto w-full max-w-[1340px] overflow-x-auto"
     >
       <div className="flex w-max gap-2 py-1">
         {launches.map((launch, index) => (
@@ -327,8 +311,8 @@ function FeaturedProjectCard({
         padding="lg"
         className="flex h-full items-center justify-center text-center"
       >
-        <p className="text-body-sm text-fg-muted">
-          Featured project not seeded yet.
+        <p className="text-body-sm text-fg-secondary">
+          The GitShipt debut token hasn’t launched yet.
         </p>
       </Card>
     );

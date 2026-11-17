@@ -30,7 +30,11 @@ async function WalletAuthPageContent() {
   }
 
   return (
-    <div className="grid min-h-screen place-items-center bg-app-gradient px-6 py-12">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="grid min-h-dvh place-items-center bg-app-gradient px-6 py-12 outline-none"
+    >
       <div className="w-full max-w-md rounded-xl border border-border bg-surface p-8 shadow-card-elevated surface-highlight">
         <Link
           href="/"
@@ -60,6 +64,6 @@ async function WalletAuthPageContent() {
           Solana wallet standard.
         </p>
       </div>
-    </div>
+    </main>
   );
 }

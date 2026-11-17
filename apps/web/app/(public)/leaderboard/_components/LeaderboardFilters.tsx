@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
 import { Search } from "lucide-react";
 import { cn } from "@repo/lib";
 import { Input } from "@repo/ui";
@@ -83,8 +89,7 @@ export function LeaderboardFilters({ mode }: { mode: Mode }) {
       />
 
       <div className="flex flex-wrap items-center gap-2 md:ml-auto">
-        <div
-          role="tablist"
+        <nav
           aria-label="Leaderboard view"
           className="gb-control-cluster inline-flex items-center gap-0.5 rounded-md border border-border/60 bg-bg/40 p-0.5"
         >
@@ -94,8 +99,7 @@ export function LeaderboardFilters({ mode }: { mode: Mode }) {
               <Link
                 key={value}
                 href={href}
-                role="tab"
-                aria-selected={on}
+                aria-current={on ? "page" : undefined}
                 className={cn(
                   "rounded-md border px-3 py-1.5 text-label-md transition-[background-color,border-color,box-shadow,color,transform]",
                   on
@@ -108,7 +112,7 @@ export function LeaderboardFilters({ mode }: { mode: Mode }) {
               </Link>
             );
           })}
-        </div>
+        </nav>
         {isPending ? (
           <span
             role="status"

@@ -85,7 +85,7 @@ async function DocsPageContent() {
             today counts in full; a contribution 29 days ago counts at 1/30).
             The default formula:
           </p>
-          <pre className="overflow-x-auto rounded-lg border border-border bg-surface p-4 text-mono-sm text-fg">
+          <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-surface p-4 text-mono-sm text-fg">
             {
               "score = 3.0 × PRs\n      + 1.0 × commits\n      + 1.5 × reviews\n      + 0.5 × issues\n      + 0.2 × log10(1 + netLines)"
             }
@@ -148,7 +148,7 @@ async function DocsPageContent() {
             <span className="text-mono-sm text-fg">380×360</span>.
           </p>
           <div className="relative">
-            <pre className="overflow-x-auto rounded-lg border border-border bg-surface p-4 pr-12 text-mono-sm text-fg">
+            <pre className="whitespace-pre-wrap break-words rounded-lg border border-border bg-surface p-4 pr-14 text-mono-sm text-fg">
               {EMBED_SNIPPET}
             </pre>
             <span className="absolute right-2 top-2">

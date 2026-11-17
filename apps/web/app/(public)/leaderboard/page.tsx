@@ -69,7 +69,7 @@ async function LeaderboardPageContent({
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      <h1 className="sr-only">Global leaderboard</h1>
+      <h1 className="text-headline-lg">Global leaderboard</h1>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <LeaderboardFilters mode={mode} />
         <LiveIndicator lastSyncAt={indexerHeartbeat} label="Indexer" />

@@ -31,8 +31,7 @@ export function TokenInfoCard({
           No token launched
         </div>
         <p className="mt-2 flex-1 text-body-sm text-fg-muted">
-          Launch a Bags.fm token for {ghOwner}/{ghRepo} to start the daily fee
-          pool and reward contributors.
+          {ghOwner}/{ghRepo} does not have a Bags.fm token yet.
         </p>
         <Link
           href="/launch"

@@ -119,9 +119,8 @@ export function ExploreFilters() {
           })}
         </div>
 
-        <label className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-bg/40 px-3 text-label-md text-fg focus-within:border-border-strong">
+        <label className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-md border border-border/60 bg-bg/40 px-3 text-label-md text-fg focus-within:outline-2 focus-within:outline-focus-ring">
           <span className="text-fg-muted">Sort</span>
-          <span className="text-mono-sm text-fg-secondary">·</span>
           <select
             value={sort}
             disabled={isPending}
@@ -132,7 +131,7 @@ export function ExploreFilters() {
                 else p.set("sort", nextSort);
               })
             }
-            className="h-9 bg-transparent pr-6 text-label-md text-fg outline-none"
+            className="min-h-11 min-w-0 bg-transparent text-label-md text-fg outline-none lg:min-h-9"
             aria-label="Sort projects"
           >
             {SORT_OPTIONS.map(({ key, label }) => (

@@ -7,12 +7,7 @@ import { cn } from "@repo/lib";
 /**
  * Mobile-only hamburger button that toggles the sidebar drawer.
  *
- * Renders a small floating glass square anchored to the top-left of the
- * content area. On `lg+` (desktop) the inline sidebar takes over and this
- * trigger is hidden.
- *
- * Must live inside a `<SidebarProvider>` (the app shells already wrap their
- * children in one). Place it at the top of `<main>` so it's always reachable.
+ * Lives in the persistent mobile header, inside a SidebarProvider.
  */
 export function MobileSidebarTrigger({ className }: { className?: string }) {
   const { mobileOpen, toggleMobile } = useSidebar();
@@ -21,18 +16,23 @@ export function MobileSidebarTrigger({ className }: { className?: string }) {
       type="button"
       onClick={toggleMobile}
       aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
+      aria-haspopup="dialog"
+      data-mobile-nav-trigger
       aria-expanded={mobileOpen}
       className={cn(
         "lg:hidden",
         "gb-control gb-control-icon gb-control-secondary inline-flex size-11 items-center justify-center rounded-md",
-        "border border-border/60",
-        "glass surface-highlight",
+        "shrink-0 border border-border/60",
         "text-fg-secondary hover:text-fg",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
         className,
       )}
     >
-      {mobileOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+      {mobileOpen ? (
+        <X aria-hidden className="size-4" />
+      ) : (
+        <Menu aria-hidden className="size-4" />
+      )}
     </button>
   );
 }

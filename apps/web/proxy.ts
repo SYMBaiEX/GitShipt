@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { hasAuthCookie } from "@/lib/auth/cookies";
+import { hasCredentials } from "@/lib/env";
 
 /**
  * Next.js 16 proxy (renamed from middleware.ts in Next 15-).
@@ -12,7 +13,7 @@ import { hasAuthCookie } from "@/lib/auth/cookies";
  *
  * What this file does:
  *   1. Set the enforced response CSP for HTML routes.
- *   2. Send unauthenticated requests to /dashboard/* to /auth/signin?next=...
+ *   2. Send anonymous dashboard and enabled admin requests to sign-in.
  *   3. Strip `x-middleware-subrequest` if a client tries to set it.
  *
  * CSP currently uses the standard Next/Vercel-compatible inline-script
@@ -86,7 +87,7 @@ function buildContentSecurityPolicy({ isEmbed }: { isEmbed: boolean }) {
     "base-uri 'self'",
     "form-action 'self'",
     "object-src 'none'",
-    "upgrade-insecure-requests",
+    ...(isDev ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
 }
 
@@ -114,18 +115,16 @@ export function proxy(req: NextRequest) {
   // authorization always happens inside the route handler.
   const hasSession = hasAuthCookie(req.cookies);
 
-  if (pathname.startsWith("/dashboard")) {
-    if (!hasSession) {
-      const signin = url.clone();
-      signin.pathname = "/auth/signin";
-      signin.searchParams.set("next", pathname + url.search);
-      return setCspHeader(NextResponse.redirect(signin), csp);
-    }
+  const isDashboard =
+    pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+  if (!hasSession && (isDashboard || (isAdmin && hasCredentials.db()))) {
+    const signin = url.clone();
+    signin.pathname = "/auth/signin";
+    signin.search = "";
+    signin.searchParams.set("next", pathname + url.search);
+    return setCspHeader(NextResponse.redirect(signin), csp);
   }
-
-  // /admin pages are loaded only after the route handler revalidates the
-  // session and confirms the global role. We do nothing extra here so the
-  // route's own revalidation is the security boundary.
 
   return setCspHeader(
     NextResponse.next({ request: { headers: incoming } }),

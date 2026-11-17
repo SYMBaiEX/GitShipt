@@ -20,14 +20,13 @@ export function TokenStatsRow({ stats }: { stats: TokenStats | null }) {
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-surface/40 px-3 py-2.5">
         <div className="text-body-sm text-fg-secondary">
-          No token launched —{" "}
+          No token has launched for this repository.{" "}
           <Link
             href="/launch"
-            className="font-medium text-primary-readable hover:underline"
+            className="font-medium text-primary-readable underline underline-offset-4"
           >
-            launch one
-          </Link>{" "}
-          to start the daily fee pool.
+            Launch a token
+          </Link>
         </div>
       </div>
     );

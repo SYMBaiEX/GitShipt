@@ -13,6 +13,7 @@ import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { cacheTags } from "@/lib/cache";
+import { hasCredentials } from "@/lib/env";
 
 /**
  * Discovery queries — back the public browse surfaces (/explore, /u/[username],
@@ -77,6 +78,7 @@ export interface ExploreFilters {
 async function getAllPublicProjectsUncached(
   filters: ExploreFilters,
 ): Promise<PublicProjectRow[]> {
+  if (!hasCredentials.db()) return [];
   const limit = filters.limit ?? 60;
   const status = filters.status ?? "all";
   const sort = filters.sort ?? "trending";

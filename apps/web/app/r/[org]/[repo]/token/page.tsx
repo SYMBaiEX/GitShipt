@@ -89,10 +89,12 @@ async function ProjectTokenPageContent({ params }: { params: Params }) {
         ]}
       />
 
+      <h1 className="text-headline-md">Token</h1>
+
       {!hasLiveToken || !stats || !header.tokenMint ? (
         <Card depth="raised" padding="default" className="text-center">
           <Coins className="mx-auto size-10 text-fg-muted" aria-hidden />
-          <CardTitle className="mt-3 justify-center">
+          <CardTitle as="h2" className="mt-3 justify-center">
             {header.status === "launch_configured"
               ? "Launch configured"
               : "No token launched"}
@@ -100,7 +102,7 @@ async function ProjectTokenPageContent({ params }: { params: Params }) {
           <CardDescription className="mt-1 mx-auto max-w-md">
             {header.status === "launch_configured"
               ? "Bags token metadata and fee sharing are configured, but the final launch transaction has not been broadcast yet."
-              : `${header.ghOwner}/${header.ghRepo} hasn't been minted on Bags.fm yet. The owner can launch from the dashboard to start the daily fee pool.`}
+              : `${header.ghOwner}/${header.ghRepo} has not launched a token on Bags.fm yet.`}
           </CardDescription>
           <Button asChild variant="primary" size="default" className="mt-4">
             <Link href="/launch">Launch a token</Link>
@@ -119,7 +121,7 @@ async function ProjectTokenPageContent({ params }: { params: Params }) {
 
             <Card depth="raised" padding="default">
               <CardHeader>
-                <CardTitle>Token economics</CardTitle>
+                <CardTitle as="h2">Token economics</CardTitle>
               </CardHeader>
               <CardContent className="mt-4 flex flex-col gap-4">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

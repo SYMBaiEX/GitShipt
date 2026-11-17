@@ -63,4 +63,13 @@ test.describe("public routing", () => {
     expect(body.name).toBe("GitShipt");
     expect(body.display).toBe("standalone");
   });
+
+  test("project share previews render a PNG", async ({ request }) => {
+    const response = await request.get("/r/SYMBaiEX/gitshipt/opengraph-image");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toMatch(/^image\/png/);
+    expect((await response.body()).subarray(0, 8).toString("hex")).toBe(
+      "89504e470d0a1a0a",
+    );
+  });
 });

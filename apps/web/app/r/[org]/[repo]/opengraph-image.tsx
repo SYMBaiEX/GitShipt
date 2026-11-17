@@ -1,8 +1,9 @@
 import { ImageResponse } from "next/og";
+import { rewardModeOf } from "@repo/shared";
 
 import { getProjectPageData } from "@/lib/queries/project-page";
 
-export const alt = "GitShipt project leaderboard";
+export const alt = "GitShipt repository and rewards";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -10,8 +11,7 @@ type Params = { org: string; repo: string };
 
 /**
  * Generative OG card for the public project page. Pulls the same data the
- * page renders (project name, token symbol, daily fee total) so a shared
- * link previews with live numbers rather than a static placeholder.
+ * page renders so a shared link previews the relevant repository and rewards.
  *
  * Deliberately monochrome with mono numerics so it matches the brand and
  * works on every social platform's preview cropping.
@@ -27,6 +27,11 @@ export default async function ProjectOgImage({
   const language = data?.header.language ?? null;
   const ghOwner = data?.header.ghOwner ?? org;
   const ghRepo = data?.header.ghRepo ?? repo;
+  const rewards = data
+    ? rewardModeOf(data.header.payoutConfig) === "owner"
+      ? "Owner rewards and contributor rankings"
+      : "Contributor rewards and rankings"
+    : "Repository tokens on Solana";
 
   return new ImageResponse(
     <div
@@ -56,14 +61,14 @@ export default async function ProjectOgImage({
       >
         <div>GitShipt</div>
         <div style={{ fontFamily: "ui-monospace, monospace" }}>
-          {ghOwner}/{ghRepo}
+          {`${ghOwner}/${ghRepo}`}
         </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <div
           style={{
-            fontSize: 88,
+            fontSize: name.length > 24 ? 60 : 88,
             lineHeight: 1.05,
             fontWeight: 700,
             color: "#fafafa",
@@ -109,7 +114,7 @@ export default async function ProjectOgImage({
           fontSize: 22,
         }}
       >
-        <div>Trade fees → top contributors, every 24h</div>
+        <div>{rewards}</div>
         <div style={{ fontFamily: "ui-monospace, monospace" }}>
           gitshipt.com
         </div>

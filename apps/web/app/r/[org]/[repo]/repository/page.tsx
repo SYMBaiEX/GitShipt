@@ -71,10 +71,12 @@ async function ProjectRepositoryPageContent({ params }: { params: Params }) {
         ]}
       />
 
+      <h1 className="text-headline-md">Repository</h1>
+
       {/* Public repo info */}
       <Card depth="raised" padding="default">
         <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>GitHub repository</CardTitle>
+          <CardTitle as="h2">GitHub repository</CardTitle>
           <Button asChild variant="ghost" size="sm">
             <Link href={repoUrl} target="_blank" rel="noreferrer noopener">
               Open on GitHub <ArrowUpRight className="size-3.5" />
@@ -110,7 +112,7 @@ async function ProjectRepositoryPageContent({ params }: { params: Params }) {
       {/* Indexer state */}
       <Card depth="raised" padding="default">
         <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>Indexer status</CardTitle>
+          <CardTitle as="h2">Indexer status</CardTitle>
           <Badge
             variant={installed ? "success" : "warning"}
             dot={installed}
@@ -177,7 +179,7 @@ async function ProjectRepositoryPageContent({ params }: { params: Params }) {
       {/* What's tracked */}
       <Card depth="raised" padding="default">
         <CardHeader>
-          <CardTitle>What feeds the leaderboard</CardTitle>
+          <CardTitle as="h2">What feeds the leaderboard</CardTitle>
         </CardHeader>
         <CardContent className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Signal
@@ -212,14 +214,14 @@ async function ProjectRepositoryPageContent({ params }: { params: Params }) {
         Want a deeper look? See the{" "}
         <Link
           href={`/r/${header.ghOwner}/${header.ghRepo}/snapshots`}
-          className="text-fg-secondary underline-offset-4 hover:text-fg hover:underline"
+          className="text-fg-secondary underline underline-offset-4 hover:text-fg"
         >
           snapshot ledger
         </Link>{" "}
         for every freeze, or read the{" "}
         <Link
           href="/docs"
-          className="text-fg-secondary underline-offset-4 hover:text-fg hover:underline"
+          className="text-fg-secondary underline underline-offset-4 hover:text-fg"
         >
           scoring docs
         </Link>

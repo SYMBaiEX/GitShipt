@@ -15,6 +15,147 @@
 @import "tailwindcss";
 @source "../../../packages/ui/src";
 
+/* The navigation bars occupy their own space instead of covering content. */
+.gb-app-frame {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.gb-app-content {
+  scroll-padding-block: 1rem;
+}
+
+.gb-mobile-header {
+  padding: calc(0.375rem + env(safe-area-inset-top))
+    max(1rem, env(safe-area-inset-right)) 0.375rem
+    max(1rem, env(safe-area-inset-left));
+}
+
+.gb-mobile-dock {
+  flex-shrink: 0;
+  padding: 0.25rem max(0.5rem, env(safe-area-inset-right))
+    calc(0.25rem + env(safe-area-inset-bottom))
+    max(0.5rem, env(safe-area-inset-left));
+  box-shadow:
+    0 -1px 0 color-mix(in oklab, var(--fg) 6%, transparent),
+    0 -8px 20px color-mix(in oklab, var(--bg) 38%, transparent);
+}
+
+.gb-mobile-tab[aria-current="page"] {
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--fg) 14%, transparent),
+    var(--shadow-press);
+}
+
+.gb-navigation-sheet {
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+
+.gb-navigation-sheet [data-slot="sheet-close"] {
+  top: calc(0.375rem + env(safe-area-inset-top));
+}
+
+@media (width < 64rem) {
+  .gb-app-content {
+    padding-inline: max(1rem, env(safe-area-inset-left))
+      max(1rem, env(safe-area-inset-right));
+  }
+}
+
+@media (pointer: coarse) {
+  :is(input, textarea, select).gb-field-control:not([type="range"]) {
+    min-height: var(--control-touch-target);
+    font-size: max(1rem, 16px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-slot="sheet-overlay"][data-state="open"],
+  [data-slot="dialog-overlay"][data-state="open"],
+  [data-slot="alert-dialog-overlay"][data-state="open"] {
+    animation: gb-fade-in 150ms ease-out both;
+  }
+  [data-slot="sheet-overlay"][data-state="closed"],
+  [data-slot="dialog-overlay"][data-state="closed"],
+  [data-slot="alert-dialog-overlay"][data-state="closed"] {
+    animation: gb-fade-out 130ms ease-in both;
+  }
+  [data-slot="sheet-content"][data-side="left"][data-state="open"] {
+    animation: gb-sheet-in 230ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  [data-slot="sheet-content"][data-side="left"][data-state="closed"] {
+    animation: gb-sheet-out 160ms ease-in both;
+  }
+  [data-slot="dialog-content"][data-state="open"],
+  [data-slot="alert-dialog-content"][data-state="open"] {
+    animation: gb-fade-in 170ms ease-out both;
+  }
+  [data-slot="dialog-content"][data-state="closed"],
+  [data-slot="alert-dialog-content"][data-state="closed"] {
+    animation: gb-fade-out 130ms ease-in both;
+  }
+}
+
+@keyframes gb-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes gb-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes gb-sheet-in {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes gb-sheet-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(
+    [data-slot="sheet-content"],
+    [data-slot="sheet-overlay"],
+    [data-slot="dialog-content"],
+    [data-slot="dialog-overlay"]
+  ) {
+    transition: none;
+  }
+  :is(.animate-spin, .animate-pulse) {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  :is(.gb-route-link, .gb-control, .gb-field-control):focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+  .gb-mobile-tab[aria-current="page"] {
+    outline: 1px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
 /* ============================================================
  * Dark palette (canonical default). Mirrors DESIGN.md `colors:`
  * ============================================================ */
@@ -89,7 +230,7 @@
 
   /* Controls */
   --control-touch-target: 2.75rem;
-  --focus-ring: color-mix(in oklab, var(--primary) 86%, transparent);
+  --focus-ring: var(--primary-readable);
   --focus-ring-soft: color-mix(in oklab, var(--primary) 28%, transparent);
 }
 
@@ -1035,7 +1176,9 @@
 }
 
 @utility animate-pulse-dot {
-  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) 2;
+  }
 }
 
 /* ============================================================
@@ -1652,7 +1795,11 @@ body {
   --hero-art-soft-shadow: rgb(72 54 34 / 0.1);
   --hero-art-tight-shadow: rgb(72 54 34 / 0.12);
   --hero-art-rim-light: rgb(255 255 255 / 0.62);
-  --hero-art-gold-rim: color-mix(in oklab, var(--primary-readable) 18%, transparent);
+  --hero-art-gold-rim: color-mix(
+    in oklab,
+    var(--primary-readable) 18%,
+    transparent
+  );
   --hero-stage-aura:
     radial-gradient(
       ellipse at 64% 52%,
@@ -1762,7 +1909,7 @@ body {
 }
 
 .gitshipt-ship-float {
-  animation: gitshipt-ship-bob 5.6s ease-in-out infinite;
+  animation: gitshipt-ship-bob 4.4s ease-in-out 1;
   isolation: isolate;
   overflow: visible;
   transform-origin: center bottom;
@@ -1778,8 +1925,16 @@ body {
   height: 24%;
   border-radius: var(--radius-full);
   background:
-    radial-gradient(ellipse at center, var(--hero-ship-contact-shadow), transparent 72%),
-    radial-gradient(ellipse at center, var(--hero-stage-floor-glow), transparent 74%);
+    radial-gradient(
+      ellipse at center,
+      var(--hero-ship-contact-shadow),
+      transparent 72%
+    ),
+    radial-gradient(
+      ellipse at center,
+      var(--hero-stage-floor-glow),
+      transparent 74%
+    );
   content: "";
   filter: blur(8px);
   opacity: var(--hero-ship-contact-opacity);
@@ -1821,8 +1976,7 @@ body {
     drop-shadow(0 3px 2px var(--hero-art-tight-shadow))
     drop-shadow(0 -1px 0 var(--hero-art-rim-light));
   will-change: transform;
-  animation: gitshipt-flag-anchor-sway 8.4s cubic-bezier(0.25, 1, 0.5, 1)
-    infinite;
+  animation: gitshipt-flag-anchor-sway 4.4s cubic-bezier(0.25, 1, 0.5, 1) 1;
   perspective: 360px;
 }
 
@@ -1832,8 +1986,16 @@ body {
   inset: 18% 4% 15% 10%;
   border-radius: var(--radius-full);
   background:
-    radial-gradient(ellipse at 58% 56%, var(--hero-flag-contact-shadow), transparent 70%),
-    radial-gradient(ellipse at 50% 50%, var(--hero-stage-floor-glow), transparent 76%);
+    radial-gradient(
+      ellipse at 58% 56%,
+      var(--hero-flag-contact-shadow),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse at 50% 50%,
+      var(--hero-stage-floor-glow),
+      transparent 76%
+    );
   content: "";
   filter: blur(9px);
   opacity: var(--hero-flag-contact-opacity);
@@ -1845,7 +2007,7 @@ body {
   z-index: 1;
   filter: none;
   transform-origin: 18% 52%;
-  animation: gitshipt-flag-cloth 7.8s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  animation: gitshipt-flag-cloth 4.4s cubic-bezier(0.45, 0, 0.2, 1) 1;
   will-change: transform;
 }
 
@@ -1873,13 +2035,12 @@ body {
 
 @keyframes gitshipt-flag-cloth {
   0% {
-    transform: translate3d(0, 0, 0) rotateZ(-0.12deg) skewY(-0.18deg)
-      scaleX(1);
+    transform: translate3d(0, 0, 0) rotateZ(-0.12deg) skewY(-0.18deg) scaleX(1);
   }
 
   24% {
-    transform: translate3d(0.25px, -0.7px, 0) rotateZ(0.12deg)
-      skewY(0.2deg) scaleX(1.004);
+    transform: translate3d(0.25px, -0.7px, 0) rotateZ(0.12deg) skewY(0.2deg)
+      scaleX(1.004);
   }
 
   52% {
@@ -1888,13 +2049,12 @@ body {
   }
 
   76% {
-    transform: translate3d(0.18px, -0.35px, 0) rotateZ(-0.04deg)
-      skewY(0.16deg) scaleX(1.002);
+    transform: translate3d(0.18px, -0.35px, 0) rotateZ(-0.04deg) skewY(0.16deg)
+      scaleX(1.002);
   }
 
   100% {
-    transform: translate3d(0, 0, 0) rotateZ(-0.12deg) skewY(-0.18deg)
-      scaleX(1);
+    transform: translate3d(0, 0, 0) rotateZ(-0.12deg) skewY(-0.18deg) scaleX(1);
   }
 }
 

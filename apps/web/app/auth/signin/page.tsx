@@ -9,20 +9,21 @@ export default function SignInPage({
   searchParams: Promise<{ next?: string | string[] }>;
 }) {
   return (
-    <Suspense
-      fallback={
-        <main
-          id="main-content"
-          className="grid min-h-screen place-items-center bg-bg px-6 py-12"
-        >
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="grid min-h-dvh place-items-center bg-bg px-4 py-8 sm:px-6 sm:py-12"
+    >
+      <Suspense
+        fallback={
           <p role="status" className="text-body-md text-fg-secondary">
             Loading sign in...
           </p>
-        </main>
-      }
-    >
-      <SignInContent searchParams={searchParams} />
-    </Suspense>
+        }
+      >
+        <SignInContent searchParams={searchParams} />
+      </Suspense>
+    </main>
   );
 }
 

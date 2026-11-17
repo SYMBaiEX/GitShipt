@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -112,6 +112,13 @@ export function WizardShell({
     | { status: "error"; message: string }
   >({ status: "idle" });
   const step = useLaunchWizardStore((state) => state.step);
+  const stageRef = useRef<HTMLElement>(null);
+  const previousStep = useRef(step);
+  useEffect(() => {
+    if (previousStep.current === step) return;
+    previousStep.current = step;
+    stageRef.current?.focus();
+  }, [step]);
   const repo = useLaunchWizardStore((state) => state.repo);
   const metadata = useLaunchWizardStore((state) => state.metadata);
   const leaderboard = useLaunchWizardStore((state) => state.leaderboard);
@@ -466,18 +473,24 @@ export function WizardShell({
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-4 sm:px-6 lg:py-6">
-      <h1 className="sr-only">Launch a repo token</h1>
-      <StepIndicator current={step} />
+    <div className="mx-auto w-full max-w-4xl py-3 sm:px-6 lg:py-6">
+      <h1 className="mb-4 text-headline-lg">Launch a repo token</h1>
+      {signedIn ? <StepIndicator current={step} /> : null}
 
       {draft ? (
         <DraftResumeBanner ghOwner={draft.ghOwner} ghRepo={draft.ghRepo} />
       ) : null}
 
       <section
-        className={cn(
-          "mt-3 rounded-lg border border-border bg-surface/70 p-4 lg:p-5",
-        )}
+        ref={stageRef}
+        tabIndex={-1}
+        aria-label={
+          signedIn
+            ? `Step ${step} of 4: ${STEP_LABELS[step]}`
+            : "GitHub sign-in"
+        }
+        aria-busy={status === "submitting"}
+        className="relative mt-3 rounded-md border border-border bg-surface p-4 shadow-card-elevated outline-none focus-visible:outline-2 focus-visible:outline-primary-readable sm:p-6"
       >
         {!signedIn ? (
           <SignedOutPrompt />
@@ -1012,57 +1025,55 @@ export function TestModeBanner({ className }: { className?: string }) {
 // Step indicator
 // ============================================================
 
+const STEP_LABELS: Record<LaunchWizardStep, string> = {
+  1: "Repo",
+  2: "Token",
+  3: "Rewards",
+  4: "Launch",
+};
+
 function StepIndicator({ current }: { current: LaunchWizardStep }) {
   const steps = [1, 2, 3, 4] as const;
-  const labels: Record<LaunchWizardStep, string> = {
-    1: "Repo",
-    2: "Token",
-    3: "Rewards",
-    4: "Launch",
-  };
   return (
     <ol
-      className="flex items-center gap-1 overflow-x-auto pb-1 [scrollbar-width:none]"
+      className="grid grid-cols-4 gap-1 rounded-md border border-border bg-surface p-1 shadow-inset-light"
       aria-label="Wizard steps"
     >
       {steps.map((s) => {
         const state =
           s < current ? "done" : s === current ? "current" : "future";
         return (
-          <li key={s} className="flex shrink-0 items-center gap-1.5">
+          <li
+            key={s}
+            aria-current={state === "current" ? "step" : undefined}
+            className={cn(
+              "flex min-w-0 flex-col items-center justify-center gap-1 rounded-sm px-0.5 py-2 text-center sm:flex-row sm:gap-2",
+              state === "current" && "bg-primary-soft shadow-press",
+            )}
+          >
             <span
               className={cn(
                 "grid size-5 place-items-center rounded-full text-mono-sm font-medium",
                 state === "current" &&
                   "bg-primary text-primary-fg shadow-inset-light",
                 state === "done" &&
-                  "border border-success bg-success-soft text-success",
+                  "border border-border-strong bg-surface-elevated text-fg-secondary",
                 state === "future" &&
                   "border border-border-strong text-fg-muted",
               )}
-              aria-current={state === "current" ? "step" : undefined}
             >
               {s}
             </span>
             <span
               className={cn(
-                "text-label-sm whitespace-nowrap",
+                "text-label-sm [overflow-wrap:anywhere]",
                 state === "current" && "text-fg",
                 state === "done" && "text-fg-secondary",
                 state === "future" && "text-fg-muted",
               )}
             >
-              {labels[s]}
+              {STEP_LABELS[s]}
             </span>
-            {s < 4 ? (
-              <span
-                className={cn(
-                  "mx-1 h-px w-6 sm:w-12",
-                  state === "done" ? "bg-success" : "bg-border",
-                )}
-                aria-hidden
-              />
-            ) : null}
           </li>
         );
       })}

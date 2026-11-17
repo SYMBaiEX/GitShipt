@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { connection } from "next/server";
@@ -31,12 +31,20 @@ const geistMono = Geist_Mono({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "rgb(8, 8, 12)" },
+    { media: "(prefers-color-scheme: light)", color: "rgb(250, 250, 252)" },
+  ],
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   ),
   title: {
-    default: "GitShipt — tokenize your repo, pay your contributors",
+    default: "GitShipt · GitHub repository token launchpad",
     template: "%s · GitShipt",
   },
   description:
@@ -55,7 +63,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "GitShipt",
-    title: "GitShipt — tokenize your repo, pay your contributors",
+    title: "GitShipt · GitHub repository token launchpad",
     description:
       "Launch a Bags.fm token for an eligible personal GitHub repository with owner rewards.",
     images: [{ url: "/content.png", width: 1600, height: 900 }],

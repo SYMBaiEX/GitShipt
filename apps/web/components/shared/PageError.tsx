@@ -53,7 +53,7 @@ export function PageError({
         className="flex w-full max-w-md flex-col items-center gap-3 text-center"
       >
         <AlertTriangle className="size-16 text-danger" aria-hidden />
-        <h2 className="text-headline-sm text-fg">{title}</h2>
+        <h1 className="text-headline-sm text-fg">{title}</h1>
         <p className="max-w-md text-body-md text-fg-secondary">
           {description ?? fallbackDescription}
         </p>

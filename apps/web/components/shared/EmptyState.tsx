@@ -19,6 +19,7 @@ export interface EmptyStateProps {
    * full-page empty states (404 / not-found) where a card would compete.
    */
   bordered?: boolean;
+  heading?: "h1" | "h2";
   className?: string;
 }
 
@@ -40,12 +41,13 @@ export function EmptyState({
   cta,
   secondary,
   bordered = false,
+  heading: Heading = "h2",
   className,
 }: EmptyStateProps) {
   const inner = (
     <>
       <Icon className="size-16 text-fg-muted" aria-hidden />
-      <h2 className="text-headline-sm text-fg">{title}</h2>
+      <Heading className="text-headline-sm text-fg">{title}</Heading>
       {description ? (
         <p className="max-w-md text-body-md text-fg-secondary">{description}</p>
       ) : null}

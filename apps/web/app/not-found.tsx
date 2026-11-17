@@ -7,8 +7,13 @@ import { EmptyState } from "@/components/shared/EmptyState";
  */
 export default function NotFound() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-bg p-4">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="flex min-h-dvh items-center justify-center bg-bg p-4 outline-none"
+    >
       <EmptyState
+        heading="h1"
         icon={Frown}
         title="Page not found"
         description="This page doesn't exist or may have been moved."

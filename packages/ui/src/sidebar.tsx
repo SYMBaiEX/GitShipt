@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@repo/lib";
 import { createUiStore, useUiStoreValue, type UiStore } from "./ui-store";
+import { Sheet, SheetContent, SheetTitle } from "./sheet";
 
 /**
  * Sidebar primitive — shadcn-composable, macOS Tahoe / Liquid Glass aesthetic.
@@ -147,19 +148,15 @@ export function SidebarProvider({
     (state) => state.closeSidebarMobile,
   );
 
-  // Lock body scroll when the mobile drawer is open + close on Escape.
   React.useEffect(() => {
     if (!mobileOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closeSidebarMobile();
+    const desktop = window.matchMedia("(min-width: 64rem)");
+    const closeOnDesktop = () => {
+      if (desktop.matches) closeSidebarMobile();
     };
-    document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
+    closeOnDesktop();
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => desktop.removeEventListener("change", closeOnDesktop);
   }, [closeSidebarMobile, mobileOpen]);
 
   return (
@@ -177,45 +174,35 @@ export function Sidebar({
   "aria-label": ariaLabel = "App navigation",
   ...props
 }: React.HTMLAttributes<HTMLElement>) {
-  const { collapsed, mobileOpen, closeMobile } = useSidebar();
+  const { collapsed, mobileOpen, setMobileOpen } = useSidebar();
   return (
     <>
-      {/* Mobile backdrop — only mounted while the drawer is open, < lg only. */}
-      {mobileOpen ? (
-        <button
-          type="button"
-          aria-label="Close navigation"
-          onClick={closeMobile}
-          className={cn(
-            "fixed inset-0 z-40 bg-bg/60 backdrop-blur-sm lg:hidden",
-            "transition-opacity duration-200",
-          )}
-        />
-      ) : null}
-
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent
+          side="left"
+          aria-describedby={undefined}
+          className="gb-navigation-sheet gap-0 lg:hidden [&_[data-sidebar-header]]:pr-16"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            const trigger = document.querySelector<HTMLElement>(
+              "[data-mobile-nav-trigger]",
+            );
+            const target = trigger?.getClientRects().length
+              ? trigger
+              : document.getElementById("main-content");
+            target?.focus({ preventScroll: true });
+          }}
+        >
+          <SheetTitle className="sr-only">{ariaLabel}</SheetTitle>
+          {children}
+        </SheetContent>
+      </Sheet>
       <aside
         data-gitshipt-sidebar="true"
         data-collapsed={collapsed ? "true" : "false"}
-        data-mobile-open={mobileOpen ? "true" : "false"}
         aria-label={ariaLabel}
         className={cn(
-          // ── Mobile (< lg): slide-over drawer pinned to the left.
-          // The shell shows it via `fixed` + a translateX transform. We always
-          // render the aside (so its internal state survives) and only toggle
-          // visibility/transform; no layout shift.
-          "fixed inset-y-0 left-0 z-50 m-3 flex flex-col",
-          "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
-          mobileOpen ? "translate-x-0" : "-translate-x-[110%]",
-          // Mobile drawer is always at the expanded width — collapsing only
-          // applies on desktop where the icon rail is useful.
-          "w-[260px]",
-
-          // ── Desktop (lg+): inline column inside the app-shell flex layout.
-          // Reset the mobile-only positioning, drop the m-3 (the parent owns
-          // the gutter on lg+), restore inline flow, and apply the collapse
-          // width transition.
-          "lg:static lg:inset-auto lg:m-0 lg:translate-x-0 lg:transition-[width]",
-          "lg:h-full lg:shrink-0",
+          "hidden h-full shrink-0 flex-col motion-safe:transition-[width] lg:flex",
           collapsed ? "lg:w-[68px]" : "lg:w-[260px]",
 
           // Surface
@@ -227,7 +214,7 @@ export function Sidebar({
         )}
         {...props}
       >
-        {children}
+        {!mobileOpen ? children : null}
       </aside>
     </>
   );
@@ -244,6 +231,7 @@ export function SidebarHeader({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
+      data-sidebar-header
       className={cn(
         "flex h-14 items-center gap-2 px-3 shrink-0",
         "border-b border-border/40",
@@ -398,6 +386,7 @@ export function SidebarItem({
       return (
         <a
           href={href}
+          aria-current={active ? "page" : undefined}
           target="_blank"
           rel="noreferrer noopener"
           className={className}
@@ -411,9 +400,10 @@ export function SidebarItem({
     return (
       <Link
         href={href}
+        aria-current={active ? "page" : undefined}
         className={className}
         title={collapsed ? label : undefined}
-        onClick={handleClick}
+        onNavigate={handleClick}
       >
         {inner}
       </Link>

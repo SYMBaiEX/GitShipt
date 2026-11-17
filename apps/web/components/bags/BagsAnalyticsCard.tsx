@@ -37,7 +37,7 @@ export function BagsAnalyticsCard({
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Bags analytics</CardTitle>
+            <CardTitle as="h2">Bags analytics</CardTitle>
           </div>
           {stats.isStub || pool.isStub ? (
             <Badge variant="warning" size="sm">

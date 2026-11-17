@@ -95,7 +95,7 @@ export function LiveIndicator({
 
   const dotClass =
     tone === "fresh"
-      ? "bg-success animate-pulse"
+      ? "bg-success animate-pulse-dot"
       : tone === "warn"
         ? "bg-warning"
         : "bg-danger";

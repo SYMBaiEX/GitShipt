@@ -69,11 +69,11 @@ async function ExplorePageContent({
 
   return (
     <div className="flex flex-col gap-6 lg:gap-8">
-      <h1 className="sr-only">Explore projects</h1>
+      <h1 className="text-headline-lg">Explore projects</h1>
       <FiltersBar />
 
       <div className="flex items-center justify-between">
-        <span className="text-caption text-fg-muted">
+        <span role="status" className="text-caption text-fg-muted">
           {projects.length === 0
             ? "0 projects"
             : projects.length === 1
@@ -85,7 +85,7 @@ async function ExplorePageContent({
       {projects.length === 0 ? (
         <EmptyState hasFilters={hasFilters} />
       ) : (
-        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-4">
           {projects.map((p) => (
             <li key={p.id}>
               <ProjectCard project={p} />

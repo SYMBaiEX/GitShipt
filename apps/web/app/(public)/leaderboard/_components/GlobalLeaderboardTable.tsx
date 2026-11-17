@@ -60,7 +60,12 @@ export function GlobalLeaderboardTable(
 
 function ContributorList({ rows }: { rows: GlobalLeaderboardEntry[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div
+      className="overflow-x-auto focus-visible:outline-offset-[-2px]"
+      role="region"
+      aria-label="Contributor ranking columns"
+      tabIndex={0}
+    >
       <div
         role="table"
         aria-label="Global contributor rankings"
@@ -100,27 +105,28 @@ function ContributorList({ rows }: { rows: GlobalLeaderboardEntry[] }) {
               <div role="cell" className="flex items-center">
                 <RankMedal rank={row.rank} />
               </div>
-              <Link
-                href={`/u/${row.ghUsername}`}
-                role="cell"
-                className="flex min-w-0 items-center gap-3 transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              >
-                <Image
-                  src={row.avatarUrl}
-                  alt=""
-                  width={32}
-                  height={32}
-                  className="size-8 shrink-0 rounded-lg bg-surface-elevated"
-                />
-                <div className="min-w-0">
-                  <div className="truncate text-body-md text-fg">
-                    {row.ghUsername}
+              <div role="cell" className="min-w-0">
+                <Link
+                  href={`/u/${row.ghUsername}`}
+                  className="flex min-h-11 min-w-0 items-center gap-3 rounded-md hover:underline"
+                >
+                  <Image
+                    src={row.avatarUrl}
+                    alt=""
+                    width={32}
+                    height={32}
+                    className="size-8 shrink-0 rounded-lg bg-surface-elevated"
+                  />
+                  <div className="min-w-0">
+                    <div className="truncate text-body-md text-fg">
+                      {row.ghUsername}
+                    </div>
+                    <div className="truncate text-body-sm text-fg-muted">
+                      @{row.ghUsername}
+                    </div>
                   </div>
-                  <div className="truncate text-body-sm text-fg-muted">
-                    @{row.ghUsername}
-                  </div>
-                </div>
-              </Link>
+                </Link>
+              </div>
               <div role="cell" className="text-right text-mono-md text-fg">
                 {formatSol(row.totalLifetimeLamports)}
               </div>
@@ -152,7 +158,12 @@ function ContributorList({ rows }: { rows: GlobalLeaderboardEntry[] }) {
 
 function ProjectList({ rows }: { rows: GlobalProjectEntry[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div
+      className="overflow-x-auto focus-visible:outline-offset-[-2px]"
+      role="region"
+      aria-label="Project ranking columns"
+      tabIndex={0}
+    >
       <div
         role="table"
         aria-label="Global project rankings"
@@ -188,32 +199,35 @@ function ProjectList({ rows }: { rows: GlobalProjectEntry[] }) {
               row.imageUrl ??
               `https://github.com/${row.slug.split("/")[0]}.png`;
             return (
-              <Link
+              <div
                 key={row.id}
-                href={`/r/${row.slug}?from=leaderboard`}
                 role="row"
-                aria-label={`Rank ${row.rank} ${row.name}`}
-                className="grid grid-cols-[56px_minmax(0,1fr)_140px_120px_120px] items-center gap-3 border-b border-border px-5 py-3 last:border-b-0 transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:px-6"
+                className="grid grid-cols-[56px_minmax(0,1fr)_140px_120px_120px] items-center gap-3 border-b border-border px-5 py-3 last:border-b-0 transition-colors hover:bg-surface-elevated lg:px-6"
               >
                 <div role="cell" className="flex items-center">
                   <RankMedal rank={row.rank} />
                 </div>
-                <div role="cell" className="flex min-w-0 items-center gap-3">
-                  <Image
-                    src={avatar}
-                    alt=""
-                    width={32}
-                    height={32}
-                    className="size-8 shrink-0 rounded-lg bg-surface-elevated"
-                  />
-                  <div className="min-w-0">
-                    <div className="truncate text-body-md text-fg">
-                      {row.name}
+                <div role="cell" className="min-w-0">
+                  <Link
+                    href={`/r/${row.slug}?from=leaderboard`}
+                    className="flex min-h-11 min-w-0 items-center gap-3 rounded-md hover:underline"
+                  >
+                    <Image
+                      src={avatar}
+                      alt=""
+                      width={32}
+                      height={32}
+                      className="size-8 shrink-0 rounded-lg bg-surface-elevated"
+                    />
+                    <div className="min-w-0">
+                      <div className="truncate text-body-md text-fg">
+                        {row.name}
+                      </div>
+                      <div className="truncate text-body-sm text-fg-muted">
+                        {row.slug}
+                      </div>
                     </div>
-                    <div className="truncate text-body-sm text-fg-muted">
-                      {row.slug}
-                    </div>
-                  </div>
+                  </Link>
                 </div>
                 <div role="cell" className="text-right text-mono-md text-fg">
                   {formatSol(row.lifetimeFeesLamports)}
@@ -230,7 +244,7 @@ function ProjectList({ rows }: { rows: GlobalProjectEntry[] }) {
                 >
                   {formatSol(row.dailyFeeLamports)}
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

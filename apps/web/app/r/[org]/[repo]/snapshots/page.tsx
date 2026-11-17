@@ -12,6 +12,11 @@ import { getProjectSnapshots } from "@/lib/queries/discovery";
 import { formatSol } from "@repo/lib";
 import { SnapshotRow } from "./_components/SnapshotRow";
 
+const SNAPSHOT_COLUMNS = {
+  owner: "xl:grid-cols-[minmax(0,1fr)_170px_96px]",
+  contributor: "xl:grid-cols-[minmax(0,1fr)_100px_85px_105px_150px_86px]",
+} as const;
+
 type Params = Promise<{ org: string; repo: string }>;
 
 export async function generateMetadata({
@@ -60,6 +65,7 @@ async function ProjectSnapshotsPageContent({
 
   const { header } = data;
   const ownerRewards = rewardModeOf(header.payoutConfig) === "owner";
+  const columns = SNAPSHOT_COLUMNS[ownerRewards ? "owner" : "contributor"];
   const slug = `${header.ghOwner}/${header.ghRepo}`;
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
 
@@ -90,6 +96,8 @@ async function ProjectSnapshotsPageContent({
           { label: "Snapshots" },
         ]}
       />
+
+      <h1 className="text-headline-md">Snapshots</h1>
 
       {ownerRewards ? (
         <p className="text-body-sm text-fg-secondary">
@@ -123,13 +131,18 @@ async function ProjectSnapshotsPageContent({
           <Empty />
         ) : (
           <>
-            <div className="grid grid-cols-[minmax(0,1fr)_110px_110px_140px_170px_96px] items-center gap-3 border-b border-border bg-surface-elevated/40 px-5 py-2.5 text-label-sm text-fg-muted">
+            <div
+              aria-hidden
+              className={`hidden items-center gap-3 border-b border-border bg-surface-elevated/40 px-5 py-2.5 text-label-sm text-fg-muted xl:grid ${columns}`}
+            >
               <div>When</div>
-              <div className="text-right">{ownerRewards ? "" : "Status"}</div>
-              <div className="text-right">
-                {ownerRewards ? "" : "Recipients"}
-              </div>
-              <div className="text-right">{ownerRewards ? "" : "Fees"}</div>
+              {!ownerRewards ? (
+                <>
+                  <div className="text-right">Status</div>
+                  <div className="text-right">Recipients</div>
+                  <div className="text-right">Fees</div>
+                </>
+              ) : null}
               <div className="text-right">Merkle root</div>
               <div />
             </div>
@@ -139,6 +152,7 @@ async function ProjectSnapshotsPageContent({
                   key={row.id}
                   row={row}
                   informational={ownerRewards}
+                  columns={columns}
                 />
               ))}
             </ul>

@@ -65,10 +65,11 @@ export function CardHeader({
 }
 
 export function CardTitle({
+  as: Heading = "h3",
   className,
   ...props
-}: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn("text-headline-sm", className)} {...props} />;
+}: React.HTMLAttributes<HTMLHeadingElement> & { as?: "h2" | "h3" | "h4" }) {
+  return <Heading className={cn("text-headline-sm", className)} {...props} />;
 }
 
 export function CardDescription({

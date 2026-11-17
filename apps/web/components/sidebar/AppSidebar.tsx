@@ -422,12 +422,6 @@ function adminGroups(): NavGroup[] {
           href: "/admin/projects/reconciliation",
         },
         {
-          key: "payouts",
-          label: "Payouts",
-          icon: Coins,
-          href: "/admin/payouts",
-        },
-        {
           key: "snapshots",
           label: "Snapshots",
           icon: History,
@@ -578,7 +572,9 @@ export function AppSidebar(props: AppSidebarProps) {
     return <AppSidebarContent {...props} fromOrigin={null} />;
   }
   return (
-    <React.Suspense fallback={<AppSidebarContent {...props} fromOrigin={null} />}>
+    <React.Suspense
+      fallback={<AppSidebarContent {...props} fromOrigin={null} />}
+    >
       <AppSidebarWithSearchParams {...props} />
     </React.Suspense>
   );
@@ -597,7 +593,7 @@ function AppSidebarContent({
 }: AppSidebarProps & { fromOrigin: string | null }) {
   const pathname = usePathname() ?? "/";
   const chromeUser = useSessionChrome();
-  const { collapsed } = useSidebar();
+  const { collapsed, closeMobile } = useSidebar();
   const setRouteChrome = useAuthenticatedRouteStore(
     (state) => state.setRouteChrome,
   );
@@ -659,6 +655,7 @@ function AppSidebarContent({
       <SidebarHeader>
         <Link
           href={brand.href}
+          onNavigate={closeMobile}
           className={cn(
             "flex min-w-0 items-center gap-2.5",
             collapsed && "lg:hidden",
@@ -758,16 +755,22 @@ function ReturnToLink({ href, label }: { href: string; label: string }) {
 }
 
 function FooterLegalRow({ isActive }: { isActive: (href: string) => boolean }) {
-  const { collapsed } = useSidebar();
-  if (collapsed) return null;
+  const { collapsed, closeMobile } = useSidebar();
   return (
-    <div className="flex items-center justify-between gap-3 px-1 pb-1 text-caption text-fg-muted">
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 px-1 text-caption text-fg-muted",
+        collapsed && "lg:hidden",
+      )}
+    >
       {LEGAL_LINKS.map(({ label, href }) => (
         <Link
           key={href}
           href={href}
+          onNavigate={closeMobile}
+          aria-current={isActive(href) ? "page" : undefined}
           className={cn(
-            "transition-colors hover:text-fg",
+            "flex min-h-11 items-center rounded-sm px-1 transition-colors hover:text-fg lg:min-h-6",
             isActive(href) && "text-fg",
           )}
         >

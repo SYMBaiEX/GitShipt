@@ -13,7 +13,9 @@ const HAS_E2E_DB = Boolean(
   process.env.POSTGRES_PRISMA_URL,
 );
 if (process.env.E2E_REQUIRE_DB === "1" && !HAS_E2E_DB) {
-  throw new Error("E2E_REQUIRE_DB=1 requires a staging DATABASE_URL/POSTGRES_URL.");
+  throw new Error(
+    "E2E_REQUIRE_DB=1 requires a staging DATABASE_URL/POSTGRES_URL.",
+  );
 }
 const regressionTest = HAS_E2E_DB ? test : test.skip;
 
@@ -137,41 +139,50 @@ async function visibleTextContrastFailures(page: Page) {
 
 test.describe("audit regression coverage", () => {
   regressionTest(
-    "mobile project footer does not overlap the daily fee pool value",
+    "mobile project navigation does not cover reward information",
     async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
       await requireOkPage(page, DEMO_PROJECT_PATH);
 
-      const poolCard = page
-        .getByRole("heading", { name: "Daily Fee Pool", level: 2 })
-        .locator("xpath=ancestor::section[1]");
-      await expect(poolCard).toBeVisible();
-      await poolCard.scrollIntoViewIfNeeded();
+      const heading = page
+        .getByRole("heading", {
+          name: /Daily Fee Pool|Owner rewards/i,
+          level: 2,
+        })
+        .first();
+      await expect(heading).toBeVisible();
+      await heading.scrollIntoViewIfNeeded();
+      const rewards = (await heading.boundingBox())!;
+      const navigation = (await page
+        .getByRole("navigation", {
+          name: "Quick navigation",
+        })
+        .boundingBox())!;
+      expect(rewards.y + rewards.height).toBeLessThanOrEqual(navigation.y);
+    },
+  );
 
-      const layout = await page.evaluate(() => {
-        const footer = document.querySelector("footer");
-        const heading = Array.from(document.querySelectorAll("h2")).find(
-          (el) => el.textContent?.trim() === "Daily Fee Pool",
-        );
-        const pool = heading?.closest("section") ?? null;
-        const amount = pool
-          ? Array.from(pool.querySelectorAll("div, span")).find((el) =>
-              /\bSOL\b/.test(el.textContent ?? ""),
-            )
-          : null;
-
-        if (!footer || !pool || !amount) return null;
-
-        const footerBox = footer.getBoundingClientRect();
-        const amountBox = amount.getBoundingClientRect();
-        return {
-          footerTop: footerBox.top,
-          amountBottom: amountBox.bottom,
-        };
-      });
-
-      expect(layout).not.toBeNull();
-      expect(layout!.amountBottom).toBeLessThanOrEqual(layout!.footerTop);
+  regressionTest(
+    "project share menu supports keyboard navigation and Escape",
+    async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await requireOkPage(page, DEMO_PROJECT_PATH);
+      const share = page.getByRole("button", { name: "Share", exact: true });
+      await share.focus();
+      await page.keyboard.press("ArrowDown");
+      const menu = page.getByRole("menu");
+      await expect(menu).toBeVisible();
+      await page.keyboard.press("Home");
+      await expect(
+        menu.getByRole("menuitem", { name: "Copy embed code" }),
+      ).toBeFocused();
+      await page.keyboard.press("End");
+      await expect(
+        menu.getByRole("menuitem", { name: "GitHub repository" }),
+      ).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(menu).not.toBeVisible();
+      await expect(share).toBeFocused();
     },
   );
 
@@ -220,8 +231,13 @@ test.describe("audit regression coverage", () => {
   regressionTest(
     "admin and project settings routes are gated without a session",
     async ({ page }) => {
+      const adminResponse = await page.request.get("/admin", {
+        maxRedirects: 0,
+      });
+      expect(adminResponse.status()).toBe(307);
       await page.goto("/admin");
       await expect(page).toHaveURL(/\/auth\/signin\?next=%2Fadmin$/);
+      await expect(page.getByRole("main")).toHaveCount(1);
 
       await page.goto("/dashboard/projects/project_demo/settings");
       await expect(page).toHaveURL(

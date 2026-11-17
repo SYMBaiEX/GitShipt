@@ -313,7 +313,7 @@ export function TradingPanel({
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Trade</CardTitle>
+            <CardTitle as="h2">Trade</CardTitle>
           </div>
           <Badge variant="default" size="sm">
             no KYC

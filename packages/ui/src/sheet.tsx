@@ -59,7 +59,7 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          "gb-panel-floating fixed z-50 flex flex-col gap-4 border-border bg-surface text-fg shadow-floating outline-none transition-transform",
+          "gb-panel-floating fixed z-50 flex max-h-dvh flex-col gap-4 overflow-y-auto overscroll-contain border-border bg-surface text-fg shadow-floating outline-none motion-safe:transition-transform",
           "data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t",
           "data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=left]:sm:max-w-sm",
           "data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=right]:sm:max-w-sm",
@@ -73,7 +73,7 @@ function SheetContent({
         {showCloseButton ? (
           <SheetPrimitive.Close
             data-slot="sheet-close"
-            className="gb-control gb-control-icon gb-control-ghost absolute right-4 top-4 inline-flex size-8 items-center justify-center rounded-md text-fg-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="gb-control gb-control-icon gb-control-ghost absolute right-3 top-3 inline-flex size-11 items-center justify-center rounded-md text-fg-muted hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <XIcon aria-hidden className="size-4" />
             <span className="sr-only">Close</span>

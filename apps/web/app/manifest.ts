@@ -8,7 +8,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "GitShipt",
     short_name: "GitShipt",
     description:
-      "Launch Bags.fm tokens for GitHub repos and route fees to contributors.",
+      "Launch Bags.fm tokens for eligible GitHub repositories with owner rewards.",
     start_url: "/",
     display: "standalone",
     background_color: canonicalDarkBg,

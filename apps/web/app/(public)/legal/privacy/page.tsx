@@ -213,7 +213,7 @@ async function PrivacyPageContent() {
             Privacy requests, deletion requests, and security reports:{" "}
             <a
               href="mailto:privacy@gitshipt.com"
-              className="text-fg underline-offset-4 hover:underline"
+              className="text-fg underline underline-offset-4"
             >
               privacy@gitshipt.com
             </a>
@@ -222,7 +222,7 @@ async function PrivacyPageContent() {
               href="https://github.com/SYMBaiEX/gitshipt"
               target="_blank"
               rel="noreferrer noopener"
-              className="text-fg underline-offset-4 hover:underline"
+              className="text-fg underline underline-offset-4"
             >
               github.com/SYMBaiEX/gitshipt
             </Link>

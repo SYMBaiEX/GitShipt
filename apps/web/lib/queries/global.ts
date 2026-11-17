@@ -321,6 +321,7 @@ async function getGlobalLeaderboardUncached(): Promise<{
   byContributor: GlobalLeaderboardEntry[];
   byProject: GlobalProjectEntry[];
 }> {
+  if (!hasCredentials.db()) return { byContributor: [], byProject: [] };
   const [contributorRows, projectRows] = await Promise.all([
     // Per (project, ghUsername) aggregate, then we collapse to per-username
     // in JS so we can pick the top project without a window function.

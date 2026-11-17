@@ -161,6 +161,11 @@ describe("recordLaunch — input validation", () => {
     expect(typeof result.feeShareConfigPda).toBe("string");
     expect(typeof result.feeShareConfigId).toBe("string");
   });
+  it("does not create a payout schedule for owner rewards", async () => {
+    const { recordLaunch } = await import("./launch-integration");
+    const result = await recordLaunch(baseInput([claimer(0, 10000)], { rewardMode: "owner" }));
+    expect(result.payoutScheduleId).toBeNull();
+  });
 
   it("accepts a 50-claimer split that sums to 10000 (default cap)", async () => {
     const { recordLaunch } = await import("./launch-integration");

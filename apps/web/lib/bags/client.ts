@@ -1458,7 +1458,7 @@ export const bags = {
     const { PublicKey } = await import("@solana/web3.js");
     const sdk = await tryGetSdk();
     return sdk
-      ? await sdk.feeShareAdmin.getAdminTokenMints(new PublicKey(wallet))
+      ? z.array(SolanaAddressSchema).parse(await sdk.feeShareAdmin.getAdminTokenMints(new PublicKey(wallet)))
       : (
           await bagsRest(
             "fee-share/admin/list",
@@ -1500,7 +1500,7 @@ export const bags = {
   async getUpdateFeeShareConfigTransactions(
     input: FeeShareAdminUpdateConfigInput,
   ): Promise<TransactionWithBlockhash[]> {
-    if (!hasCredentials.bags()) return [];
+    if (!hasCredentials.bags()) throw new Error("BAGS_API_KEY is required for fee-share admin updates.");
     const validated = FeeShareAdminUpdateConfigInputSchema.parse(input);
     const { PublicKey } = await import("@solana/web3.js");
     const sdk = await tryGetSdk();
@@ -1536,7 +1536,7 @@ export const bags = {
             },
           )
         ).transactions;
-    return transactions.map((tx) => TransactionWithBlockhashSchema.parse(tx));
+    return z.array(TransactionWithBlockhashSchema).min(1).parse(transactions);
   },
 
   async checkDexscreenerOrderAvailability(

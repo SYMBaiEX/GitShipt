@@ -53,6 +53,7 @@ export type AuditAction =
   | "bags.claim_events_ingested"
   | "bags.partner_key_created"
   | "bags.partner_fees_claimed"
+  | "bags.partner_claim_skipped"
   | "admin.partner_fees_claimed_manual"
   | "contributor.bot_flag_revalidated"
   | "fund.reconciliation_warning"

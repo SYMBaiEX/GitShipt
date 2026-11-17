@@ -69,13 +69,14 @@ export interface RecordLaunchInput {
   claimers: LaunchClaimerInput[];
   /** False while the fee config has not yet been verified on-chain. */
   isInitFinalized?: boolean;
+  rewardMode?: "owner" | "contributors";
   /** 72 (3d) | 120 (5d) | 168 (7d). Default is 72. */
   steadyStateCadenceHours: 72 | 120 | 168;
 }
 
 export interface RecordLaunchResult {
   feeShareConfigId: string;
-  payoutScheduleId: string;
+  payoutScheduleId: string | null;
   feeShareConfigPda: string;
 }
 
@@ -191,14 +192,14 @@ export async function recordLaunch(
         .from(payoutSchedules)
         .where(eq(payoutSchedules.projectId, input.projectId))
         .limit(1);
-      if (!schedule) {
+      if (!schedule && input.rewardMode !== "owner") {
         throw new Error(
           `recordLaunch: existing fee-share mirror for project ${input.projectId} is missing payout schedule`,
         );
       }
       return {
         feeShareConfigId: existing.id,
-        payoutScheduleId: schedule.id,
+        payoutScheduleId: schedule?.id ?? null,
         feeShareConfigPda: existing.feeShareConfigPda,
         inserted: false,
       };
@@ -240,6 +241,9 @@ export async function recordLaunch(
       })),
     );
 
+    if (input.rewardMode === "owner") {
+      return { feeShareConfigId, payoutScheduleId: null, feeShareConfigPda: feeShareConfigPda.toBase58(), inserted: true, nextRunAtISO: null };
+    }
     const now = new Date();
     const nextRunAt = new Date(
       now.getTime() + RAMP_UP_FIRST_RUN_HOURS * 3600 * 1000,

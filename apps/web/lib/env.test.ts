@@ -65,6 +65,12 @@ describe("mainnet launch gate", () => {
       reason: "BAGS_PARTNER_CONFIG_KEY missing",
     });
   });
+  it("requires a manager only for contributor-mode launches", async () => {
+    vi.stubEnv("SOLANA_MANAGER_KEYPAIR", "");
+    const { canLaunchOnBags } = await import("./env");
+    expect(canLaunchOnBags("owner")).toEqual({ ok: true });
+    expect(canLaunchOnBags("contributors")).toEqual({ ok: false, reason: "SOLANA_MANAGER_KEYPAIR missing" });
+  });
   it("respects the emergency stop", async () => {
     vi.stubEnv("EMERGENCY_KILL_SWITCH", "true");
     const { canLaunchOnBags } = await import("./env");

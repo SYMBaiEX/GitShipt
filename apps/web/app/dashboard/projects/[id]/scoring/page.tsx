@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { rewardModeOf } from "@repo/shared";
 import {
   Bot,
   Calculator,
@@ -17,7 +18,6 @@ import { Badge } from "@repo/ui";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { ScoringConfigEditor } from "../leaderboard/_components/ScoringConfigEditor";
-
 
 export default function ScoringPage({
   params,
@@ -40,6 +40,17 @@ async function ScoringPageContent({
   const { id } = await params;
   const ctx = await loadProjectFor(id, "scoring.read");
   const { project } = ctx;
+  if (rewardModeOf(project.payoutConfig) === "owner") {
+    return (
+      <div className="space-y-3">
+        <h1 className="text-headline-md">Contribution scoring</h1>
+        <p className="text-body-md text-fg-secondary">
+          Rankings are informational for owner rewards and do not determine
+          payments.
+        </p>
+      </div>
+    );
+  }
   const rows = (await getProjectLeaderboard(
     project.id,
     project.payoutConfig,

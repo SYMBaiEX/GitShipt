@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { rewardModeOf } from "@repo/shared";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -57,6 +58,17 @@ async function ProjectPayoutsPageContent({
   if (!data) notFound();
 
   const { header } = data;
+  if (rewardModeOf(header.payoutConfig) === "owner") {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-headline-lg">Owner rewards</h1>
+        <p className="text-body-md text-fg-secondary">
+          Owner rewards are handled through Bags for the linked launch wallet.
+          This project does not distribute rewards by contributor rank.
+        </p>
+      </div>
+    );
+  }
   const page = Math.max(1, Number(sp.page ?? 1));
   const allPayouts = await getProjectPayoutHistory(header.id, page * PAGE_SIZE);
   const start = (page - 1) * PAGE_SIZE;

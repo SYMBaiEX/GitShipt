@@ -317,7 +317,7 @@ function defaultDescription(repo: GithubRepo): string {
 }
 
 function templateDescription(repo: GithubRepo): string {
-  return `Token for ${repo.owner}/${repo.name}. Fees route to top contributors through Bags.`;
+  return `Token for ${repo.owner}/${repo.name}.`;
 }
 
 function safeImageUrl(value: string | undefined, fallback: string): string {

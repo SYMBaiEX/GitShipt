@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     template: "%s · GitShipt",
   },
   description:
-    "GitShipt turns any GitHub repo into a tradeable Bags.fm token. Swap fees flow to top contributors through Bags-native fee sharing.",
+    "Launch a Bags.fm token for an eligible personal GitHub repository with owner rewards.",
   applicationName: "GitShipt",
   authors: [{ name: "SYMBiEX" }],
   keywords: [
@@ -57,7 +57,7 @@ export const metadata: Metadata = {
     siteName: "GitShipt",
     title: "GitShipt — tokenize your repo, pay your contributors",
     description:
-      "GitShipt turns any GitHub repo into a tradeable Bags.fm token. Swap fees flow to top contributors through Bags-native fee sharing.",
+      "Launch a Bags.fm token for an eligible personal GitHub repository with owner rewards.",
     images: [{ url: "/content.png", width: 1600, height: 900 }],
   },
   twitter: {

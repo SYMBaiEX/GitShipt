@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { rewardModeOf } from "@repo/shared";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -128,46 +129,61 @@ async function ProjectTokenPageContent({ params }: { params: Params }) {
                     detail={`${header.platformFeeBps} bps`}
                   />
                   <Metric
-                    label="Contributor pool"
+                    label={
+                      rewardModeOf(header.payoutConfig) === "owner"
+                        ? "Owner normal allocation"
+                        : "Contributor pool"
+                    }
                     value={`${contributorPoolPct}%`}
                     detail={`${10_000 - header.platformFeeBps} bps`}
                     accent
                   />
-                  <Metric
-                    label="Top-N"
-                    value={String(header.payoutConfig.topN)}
-                    detail="paid"
-                  />
-                  <Metric
-                    label="Min payout"
-                    value={formatSol(
-                      BigInt(header.payoutConfig.claimThresholdLamports),
-                      2,
-                    )}
-                    detail="threshold"
-                  />
+                  {rewardModeOf(header.payoutConfig) !== "owner" ? (
+                    <>
+                      <Metric
+                        label="Top-N"
+                        value={String(header.payoutConfig.topN)}
+                        detail="paid"
+                      />
+                      <Metric
+                        label="Min payout"
+                        value={formatSol(
+                          BigInt(header.payoutConfig.claimThresholdLamports),
+                          2,
+                        )}
+                        detail="threshold"
+                      />
+                    </>
+                  ) : null}
                 </div>
 
-                <div className="border-t border-border pt-4">
-                  <div className="mb-2 text-label-sm text-fg-secondary">
-                    Payout weights
+                {rewardModeOf(header.payoutConfig) !== "owner" ? (
+                  <div className="border-t border-border pt-4">
+                    <div className="mb-2 text-label-sm text-fg-secondary">
+                      Payout weights
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                      {header.payoutConfig.tierWeights.map((w, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between gap-2 rounded-md border border-border/50 bg-surface/40 px-3 py-2"
+                        >
+                          <span className="text-caption text-fg-muted">
+                            #{i + 1}
+                          </span>
+                          <span className="text-mono-sm text-fg">
+                            {(w * 100).toFixed(1)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                    {header.payoutConfig.tierWeights.map((w, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between gap-2 rounded-md border border-border/50 bg-surface/40 px-3 py-2"
-                      >
-                        <span className="text-caption text-fg-muted">
-                          #{i + 1}
-                        </span>
-                        <span className="text-mono-sm text-fg">
-                          {(w * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                ) : (
+                  <p className="border-t border-border pt-4 text-body-sm text-fg-secondary">
+                    Rankings are informational and do not allocate owner
+                    rewards.
+                  </p>
+                )}
 
                 <div className="grid gap-2 border-t border-border pt-4 md:grid-cols-3">
                   <TokenMeta label="Mint">

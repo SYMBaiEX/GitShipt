@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { dbHttp } from "@/db";
 import { projects, wallets } from "@/db/schema";
@@ -24,14 +24,18 @@ import {
 import {
   loadRecordedLaunchClaimers,
   resolveDirectLaunchClaimers,
+  assertLaunchPartnerReady,
 } from "@/lib/bags/launch-claimers";
 import {
   LaunchProjectRequestSchema,
   LaunchProjectResponseSchema,
+  rewardModeOf,
 } from "@repo/shared";
 import { revalidateProjectCaches } from "@/lib/cache";
 import { acquireWorkflowLock, releaseWorkflowLock } from "@/lib/workflow-locks";
 import { platformFeeBps } from "@/lib/platform-fee";
+import { requirePersonalRepoOwner, RepoOwnerError } from "@/lib/github/repo-owner";
+import { buildOwnerLaunchClaimers } from "@/lib/bags/owner-claimers";
 
 export const maxDuration = 300;
 
@@ -222,6 +226,15 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
           if (!project) {
             throw new LaunchError("not_found", "Project not found.", 404);
           }
+          const rewardMode = rewardModeOf(project.payoutConfig);
+          if (!willStubMode) {
+            const modeGuard = canLaunchOnBags(rewardMode);
+            if (!modeGuard.ok) throw new LaunchError("launch_refused", modeGuard.reason, 409);
+          }
+          if (!willStubMode && rewardMode === "owner") {
+            await requirePersonalRepoOwner({ userId, ghOwner: project.ghOwner, ghRepo: project.ghRepo, ghRepoId: project.ghRepoId });
+            await assertLaunchPartnerReady();
+          }
 
           // Promote-from-stub: when a simulated_live project hits this route in
           // real mode, clear the stub artifacts and re-run the launch. The
@@ -342,6 +355,9 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
             );
           }
 
+          if (!willStubMode && rewardMode === "contributors") {
+            throw new LaunchError("contributor_automation_unavailable", "New contributor-reward launches are unavailable until automated Bags updates are supported.", 409);
+          }
           const feeBps = await platformFeeBps();
           if (!willStubMode && body?.reviewedPlatformFeeBps !== feeBps) {
             throw new LaunchError(
@@ -355,14 +371,14 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
             .set({ platformFeeBps: feeBps })
             .where(eq(projects.id, projectId));
           project.platformFeeBps = feeBps;
-          const directClaimers = willStubMode
-            ? null
+          const directClaimers = willStubMode ? null : rewardMode === "owner"
+            ? buildOwnerLaunchClaimers(launchWalletAddress!, serverEnv().SOLANA_TREASURY_ADDRESS, feeBps)
             : await resolveDirectLaunchClaimers(
                 projectId,
                 project.payoutConfig.maxClaimers ?? 50,
                 feeBps,
               );
-          if (!willStubMode && !project.ghInstallationId) {
+          if (!willStubMode && rewardMode === "contributors" && !project.ghInstallationId) {
             throw new LaunchError(
               "github_app_required",
               "Install the GitShipt GitHub App and index contributors before launching.",
@@ -433,7 +449,7 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
                 updatedAt: new Date(),
               })
               .where(
-                and(eq(projects.id, projectId), eq(projects.status, "draft")),
+                and(eq(projects.id, projectId), eq(projects.status, "draft"), sql`${projects.payoutConfig}->>'rewardMode' IS NOT DISTINCT FROM ${project.payoutConfig.rewardMode ?? null}`),
               )
               .returning({ id: projects.id });
             if (!checkpoint)
@@ -449,6 +465,7 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
               baseMint: tokenInfo.tokenMint,
               adminPubkey: launchWallet,
               claimers: directClaimers,
+              rewardMode,
               isInitFinalized: false,
               steadyStateCadenceHours:
                 project.payoutConfig.steadyStateCadenceHours ?? 72,
@@ -639,6 +656,7 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
     await revalidateProjectCaches(projectId);
     return NextResponse.json(result, { status: 200 });
   } catch (e) {
+    if (e instanceof RepoOwnerError) return NextResponse.json({ error: e.code, message: e.message }, { status: e.status });
     if (e instanceof LaunchError) {
       return NextResponse.json(
         { error: e.code, message: e.message },

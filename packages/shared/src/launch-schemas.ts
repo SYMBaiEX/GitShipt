@@ -96,8 +96,17 @@ export const STEADY_STATE_CADENCE_OPTIONS = [72, 120, 168] as const;
 export type SteadyStateCadenceHours =
   (typeof STEADY_STATE_CADENCE_OPTIONS)[number];
 
+export const RewardModeSchema = z.enum(["owner", "contributors"]);
+export type RewardMode = z.infer<typeof RewardModeSchema>;
+
+/** Missing mode identifies projects created before owner rewards existed. */
+export function rewardModeOf(config: { rewardMode?: RewardMode }): RewardMode {
+  return config.rewardMode ?? "contributors";
+}
+
 export const PayoutConfigSchema = z
   .object({
+    rewardMode: RewardModeSchema.optional(),
     topN: z.number().int().min(3).max(50),
     tierWeights: z.array(z.number().min(0).max(1)).min(3).max(50),
     claimThresholdLamports: z.number().int().min(0),
@@ -169,7 +178,10 @@ export const CreateProjectBodySchema = z.object({
   twitter: z.string().trim().url().max(200).optional(),
   telegram: z.string().trim().url().max(200).optional(),
   scoringConfig: ScoringConfigSchema,
-  payoutConfig: PayoutConfigSchema,
+  payoutConfig: PayoutConfigSchema.transform((value) => ({
+    ...value,
+    rewardMode: value.rewardMode ?? "owner",
+  })),
   platformFeeBps: z.number().int().min(0).max(10_000),
 });
 export type CreateProjectBody = z.infer<typeof CreateProjectBodySchema>;

@@ -14,24 +14,33 @@ the product model.
 - **SOL-only payouts.** No SPL token logic, no multi-token branches, no
   token-type abstractions. Payouts are SOL via `@solana/web3.js@^1.98.x`.
 - **All launches are community launches.** There is exactly one launch type.
-- **Bags handles Incorporation, custody, and contributor claims.** We do not
-  re-implement, mirror, or wrap any of it. Contributors claim fees through
-  Bags' GitHub-OAuth UI, signing transactions with their own wallet. GitShipt
-  never holds, dispatches, or routes contributor SOL.
-- **Bags-native payouts with explicitly authorized management.** The desired
-  flow is GitHub activity -> ranked contributors -> daily snapshot -> on-chain
-  BPS rebalance. However, owner-only `update_fee_config_manager` was proven to
-  fail on mainnet with Unauthorized on November 17, 2026. The token admin
-  recognized by Bags' API is not the Bags program administrator. Obtain and
-  verify Bags-authorized manager delegation before enabling general creation
-  or promising automated rebalances for new launches. The app must not prepare
-  the unsupported owner-only transaction or mark delegation complete manually.
-  Existing correctly delegated configurations may continue. The app constructs
-  rebalances against recorded recipient slots; the IDL alone does not prove
-  the deployed manager cannot replace recipients. Post-launch recipient/BPS
-  changes use Bags' token-admin update API, owner review/signing, and manifest
-  reconciliation. Never custody or dispatch contributor SOL. Evidence and
-  remaining integration limits are in `docs/debut-launch.md`.
+- **Bags handles Incorporation, custody, and recipient claims.** We do not
+  re-implement, mirror, or wrap any of it. Recipients claim through Bags with
+  their own wallets. GitShipt never holds, dispatches, or routes their SOL.
+- **New launches use owner rewards.** Explicitly approved November 17, 2026.
+  Only the verified owner of a public, personally owned GitHub repository can
+  launch. Compare immutable GitHub account and repository IDs, not display
+  names or repository-admin permission alone. The owner's SIWS-linked launch
+  wallet receives the normal allocation remaining after GitShipt's configured
+  share (default 90% owner / 10% platform). This does not require a second
+  GitHub-wallet link on Bags. Organization repositories and new contributor-mode
+  live launches stay blocked until their authority policies are implemented.
+  Daily contributor rankings are informational, not payout entitlements.
+- **Owner mode requires no manager delegation or rebalance schedule.** Fees
+  accrue directly under the configured Bags allocation; this is not a daily
+  wallet transfer. Old projects without `payoutConfig.rewardMode` remain
+  contributor mode. Only an explicitly reviewed, unprepared draft can convert
+  to owner mode. Prepared/live mode, wallet manifest, and fee snapshots cannot
+  be silently replaced. See `docs/adr/0003-owner-rewards-debut.md`.
+- **Legacy contributor management requires real authorization.** Owner-only
+  `update_fee_config_manager` failed on mainnet with Unauthorized. Never build
+  that transaction or fake delegation completion. Existing correctly delegated
+  configs may continue their schedules. Bags' admin-update API returned a valid
+  program-admin co-signature and succeeded in unsigned simulation when the
+  token admin was the remaining signer. It still requires that wallet's
+  approval; it is not unattended contributor automation. Recipient changes
+  require wallet review, confirmation and local-manifest reconciliation. The
+  IDL alone does not prove the deployed manager cannot replace recipients.
 - **Three separate platform revenue streams.** GitShipt is the fee-config
   payer/deployer, receives its Bags partner share, and receives a configurable
   normal-recipient treasury allocation (default 1,000 BPS / 10%). Partner fees
@@ -42,10 +51,10 @@ the product model.
   fee changes affect new configs only; existing prepared/live configs retain
   their snapshot. Rebalances preserve the explicit platform slot. See
   `docs/adr/0002-platform-revenue.md` for exact denominators and rounding.
-- **Cadence is per-project, configurable.** 24h initial → 3d second → 3/5/7d
+- **Legacy contributor cadence is per-project, configurable.** 24h initial → 3d second → 3/5/7d
   configurable thereafter. Stored in `payout_schedules` per project. The
   leaderboard UI updates daily regardless; the on-chain rebalance follows
-  the configured cadence.
+  the configured cadence. Owner mode never creates or runs this schedule.
 - **No grace windows. No off-chain claim windows. No off-chain custody.**
   Contributors who haven't onboarded to Bags at launch time are skipped from
   the initial claimer set but can be added later via admin update. Project owners
@@ -54,8 +63,8 @@ the product model.
 - **Contributor wallet linking is on Bags, not on GitShipt.** GitShipt never
   asks contributors for wallet addresses, never runs SIWS for contributor
   identity, never custodies a "claimable balance" for them. The only wallet
-  identity GitShipt holds is project-owner attestation for launch-time
-  signing.
+  identity GitShipt holds is project-owner attestation for launch-time signing
+  and the new owner-reward recipient.
 - **Stub-safe by default.** External clients (Bags, Helius, payout keypair)
   must keep deterministic stub fallbacks based on env-var presence. Never
   invent secrets to make a flow "work" — stop and name the missing env var.

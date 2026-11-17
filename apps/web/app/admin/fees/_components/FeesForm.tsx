@@ -8,7 +8,7 @@ import { updateFeesBps } from "@/app/admin/actions";
 export function FeesForm({ currentBps }: { currentBps: number }) {
   const [input, setInput] = React.useState(String(currentBps));
   const bps = Number(input);
-  const valid = /^\d+$/.test(input) && Number.isInteger(bps) && bps <= 10000;
+  const valid = /^\d+$/.test(input) && Number.isInteger(bps) && bps <= 9999;
   const [open, setOpen] = React.useState(false);
   const dirty = bps !== currentBps;
 
@@ -30,13 +30,13 @@ export function FeesForm({ currentBps }: { currentBps: number }) {
         <input
           type="number"
           min={0}
-          max={10000}
+          max={9999}
           step={1}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           className="h-10 w-full rounded-md border border-border bg-surface px-3 text-mono-md text-fg outline-none focus:border-primary"
         />
-        <div className="text-caption text-fg-muted">0–10,000 bps.</div>
+        <div className="text-caption text-fg-muted">0–9,999 bps.</div>
       </div>
       <div className="flex justify-end">
         <Button

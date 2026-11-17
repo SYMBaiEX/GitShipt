@@ -4,6 +4,13 @@ Accepted November 17, 2026, following the owner's explicit choice of partner
 revenue, deployer revenue, and 10% of normal creator rewards. This decision
 supersedes ADR 0001's partner-only economics and inaccurate percentage wording.
 
+[ADR 0003](0003-owner-rewards-debut.md) subsequently selects owner rewards for
+new launches. Its owner recipient replaces contributor distribution below;
+the three revenue streams and their denominators are unchanged. The config
+payer, partner wallet and treasury recipient are distinct roles and need not
+be the same wallet. A different partner wallet requires manual partner claims,
+not a different config payer or an extra charge to the owner.
+
 ## Three separate revenue streams
 
 1. **Partner:** the configured Bags partner rate applies to Bags' platform pool,

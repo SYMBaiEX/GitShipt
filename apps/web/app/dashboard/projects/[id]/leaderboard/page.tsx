@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { rewardModeOf } from "@repo/shared";
 import { Sparkles } from "lucide-react";
 import { hasCredentials } from "@/lib/env";
 import {
@@ -11,7 +12,6 @@ import { LeaderboardTable } from "@/app/r/[org]/[repo]/_components/LeaderboardTa
 import { ScoringConfigEditor } from "./_components/ScoringConfigEditor";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-
 
 export default function LeaderboardPage({
   params,
@@ -82,11 +82,13 @@ async function LeaderboardPageContent({
         />
       </div>
 
-      <ScoringConfigEditor
-        projectId={id}
-        scoring={project.scoringConfig}
-        payout={project.payoutConfig}
-      />
+      {rewardModeOf(project.payoutConfig) !== "owner" ? (
+        <ScoringConfigEditor
+          projectId={id}
+          scoring={project.scoringConfig}
+          payout={project.payoutConfig}
+        />
+      ) : null}
     </div>
   );
 }

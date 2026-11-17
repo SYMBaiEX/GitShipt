@@ -6,6 +6,7 @@ import {
 } from "@/lib/funds/partner-fee-claims";
 import { hasCredentials, serverEnv, stubsAllowed } from "@/lib/env";
 import { payoutSignerPublicKey } from "@/lib/solana/signer";
+import { audit } from "@/lib/audit";
 import {
   acquireWorkflowLock,
   releaseWorkflowLock,
@@ -75,9 +76,7 @@ async function loadPartnerClaimInputStep(): Promise<
     throw new Error("SOLANA_PAYOUT_KEYPAIR is not configured.");
   }
   if (signerWallet !== env.BAGS_PARTNER_WALLET) {
-    throw new Error(
-      "BAGS_PARTNER_WALLET must match the public key derived from SOLANA_PAYOUT_KEYPAIR before partner fee claims can run.",
-    );
+    return { skipReason: "manual_claim_required" };
   }
   if (!env.BAGS_PARTNER_CONFIG_KEY) {
     throw new Error("BAGS_PARTNER_CONFIG_KEY is not configured.");
@@ -112,6 +111,9 @@ async function skippedPartnerClaimStep(
 ): Promise<PartnerFeeClaimResult> {
   "use step";
   const env = serverEnv();
+  if (reason === "manual_claim_required") {
+    await audit({ actorUserId: null, action: "bags.partner_claim_skipped", targetType: "partner_config", targetId: env.BAGS_PARTNER_CONFIG_KEY ?? "unconfigured", metadata: { reason } });
+  }
   return {
     attemptId: "skipped",
     status: "skipped",

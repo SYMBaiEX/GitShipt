@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { start } from "workflow/api";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { dbHttp, dbPool } from "@/db";
 import {
   projects,
@@ -49,6 +49,7 @@ import {
 import {
   CreateProjectBodySchema,
   PayoutConfigSchema,
+  rewardModeOf,
   ScoringConfigSchema,
 } from "@repo/shared";
 import { healthPulse } from "@/workflows/healthPulse";
@@ -1428,10 +1429,15 @@ export async function updatePayoutConfig(
       JSON.stringify(parsed.payoutConfig),
     ),
     async () => {
-      await dbHttp
+      const [updated] = await dbHttp
         .update(projects)
         .set({ payoutConfig: parsed.payoutConfig satisfies PayoutConfig })
-        .where(eq(projects.id, parsed.projectId));
+        .where(and(
+          eq(projects.id, parsed.projectId),
+          sql`COALESCE(${projects.payoutConfig}->>'rewardMode', 'contributors') = ${rewardModeOf(parsed.payoutConfig)}`,
+        ))
+        .returning({ id: projects.id });
+      if (!updated) throw new Error("project_not_found_or_reward_mode_immutable");
       await audit({
         actorUserId: ctx.userId,
         action: "scoring.update",

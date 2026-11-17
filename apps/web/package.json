@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--no-experimental-webstorage\" bun run --bun next dev",
-    "build": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--no-experimental-webstorage\" bun run --bun next build",
+    "build": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--no-experimental-webstorage\" bun run --bun next build && node ../../scripts/check-workflow-traces.mjs",
     "start": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--no-experimental-webstorage\" bun run --bun next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
@@ -43,6 +43,7 @@
     "bs58": "^6.0.0",
     "drizzle-orm": "^0.45.4",
     "ioredis": "^6.0.0",
+    "jose": "^5.10.0",
     "lucide-react": "^1.74.0",
     "nanoid": "^6.0.2",
     "next": "16.4.6",

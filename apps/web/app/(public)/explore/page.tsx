@@ -14,7 +14,7 @@ import { ProjectCard } from "./_components/ProjectCard";
 export const metadata: Metadata = {
   title: "Explore projects",
   description:
-    "Open-source repos routing token fees to contributors through Bags-native fee sharing.",
+    "Explore repositories and tokens launched through GitShipt.",
 };
 
 type SearchParams = Promise<{

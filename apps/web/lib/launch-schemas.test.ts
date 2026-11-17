@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CreateProjectBodySchema, TokenMetadataSchema } from "@repo/shared";
+import { CreateProjectBodySchema, PayoutConfigSchema, TokenMetadataSchema, rewardModeOf } from "@repo/shared";
 
 const validBody = {
   ghOwner: "sym",
@@ -32,6 +32,13 @@ const validBody = {
 } as const;
 
 describe("Bags launch schemas", () => {
+  it("defaults new projects to owner rewards while preserving legacy contributor mode", () => {
+    const payoutConfig = { ...validBody.payoutConfig, tierWeights: [...validBody.payoutConfig.tierWeights] };
+    expect(CreateProjectBodySchema.parse({ ...validBody, payoutConfig }).payoutConfig.rewardMode).toBe("owner");
+    expect(rewardModeOf(PayoutConfigSchema.parse(payoutConfig))).toBe("contributors");
+    expect(PayoutConfigSchema.safeParse({ ...payoutConfig, rewardMode: "unknown" }).success).toBe(false);
+    expect(rewardModeOf({ rewardMode: "contributors" })).toBe("contributors");
+  });
   it("requires Bags-compatible token descriptions", () => {
     expect(
       TokenMetadataSchema.safeParse({

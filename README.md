@@ -1,9 +1,14 @@
 # GitShipt
 
-Launch a Bags.fm token for any GitHub repository and route trading fees back to
-the people who built it. GitShipt keeps the token launch simple, computes a daily
-contributor leaderboard from GitHub activity, claims accrued Bags fees into a
-platform pool, and pays contributors by rank.
+Launch a Bags.fm token for an eligible personal public GitHub repository.
+New launches use owner rewards: the linked launch wallet receives the owner
+share of the normal creator allocation through Bags. Daily contribution
+rankings are informational and do not determine owner rewards.
+
+The server verifies that the signed-in GitHub user owns the selected public
+personal repository by immutable GitHub ID. Organization launches and new
+contributor-mode launches are blocked. Existing projects with no reward mode
+remain in legacy contributor mode; they are not silently migrated.
 
 Built for the Bags.fm Hackathon, submission target April 28, 2026.
 
@@ -17,13 +22,16 @@ These root files bind product and implementation decisions:
   permissions, launch flow, payout workflow, and security posture.
 - [`AGENTS.md`](./AGENTS.md) summarizes the repo-specific constraints for
   coding agents and maintainers.
+- [`SPEC.md`](./SPEC.md) and [ADR 0003](docs/adr/0003-owner-rewards-debut.md)
+  define the current owner-rewards contract; historical PRD sections are not
+  the current launch model.
 
 If this README disagrees with those files, the spec wins.
 
 ## Stack
 
 - Bun 1.4.4 workspace monorepo with `bun.lock`
-- Next.js 16.4 App Router, React 19.3, React Compiler, Turbopack, Node 26 LTS
+- Next.js 16.4.6 App Router, React 19.3.1, React Compiler, Turbopack, Node 26
 - TypeScript strict with `noUncheckedIndexedAccess`
 - Tailwind v4 with `@theme inline`, shadcn-style primitives in `@repo/ui`,
   Lucide, Geist, Geist Mono
@@ -36,7 +44,7 @@ If this README disagrees with those files, the spec wins.
 - Vercel Workflows for indexing, snapshots, Bags BPS rebalances, partner fee
   claims, and KPI
   publishing
-- `@bagsfm/bags-sdk` v1.3.x, `@solana/web3.js` v1.98.x, Helius RPC
+- `@bagsfm/bags-sdk` ^1.4.4, `@solana/web3.js` ^1.99.0 (v1 line), Helius RPC
 
 ## Repo Structure
 
@@ -126,17 +134,20 @@ Core variables:
   `https://gitshipt.com/api/webhooks/github`.
 - `BAGS_API_KEY` enables live Bags SDK calls.
 - `BAGS_PARTNER_WALLET` and `BAGS_PARTNER_CONFIG_KEY` are required for live
-  launches. The on-chain partner rate must be 2,500 BPS and the partner wallet
-  must match the server fee-claim signer. `BAGS_CONFIG_TYPE` is optional.
-- `HELIUS_RPC_URL`, `SOLANA_MANAGER_KEYPAIR`, and the legacy
-  `SOLANA_PAYOUT_KEYPAIR` gate are required before live Bags fee-share config
-  transactions can be signed.
+  launches. The on-chain partner rate must be 2,500 BPS. `BAGS_CONFIG_TYPE` is
+  optional. If the partner wallet differs from the config payer, partner claims
+  require a manual claim using the partner wallet; this does not block launch.
+- `HELIUS_RPC_URL` and `SOLANA_PAYOUT_KEYPAIR` are required for live Bags
+  fee-share configuration. The latter is the config payer/deployer, not
+  necessarily the partner wallet. `SOLANA_MANAGER_KEYPAIR` is optional for
+  authorized delegated rebalances on legacy contributor-mode projects only.
 - GitShipt receives partner revenue, config-payer deployer revenue, and a
   normal-recipient treasury allocation. The global `fees.platform_bps` admin
   setting defaults to 1,000 BPS (10%) for new launches only. The legacy
   `PLATFORM_FEE_BPS_DEFAULT` environment variable does not control live launches.
-  Contributor rewards remain directly claimable through Bags. See
-  [the revenue decision](docs/adr/0002-platform-revenue.md) for exact denominators,
+  At that default, the linked owner wallet receives the remaining 90% of the
+  normal allocation. Bags handles custody and claims. See
+  [the owner rewards decision](docs/adr/0003-owner-rewards-debut.md) for exact denominators,
   post-launch permissions, and recovery limits, and
   [owner admin bootstrap](docs/admin-bootstrap.md) for provisioning SYMBaiEX.
 - `BAGS_ALLOW_PROD_LAUNCH=true` explicitly enables mainnet token creation once
@@ -249,26 +260,25 @@ The current live Bags path is centralized in
 1. `bags.createTokenInfo()` calls
    `sdk.tokenLaunch.createTokenInfoAndMetadata()` and validates the returned
    `tokenMint` and `tokenMetadata`.
-2. `bags.createFeeShareConfig()` resolves social claimers through
-   `sdk.state.getLaunchWalletV2Bulk()` and calls
-   `sdk.config.createBagsFeeShareConfig()`.
+2. `bags.createFeeShareConfig()` configures the linked owner wallet and the
+   platform's normal allocation through `sdk.config.createBagsFeeShareConfig()`.
 3. Fee-share config transactions returned by Bags are signed through the
    server-side signer only after instruction-policy checks.
-4. Contributor claims stay in Bags. GitShipt records claim events and runs
-   cadence-driven BPS rebalances; it does not expose `/api/claims/*`.
+4. Claims stay in Bags. Owner mode has no manager delegation or payout schedule;
+   it does not expose `/api/claims/*`.
 
 GitShipt deliberately keeps two revenue rails separate:
 
-- Direct contributor allocations are expressed through fee claimers that total
-  exactly 10,000 bps.
+- Normal allocations are expressed through fee claimers that total exactly
+  10,000 bps. New owner launches allocate that share to the linked owner wallet
+  and GitShipt; the default platform allocation is 1,000 bps.
 - Bags partner config is required for live launches and controlled through `BAGS_PARTNER_*` env
-  values, not mixed into contributor payout math.
+  values, separate from normal-allocation math.
 
-The final Bags launch transaction is still gated behind launch-wallet and
-initial-buy configuration. Until those economics are explicitly configured, the
-app records the metadata mint and fee-share config key, plus the last fee-share
-config transaction signature when live. Without Bags, Helius, or payout-key
-credentials, launch stays in deterministic stub mode.
+The final Bags launch transaction is signed by the linked launch wallet, which
+also funds any configured initial buy. Without Bags, Helius, or config-payer
+credentials, integrations retain deterministic stub fallbacks; production
+readiness must be checked before a live launch.
 
 ## Workflows
 
@@ -277,7 +287,8 @@ Workflow files live in [`apps/web/workflows`](./apps/web/workflows):
 - `indexGithubDeltas` and `indexProjectDeltas` import GitHub activity.
 - `computeLeaderboard` turns activity into ranked contributors.
 - `takeSnapshot` freezes daily leaderboard state.
-- `rebalanceBps` updates Bags fee-share BPS weights on the project cadence.
+- `rebalanceBps` updates eligible legacy contributor-mode Bags fee-share BPS
+  weights on their project cadence, subject to authorized delegation.
 - `claimPartnerFees` claims GitShipt partner fees through Bags-native
   partner-claim transactions.
 - `publishKpis` refreshes public metrics.

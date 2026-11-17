@@ -1,4 +1,5 @@
 import { Trophy } from "lucide-react";
+import { rewardModeOf } from "@repo/shared";
 import { ContributorRow } from "./ContributorRow";
 import { LeaderboardTooltipScope } from "./LeaderboardTooltipScope";
 import { HowScoringWorksModal } from "./HowScoringWorksModal";
@@ -31,8 +32,41 @@ export function LeaderboardTable({
   scoringConfig: ScoringConfig;
   payoutConfig: PayoutConfig;
 }) {
+  if (rewardModeOf(payoutConfig) === "owner") {
+    return (
+      <Card depth="raised" padding="default" className="min-h-0 overflow-auto">
+        <h2 className="text-headline-sm">Contributor rankings</h2>
+        <p className="mt-1 text-body-sm text-fg-secondary">
+          Informational only; rankings do not determine owner rewards.
+        </p>
+        {rows.length === 0 ? (
+          <p className="mt-4 text-body-sm text-fg-muted">
+            No contributors ranked yet.
+          </p>
+        ) : (
+          <ol className="mt-4 divide-y divide-border">
+            {rows.map((row) => (
+              <li
+                key={row.contributorId}
+                className="flex items-center justify-between gap-3 py-3"
+              >
+                <span className="min-w-0 truncate text-body-sm">
+                  {row.rank}. {row.ghUsername}
+                </span>
+                <span className="text-mono-sm">{row.score}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Card>
+    );
+  }
   return (
-    <Card depth="raised" padding="none" className="flex h-full min-h-0 flex-col overflow-hidden">
+    <Card
+      depth="raised"
+      padding="none"
+      className="flex h-full min-h-0 flex-col overflow-hidden"
+    >
       <div className="flex items-center justify-between gap-3 px-5 py-4 lg:px-6 lg:py-5">
         <div className="flex min-w-0 items-center gap-2.5">
           <Trophy className="size-5 text-fg-secondary" aria-hidden />
@@ -99,7 +133,9 @@ export function LeaderboardTable({
 
       <div className="flex items-center justify-between border-t border-border bg-surface-elevated/40 px-5 py-3 lg:px-6">
         <span className="text-label-md text-fg-muted">Daily pool</span>
-        <span className="text-mono-md text-fg">{formatSol(dailyFeeLamports)}</span>
+        <span className="text-mono-md text-fg">
+          {formatSol(dailyFeeLamports)}
+        </span>
       </div>
     </Card>
   );

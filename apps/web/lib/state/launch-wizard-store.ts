@@ -64,6 +64,7 @@ export interface DraftHydrationInput {
   repo: GithubRepo;
   metadata: TokenMetadataInput;
   leaderboard: LeaderboardConfig;
+  rewardMode: "owner" | "contributors";
 }
 
 interface LaunchWizardState {
@@ -71,6 +72,7 @@ interface LaunchWizardState {
   repo: GithubRepo | null;
   metadata: TokenMetadataInput | null;
   leaderboard: LeaderboardConfig;
+  rewardMode: "owner" | "contributors";
   status: LaunchStatus;
   errorMessage: string | null;
   success: LaunchSuccess | null;
@@ -80,6 +82,7 @@ interface LaunchWizardState {
   selectRepo: (repo: GithubRepo) => void;
   setMetadata: (metadata: TokenMetadataInput) => void;
   setLeaderboard: (leaderboard: LeaderboardConfig) => void;
+  setRewardMode: (mode: "owner" | "contributors") => void;
   startSubmit: () => void;
   failSubmit: (message: string) => void;
   succeedSubmit: (success: LaunchSuccess) => void;
@@ -94,6 +97,7 @@ const initialState = {
   repo: null,
   metadata: null,
   leaderboard: DEFAULT_LEADERBOARD,
+  rewardMode: "owner" as const,
   status: "idle" as LaunchStatus,
   errorMessage: null,
   success: null,
@@ -113,17 +117,18 @@ export const useLaunchWizardStore = create<LaunchWizardState>((set) => ({
       step: 2,
       errorMessage: null,
     })),
-  setMetadata: (metadata) =>
-    set({ metadata, step: 3, errorMessage: null }),
+  setMetadata: (metadata) => set({ metadata, step: 3, errorMessage: null }),
   setLeaderboard: (leaderboard) =>
     set({ leaderboard, step: 4, errorMessage: null }),
+  setRewardMode: (rewardMode) => set({ rewardMode }),
   setDraftProjectId: (id) => set({ draftProjectId: id }),
-  hydrateFromDraft: ({ projectId, repo, metadata, leaderboard }) =>
+  hydrateFromDraft: ({ projectId, repo, metadata, leaderboard, rewardMode }) =>
     set({
       draftProjectId: projectId,
       repo,
       metadata,
       leaderboard,
+      rewardMode,
       // Land on step 4 (Review) — every previous step has data to edit if the
       // user wants to change anything, but the default is "you can launch now".
       step: 4,
@@ -133,8 +138,7 @@ export const useLaunchWizardStore = create<LaunchWizardState>((set) => ({
     }),
   startSubmit: () =>
     set({ status: "submitting", errorMessage: null, success: null }),
-  failSubmit: (message) =>
-    set({ status: "idle", errorMessage: message }),
+  failSubmit: (message) => set({ status: "idle", errorMessage: message }),
   succeedSubmit: (success) =>
     set({
       status: "idle",
@@ -182,7 +186,7 @@ export function deriveSymbolFromRepo(repoName: string): string {
 function defaultDescription(repo: GithubRepo): string {
   const description = repo.description?.trim();
   if (description) return description.slice(0, 1000);
-  return `Token for ${repo.owner}/${repo.name}. Fees redistribute to top contributors daily.`;
+  return `Token for ${repo.owner}/${repo.name}.`;
 }
 
 function validUrlOrUndefined(

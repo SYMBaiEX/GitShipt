@@ -18,7 +18,13 @@ import type { SnapshotRow as SnapshotRowData } from "@/lib/queries/discovery";
  * One row in the snapshot ledger. Top-level shows the freeze metadata; the
  * expand toggle reveals the top-10 leaderboard preview that was Merkle-rooted.
  */
-export function SnapshotRow({ row }: { row: SnapshotRowData }) {
+export function SnapshotRow({
+  row,
+  informational = false,
+}: {
+  row: SnapshotRowData;
+  informational?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const takenAtIso = row.takenAt.toISOString();
 
@@ -37,8 +43,8 @@ export function SnapshotRow({ row }: { row: SnapshotRowData }) {
           </div>
         </div>
         <div className="text-right">
-          <StatusBadge status={row.status} />
-          {row.forced ? (
+          {!informational ? <StatusBadge status={row.status} /> : null}
+          {!informational && row.forced ? (
             <div className="mt-1">
               <Badge variant="warning" size="sm">
                 Forced
@@ -47,13 +53,16 @@ export function SnapshotRow({ row }: { row: SnapshotRowData }) {
           ) : null}
         </div>
         <div className="text-right text-mono-md text-fg">
-          {row.recipientCount.toLocaleString("en-US")}
+          {!informational ? row.recipientCount.toLocaleString("en-US") : null}
         </div>
         <div className="text-right text-mono-md text-fg">
-          {formatSol(row.totalFeesLamports, 4)}
+          {!informational ? formatSol(row.totalFeesLamports, 4) : null}
         </div>
         <div className="flex min-w-0 items-center justify-end gap-1.5">
-          <span className="truncate text-mono-sm text-fg" title={row.merkleRoot}>
+          <span
+            className="truncate text-mono-sm text-fg"
+            title={row.merkleRoot}
+          >
             {formatAddress(row.merkleRoot, 6, 6)}
           </span>
           <CopyButton value={row.merkleRoot} label="Copy Merkle root" />
@@ -75,6 +84,7 @@ export function SnapshotRow({ row }: { row: SnapshotRowData }) {
         <div className="border-t border-border bg-surface/30 px-5 py-3">
           <div className="mb-2 text-caption text-fg-muted">
             Top {row.leaderboard.length} contributors captured in this snapshot
+            {informational ? " (informational only)" : ""}
           </div>
           {row.leaderboard.length === 0 ? (
             <p className="text-body-sm text-fg-secondary">
@@ -88,7 +98,9 @@ export function SnapshotRow({ row }: { row: SnapshotRowData }) {
                     <th className="pb-2 pr-4 font-medium">Rank</th>
                     <th className="pb-2 pr-4 font-medium">Contributor</th>
                     <th className="pb-2 pr-4 text-right font-medium">Score</th>
-                    <th className="pb-2 text-right font-medium">Weight</th>
+                    {!informational ? (
+                      <th className="pb-2 text-right font-medium">Weight</th>
+                    ) : null}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -106,9 +118,11 @@ export function SnapshotRow({ row }: { row: SnapshotRowData }) {
                       <td className="py-2 pr-4 text-right text-mono-md text-fg">
                         {formatScore(e.score)}
                       </td>
-                      <td className="py-2 text-right text-mono-md text-fg">
-                        {formatPercent(e.weight * 100, 1)}
-                      </td>
+                      {!informational ? (
+                        <td className="py-2 text-right text-mono-md text-fg">
+                          {formatPercent(e.weight * 100, 1)}
+                        </td>
+                      ) : null}
                     </tr>
                   ))}
                 </tbody>

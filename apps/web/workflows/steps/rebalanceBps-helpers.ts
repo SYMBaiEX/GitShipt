@@ -20,7 +20,7 @@ import {
   VersionedTransaction,
   type TransactionInstruction,
 } from "@solana/web3.js";
-import { and, desc, eq, isNull, lte } from "drizzle-orm";
+import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
 import { dbHttp } from "@/db";
 import {
   bagsClaimerSlots,
@@ -118,6 +118,7 @@ export async function loadDueSchedulesStep(
     .where(
       and(
         eq(projects.status, "live"),
+        sql`${projects.payoutConfig}->>'rewardMode' IS DISTINCT FROM 'owner'`,
         lte(payoutSchedules.nextRunAt, now),
         isNull(payoutSchedules.pausedAt),
         isNull(payoutSchedules.archivedAt),
@@ -180,9 +181,10 @@ export async function loadRebalanceContextStep(
     .select()
     .from(bagsClaimerSlots)
     .where(eq(bagsClaimerSlots.feeShareConfigId, config.id));
-  const [project] = await dbHttp.select({ platformFeeBps: projects.platformFeeBps })
+  const [project] = await dbHttp.select({ platformFeeBps: projects.platformFeeBps, payoutConfig: projects.payoutConfig })
     .from(projects).where(eq(projects.id, schedule.projectId)).limit(1);
   if (!project) throw new Error("Rebalance project not found.");
+  if (project.payoutConfig.rewardMode === "owner") return null;
   validatePlatformManifest(slotRows, project.platformFeeBps);
   const slots = slotRows
     .sort((a, b) => a.slotIndex - b.slotIndex)

@@ -37,6 +37,7 @@ import { Badge } from "@repo/ui";
 import { Button } from "@repo/ui";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { ManagerDelegationStep } from "@/app/(public)/launch/_components/ManagerDelegationStep";
+import { rewardModeOf } from "@repo/shared";
 import { currentSolanaCluster } from "@/lib/solana/explorer";
 
 export default function ProjectOverviewPage({
@@ -62,6 +63,7 @@ async function ProjectOverviewPageContent({
   const { id } = await params;
   const ctx = await loadProjectFor(id, "project.read");
   const { project } = ctx;
+  const ownerRewards = rewardModeOf(project.payoutConfig) === "owner";
 
   const [kpis, audit, failed, indexer] = await Promise.all([
     getProjectKPIs(id),
@@ -103,11 +105,15 @@ async function ProjectOverviewPageContent({
           value={kpis.totalContributorsRanked.toString()}
           icon={Users}
         />
-        <StatTile
-          label="Payouts Executed"
-          value={kpis.totalPayoutsExecuted.toString()}
-          icon={Trophy}
-        />
+        {!ownerRewards ? (
+          <StatTile
+            label="Payouts Executed"
+            value={kpis.totalPayoutsExecuted.toString()}
+            icon={Trophy}
+          />
+        ) : (
+          <StatTile label="Reward mode" value="Owner" icon={Trophy} />
+        )}
         <StatTile
           label="Lifetime Fees"
           value={formatSol(kpis.lifetimeFeesLamports, 4)}
@@ -126,7 +132,7 @@ async function ProjectOverviewPageContent({
         />
       </section>
 
-      {project.status === "live" && !project.managerPubkey ? (
+      {!ownerRewards && project.status === "live" && !project.managerPubkey ? (
         <Card depth="raised" padding="default" className="border-warning/50">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex gap-3">

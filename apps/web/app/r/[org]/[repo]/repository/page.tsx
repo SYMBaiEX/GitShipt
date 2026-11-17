@@ -1,10 +1,16 @@
 import { Github } from "@repo/ui";
 import { Suspense } from "react";
+import { rewardModeOf } from "@repo/shared";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  ArrowUpRight, GitBranch, GitFork, RefreshCw, Star } from "lucide-react";
+  ArrowUpRight,
+  GitBranch,
+  GitFork,
+  RefreshCw,
+  Star,
+} from "lucide-react";
 import { getProjectPageData } from "@/lib/queries/project-page";
 import { getIndexerState } from "@/lib/queries/dashboard";
 import { Card, CardHeader, CardTitle, CardContent } from "@repo/ui";
@@ -32,11 +38,7 @@ export async function generateMetadata({
   };
 }
 
-export default function ProjectRepositoryPage({
-  params,
-}: {
-  params: Params;
-}) {
+export default function ProjectRepositoryPage({ params }: { params: Params }) {
   return (
     <Suspense fallback={null}>
       <ProjectRepositoryPageContent params={params} />
@@ -44,11 +46,7 @@ export default function ProjectRepositoryPage({
   );
 }
 
-async function ProjectRepositoryPageContent({
-  params,
-}: {
-  params: Params;
-}) {
+async function ProjectRepositoryPageContent({ params }: { params: Params }) {
   const { org, repo } = await params;
   const data = await getProjectPageData(org, repo);
   if (!data) notFound();
@@ -201,7 +199,11 @@ async function ProjectRepositoryPageContent({
           />
           <Signal
             label="Top-N"
-            detail={`Top ${header.payoutConfig.topN} contributors paid each cycle`}
+            detail={
+              rewardModeOf(header.payoutConfig) === "owner"
+                ? "Rankings are informational"
+                : `Top ${header.payoutConfig.topN} contributors paid each cycle`
+            }
           />
         </CardContent>
       </Card>

@@ -24,6 +24,7 @@ import type { LeaderboardConfig } from "@/lib/state/launch-wizard-store";
 import { SignInWithSolanaFlow } from "@/components/wallet/SignInWithSolanaFlow";
 
 export interface ReviewAndSignProps {
+  rewardMode: "owner" | "contributors";
   repo: GithubRepo;
   metadata: TokenMetadataInput;
   leaderboard: LeaderboardConfig;
@@ -44,6 +45,7 @@ export interface ReviewAndSignProps {
 }
 
 export function ReviewAndSign({
+  rewardMode,
   repo,
   metadata,
   leaderboard,
@@ -78,15 +80,25 @@ export function ReviewAndSign({
       ? `${(initialBuyLamports / LAMPORTS_PER_SOL_NUMBER).toFixed(4)} SOL`
       : "0.0000 SOL";
   const canLaunch =
-    isStubMode ||
-    (walletConnected &&
-      launchWalletAddress &&
-      walletLinked &&
-      !walletLinkChecking);
+    rewardMode === "owner" &&
+    (isStubMode ||
+      (walletConnected &&
+        launchWalletAddress &&
+        walletLinked &&
+        !walletLinkChecking));
 
   return (
     <div className="space-y-5">
       <h2 className="text-headline-sm">Review launch</h2>
+      {rewardMode === "contributors" ? (
+        <p
+          role="status"
+          className="rounded-md border border-warning bg-warning-soft p-3 text-body-sm text-fg"
+        >
+          Automatic contributor rewards are unavailable for new launches. Edit
+          rewards to convert this draft to owner rewards.
+        </p>
+      ) : null}
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="min-w-0 rounded-lg border border-border-strong bg-surface-elevated p-4">
@@ -111,20 +123,27 @@ export function ReviewAndSign({
                 {repo.fullName}
                 {repo.description ? ` · ${repo.description}` : ""}
               </p>
-              <dl className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-3">
-                <SummaryMetric
-                  label="Contributors"
-                  value={`${topNLabel(leaderboard.topN)}`}
-                />
-                <SummaryMetric
-                  label="Window"
-                  value={`${leaderboard.windowDays}d`}
-                />
-                <SummaryMetric
-                  label="Min payout"
-                  value={`${claimThresholdSol} SOL`}
-                />
-              </dl>
+              {rewardMode === "contributors" ? (
+                <dl className="mt-3 grid gap-3 border-t border-border pt-3 sm:grid-cols-3">
+                  <SummaryMetric
+                    label="Contributors"
+                    value={`${topNLabel(leaderboard.topN)}`}
+                  />
+                  <SummaryMetric
+                    label="Window"
+                    value={`${leaderboard.windowDays}d`}
+                  />
+                  <SummaryMetric
+                    label="Min payout"
+                    value={`${claimThresholdSol} SOL`}
+                  />
+                </dl>
+              ) : (
+                <p className="mt-3 border-t border-border pt-3 text-body-sm text-fg-secondary">
+                  Owner rewards go to the linked launch wallet. Rankings are
+                  informational.
+                </p>
+              )}
             </div>
             <Button
               type="button"
@@ -156,7 +175,11 @@ export function ReviewAndSign({
           </div>
           <div className="space-y-2 border-t border-border pt-3">
             <StatusLine
-              label="Contributors' normal allocation"
+              label={
+                rewardMode === "owner"
+                  ? "Owner normal allocation"
+                  : "Contributors' normal allocation"
+              }
               value={
                 <span className="text-mono-sm">{contributorPoolPct}%</span>
               }
@@ -280,10 +303,21 @@ export function ReviewAndSign({
           </dl>
         </ReviewSection>
 
-        <ReviewSection title="Leaderboard" onEdit={onEditLeaderboard}>
+        <ReviewSection
+          title={rewardMode === "owner" ? "Rewards" : "Leaderboard"}
+          onEdit={onEditLeaderboard}
+        >
           <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-            <Row k="Scoring window" v={`${leaderboard.windowDays} days`} mono />
-            <Row k="Paid ranks" v={String(leaderboard.topN)} mono />
+            {rewardMode === "contributors" ? (
+              <>
+                <Row
+                  k="Scoring window"
+                  v={`${leaderboard.windowDays} days`}
+                  mono
+                />
+                <Row k="Paid ranks" v={String(leaderboard.topN)} mono />
+              </>
+            ) : null}
             <Row k="GitShipt normal allocation" v={`${platformFeePct}%`} mono />
             <Row
               k="GitShipt deployer share"
@@ -292,16 +326,22 @@ export function ReviewAndSign({
             />
             <Row k="Bags partner share" v="Per Bags config" />
             <Row
-              k="Contributors' normal allocation"
+              k={
+                rewardMode === "owner"
+                  ? "Owner normal allocation"
+                  : "Contributors' normal allocation"
+              }
               v={`${contributorPoolPct}%`}
               mono
             />
-            <Row
-              k="Rank split"
-              v={`${(tierSum * 100).toFixed(1)}%`}
-              mono
-              full
-            />
+            {rewardMode === "contributors" ? (
+              <Row
+                k="Rank split"
+                v={`${(tierSum * 100).toFixed(1)}%`}
+                mono
+                full
+              />
+            ) : null}
           </dl>
         </ReviewSection>
       </div>

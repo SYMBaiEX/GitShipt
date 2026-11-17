@@ -14,7 +14,7 @@ import { DEFAULT_PLATFORM_FEE_BPS } from "@repo/shared";
 export const metadata = {
   title: "Launch a token",
   description:
-    "Pick a GitHub repo, configure metadata and the leaderboard, and launch a Bags.fm token.",
+    "Pick an eligible personal GitHub repo and launch a Bags.fm token with owner rewards.",
 };
 
 interface LaunchPageProps {

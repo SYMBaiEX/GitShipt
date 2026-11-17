@@ -1,11 +1,28 @@
 # GitShipt debut launch review
 
-Updated November 17, 2026. **Not cleared for general mainnet creation.**
+Updated November 17, 2026. **Owner-rewards debut approved; operational checks
+below still apply. No token has been launched by this review.**
 
 Repository: `SYMBaiEX/GitShipt`. Production: Vercel
 `symbiexs-projects/gitshipt`, aliased by `gitshipt.com` and `gitbags.com`.
 
-## Confirmed blocker: manager authorization
+## Debut Reward Model
+
+New launches use the verified personal repository owner's linked launch wallet
+for normal rewards. The default normal allocation is 90% owner / 10% GitShipt,
+with separate Bags partner and config-payer deployer streams. The global admin
+rate affects new configs only. Leaderboards are informational in owner mode.
+There is no manager-delegation step or payout schedule for this mode.
+
+Public personal repositories only: GitHub account and repository IDs are
+revalidated at prepare/resume/completion. Repo-admin permission is insufficient.
+Organization repositories and new contributor-mode live launches are blocked.
+Existing projects without a mode keep their contributor configuration. An
+unprepared legacy draft can convert only after an explicit review.
+
+See [ADR 0003](adr/0003-owner-rewards-debut.md) for the approved policy.
+
+## Supported Bags Authorization
 
 An unsigned, read-only mainnet simulation against token
 `7bVZh1HKWTT7YHPkEgZzCNKz8HzsZLsHn3qvvXwGBAGS` rejected the existing owner-only
@@ -19,26 +36,37 @@ An unsigned, read-only mainnet simulation against token
   `ADMNwg6TjZz6hs9F9rgH7PDLoTcJEVuCcXML6oQkJXU2`, not the token admin wallet.
 - Simulation disabled signature verification; no transaction was signed or sent.
 
-The token admin in Bags' API and the Bags program administrator are different
-authorities. The app now refuses to prepare the unsupported owner-only delegation
-instead of asking the owner to pay for a doomed transaction. Obtain an authorized
-manager-delegation flow from Bags and verify it before promising automatic daily
-on-chain leaderboard rebalancing. Existing correctly delegated configs are not
-disabled by this guard. A plain token launch would not prove the core reward
-automation works.
+The token admin and Bags program administrator are different authorities. The
+app refuses the unsupported delegation transaction. This does not block the
+approved owner model because it never needs a manager or a scored rebalance.
+
+The documented admin-update API was also tested with the same existing token
+and unchanged recipient allocation. It returned a transaction with a valid Bags
+program-admin co-signature, leaving the token admin's wallet signature missing.
+Unsigned mainnet simulation succeeded. No transaction was signed or sent.
+This is a supported wallet-approved update flow, not an unattended authority
+grant. A future update UI must preserve partial signatures, obtain wallet
+approval, confirm the ordered transactions and reconcile the local manifest.
+Already delegated legacy configs can continue; new unattended contributor
+automation still needs a separately verified authorization design.
 
 ## Other launch gates
 
-- Production strict health last returned 503: explicit
-  `BAGS_ALLOW_PROD_LAUNCH=true` is absent and the Sensitive-secret attestation is
-  unset. Keep creation disabled until the blockers are resolved. Never attest
-  secret visibility without reviewing it.
-- Rotate the Bags API key supplied in chat before handling live funds. Its
-  read-only partner-statistics check succeeded. The supplied credential and
-  corrected partner settings were saved for Vercel Production as appropriate;
-  key material stays in ignored local configuration and Sensitive variables.
-- Confirm the config payer signer matches the partner wallet. No existing
-  production private key was retrieved or decrypted during this review.
+- Require deployed strict health, the explicit `BAGS_ALLOW_PROD_LAUNCH=true`
+  opt-in, and a review of the actual config-payer and treasury public keys.
+  Production secret metadata was reviewed: 23 credential variables are Secret
+  protected, including database and Redis URLs. The reviewed attestation was
+  saved without reading, decrypting or replacing credential values.
+- The owner explicitly chose to retain the Bags API key supplied in chat.
+  Its read-only partner-statistics check succeeded and it is stored as a
+  protected Vercel Secret. It has not been rotated; rotation remains strongly
+  recommended before handling live funds. Never repeat the key in logs or docs.
+- The config payer and partner wallet may differ. A mismatch means partner
+  claims must be manual in Bags; the automatic claim workflow records a skip,
+  not an error/retry loop. No production private key was retrieved or decrypted.
+- Verify the config payer has sufficient SOL for config/deployer accounts and
+  transaction costs. The user's linked wallet signs the final launch and funds
+  any initial buy. Public balances do not establish permission to spend.
 - No funded launch, real delegation, rebalance, or fee claim was executed.
 - Deployer balances are reported, but automatic deployer claiming is not
   implemented. Use Bags' dedicated deployer claim flow, not contributor claims.
@@ -68,8 +96,8 @@ creator-side rate is zero. Referral attribution remains `symbiex`.
 
 - Server-selected fee defaults with explicit client review; ordinary launchers
   read the same effective setting through a narrowly scoped RLS context.
-- Direct Bags-linked contributor allocations plus an explicit platform treasury
-  slot, totaling 10,000 BPS. Rebalances preserve the treasury snapshot.
+- Direct owner-wallet and explicit platform treasury slots totaling 10,000 BPS
+  for new owner launches. Legacy rebalances preserve their treasury snapshot.
 - Pre-broadcast mint/manifest checkpoints. Interrupted configuration stops for
   reconciliation instead of silently generating another mint.
 - Confirmed fixed header checks for the fee-share PDA, program, discriminator,
@@ -97,35 +125,53 @@ The high/critical dependency audit passes without exceptions. A pure-JavaScript
 clean frozen installation and SDK resolution were checked. Moderate transitive
 advisories remain. See [security notes](security-audit-exceptions.md).
 
-Verified locally for this release:
+Verified locally for the owner-rewards release:
 
 - TypeScript 7 typecheck, ESLint, design-token lint, and production build pass.
-- 322 tests pass across 58 files, including cross-SDK partial signatures,
-  platform allocation preservation, RLS fee lookup, and malformed account data.
+- 351 tests pass across 66 files. Tests cover cross-SDK partial signatures, allocation preservation,
+  identity guards, RLS fee lookup and malformed account data.
 - Playwright passes 4 public routing/SEO tests; 7 fixture-dependent tests skip.
 - The high/critical advisory gate passes without exceptions.
 - Mobile public routes, keyboard navigation and reduced motion were inspected.
 
-Unit tests use synthetic chain-account fixtures; public browser checks do not
-establish authenticated or funded-flow acceptance. Host Bun is 1.4.2; the pinned
+Seven mocked API tests cover owner prepare/resume and rejected owner, wallet,
+manifest and header states. They do not exercise real services, wallet signing,
+or the separate web-action completion flow. Unit tests use synthetic chain
+fixtures; public browser checks do not establish authenticated or funded-flow
+acceptance. Host Bun is 1.4.2; the pinned
 1.4.4 release was separately used for frozen-install and typecheck verification.
 
-## Debut procedure after the blockers are resolved
+## Vercel Runtime Errors
 
-1. Deploy the reviewed release, review secret visibility, rotate the exposed key,
-   and verify strict health and all actual wallet/config bindings.
-2. Arrange and verify the authorized Bags manager integration. Do not bypass
-   the guard or set a DB flag to pretend delegation succeeded.
-3. Sign in with SYMBaiEX, verify GitHub repo-admin access and GitHub App
-   installation for `SYMBaiEX/GitShipt`, and enroll MFA for admin controls.
-4. Have intended contributors link GitHub on Bags. Save a draft and reindex it;
-   use a snapshot less than 24 hours old. Live configs are capped at 15 total
-   recipients, including the platform slot, pending LUT support.
-5. Review all three fee streams, recipient wallets, initial buy and cluster.
-   The owner reviews/signs the final launch in their wallet. GitShipt pays for
-   config creation and is its deployer.
-6. Verify the debut token, authorized delegation, first scored rebalance, and
-   receipts for each revenue stream before enabling general creation.
+Production logs contained 12 missing-`jose` module errors from Queue's OIDC
+helper on GitHub webhook and cron routes. The app now provides compatible
+`jose` 5.10, explicitly traces its runtime files, and checks all affected route
+traces after each build. An isolated clean production build and unauthenticated
+route smoke checks passed. Deployment must be checked separately; a successful
+local build alone is not evidence that old production errors are resolved.
+
+Two older partner-claim failures came from different payer/partner wallets.
+That state now reports manual claims rather than repeatedly failing automation.
+
+## Debut Procedure
+
+1. Deploy the reviewed release, review the retained-key risk (rotation is
+   recommended), verify strict health and inspect fresh deployment logs. Enable creation only
+   after operational checks; do not use a placeholder credential.
+2. Sign in as SYMBaiEX, verify personal ownership of `SYMBaiEX/GitShipt`, and
+   enroll MFA for admin controls. No Bags manager grant or GitHub App install is
+   required for owner-mode creation. Optional indexing needs its own access.
+3. Link the intended owner launch wallet with SIWS. Create a new owner-mode
+   draft or explicitly convert an unprepared legacy draft. Choose token name,
+   symbol, image, description and optional initial buy.
+4. Review all three fee streams, exact recipient wallets, current platform
+   rate and mainnet cluster. Ensure owner and treasury wallets are distinct.
+   GitShipt's configured payer creates the fee config and earns deployer fees.
+5. The owner reviews/signs the final launch transaction in their wallet. This
+   review did not authorize any agent to sign or broadcast it.
+6. Verify token/config bindings and Bags recipient allocation after launch.
+   Confirm owner, treasury, deployer and partner accrual/claim receipts before
+   making claims about revenue. Do not expect a contributor rebalance job.
 
 No schema migration is introduced by this upgrade. The local production file
 is not a complete copy of Vercel secrets; missing local values do not establish

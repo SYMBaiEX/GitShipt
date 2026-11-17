@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const TOC: Array<{ id: string; title: string }> = [
   { id: "what-is-gitshipt", title: "What is GitShipt?" },
   { id: "scoring", title: "How scoring works" },
-  { id: "payouts", title: "Daily payout pipeline" },
+  { id: "payouts", title: "Rewards and claims" },
   { id: "wallet-linking", title: "Linking your wallet (SIWS)" },
   { id: "embedding", title: "Embedding the token widget" },
   { id: "security", title: "Security baseline" },
@@ -64,20 +64,17 @@ async function DocsPageContent() {
         <header className="flex flex-col gap-3">
           <h1 className="text-headline-lg text-fg">GitShipt documentation</h1>
           <p className="text-body-lg text-fg-secondary">
-            The mechanics behind the launchpad. How contributions become tokens,
-            how tokens become payouts, and how to embed the widget anywhere.
+            The mechanics behind the launchpad, rewards, rankings, and the
+            embeddable project widget.
           </p>
         </header>
 
         <DocSection id="what-is-gitshipt" title="What is GitShipt?">
           <p>
-            GitShipt turns any GitHub repository into a tradeable Bags.fm token
-            whose lifetime fees flow back to the people who actually build it. A
-            repo owner connects GitHub, picks a payout config, and we mint a
-            token that&apos;s tied 1:1 to that repo. As the token trades, fees
-            accumulate; once a day at 00:30 UTC the top contributors receive
-            on-chain SOL transfers proportional to their share of the
-            leaderboard.
+            GitShipt helps an eligible owner launch a Bags.fm token for their
+            personal GitHub repository. The linked launch wallet receives the
+            owner share of the normal creator allocation. Contribution rankings
+            are informational and do not determine rewards for new launches.
           </p>
         </DocSection>
 
@@ -106,58 +103,36 @@ async function DocsPageContent() {
             <code className="rounded bg-surface-elevated px-1.5 py-0.5 text-mono-sm text-fg">
               scoringConfig.weights
             </code>
-            ; only the top N (default 10) end up in the payout pool.
+            . For owner-reward launches, rankings do not allocate rewards.
           </p>
         </DocSection>
 
-        <DocSection id="payouts" title="Daily Bags rebalance">
-          <p>Two cron-driven workflows run every day:</p>
-          <ul className="list-disc space-y-2 pl-5 text-body-md text-fg-secondary">
-            <li>
-              <span className="text-fg">00:00 UTC — snapshot.</span> Recompute
-              every project&apos;s leaderboard from the last 30 days of GitHub
-              events. Freeze the result into a snapshot row with a Merkle root.
-            </li>
-            <li>
-              <span className="text-fg">00:30 UTC — BPS rebalance.</span> For
-              each snapshot, GitShipt computes contributor BPS targets and
-              updates the Bags fee-share config according to the tier weights{" "}
-              <code className="rounded bg-surface-elevated px-1.5 py-0.5 text-mono-sm text-fg">
-                [0.30, 0.20, 0.15, 0.05 × 7]
-              </code>
-              . Contributors claim through Bags with their own wallet; GitShipt
-              does not dispatch or custody contributor SOL.
-            </li>
-          </ul>
+        <DocSection id="payouts" title="Rewards and claims">
           <p>
-            Contributors without a Bags-linked GitHub identity are skipped until
-            the Bags claimer set can include them. No GitShipt escrow balance is
-            created.
+            New launches allocate the normal creator share between the linked
+            owner wallet and GitShipt at the rate shown during launch. GitShipt
+            also receives a deployer share and a separate Bags partner share.
+            These percentages apply to their respective fee pools, not total
+            trading volume. Bags handles fee custody and claims.
+          </p>
+          <p>
+            Automatic contributor rewards are not available for new launches.
+            Existing contributor-mode projects retain their existing
+            configuration.
           </p>
         </DocSection>
 
         <DocSection id="wallet-linking" title="Wallet attestation (SIWS)">
           <p>
-            Earnings are addressed to GitHub usernames at scoring time. To
-            receive them on-chain, contributors use Bags:
+            The owner links a Solana wallet during launch and signs the launch
+            transaction. Bags handles claims for the configured wallet.
           </p>
           <ol className="list-decimal space-y-2 pl-5 text-body-md text-fg-secondary">
-            <li>
-              Open Bags with the GitHub identity that appears on the
-              leaderboard.
-            </li>
+            <li>Open Bags using the configured wallet.</li>
             <li>
               Connect a Solana wallet and sign the Bags claim transaction.
             </li>
-            <li>
-              GitShipt keeps the leaderboard and snapshot audit trail in sync
-              while Bags owns claim custody.
-            </li>
           </ol>
-          <p>
-            You can link multiple wallets per account but only one is the
-            primary recipient at any given time.
-          </p>
         </DocSection>
 
         <DocSection id="embedding" title="Embedding the token widget">

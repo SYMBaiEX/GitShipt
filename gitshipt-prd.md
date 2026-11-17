@@ -8,40 +8,32 @@
 
 ## Architecture pointer (2026-05-09)
 
-**November 17, 2026 update:** [ADR 0002](docs/adr/0002-platform-revenue.md)
-supersedes historical fee economics below. GitShipt earns the Bags partner
-share, the config-payer deployer share, and a configurable default 10% of the
-remaining normal creator allocation. These percentages have different
-denominators. The global admin default applies to new configurations only.
-Recipient changes after launch require Bags' token-admin authorization and
-local-manifest reconciliation. Owner-only manager delegation was proven to
-fail on mainnet; new daily-rebalance setup requires Bags program-admin support.
-Daily manager rebalances do not onboard new contributors automatically.
-Historical SDK limits and version statements below are not a current release
-checklist.
+**November 17, 2026 update:** The approved debut model is owner rewards. See
+[`SPEC.md`](SPEC.md), [ADR 0003](docs/adr/0003-owner-rewards-debut.md), and the
+[debut launch runbook](docs/debut-launch.md) for the current contract. The
+architecture, assumptions, SDK versions, payout math, and hackathon plans below
+are historical unless explicitly updated; they are not a release checklist.
 
-The architecture sections below this pointer reflect the **corrected understanding** of Bags fee-share capabilities. GitShipt uses a Bags-native architecture with:
+New launches require a public personal repository owned by the signed-in user,
+verified using immutable GitHub IDs. The linked launch wallet receives 90% of
+the normal creator allocation at the default 10% GitShipt allocation. The
+deployer and Bags partner shares are separate and have different denominators.
+Rankings are informational. Owner mode has no manager delegation or payout
+schedule. Organization launches and new contributor-mode launches are blocked;
+existing projects with a missing mode remain legacy contributor mode.
 
-- **Manager role** (delegated to GitShipt): BPS rebalancing within claimer set
-- **Admin role** (held by project owner): Can add/remove claimers post-launch
-- **Partner role** (GitShipt partner config): Receives 25% of trading fees from all launched tokens
-- **Dynamic contributor inclusion**: Claimers CAN be updated post-launch via admin authority
-- **Zero SOL custody**: Contributors claim directly from Bags, GitShipt claims partner fees directly
-
-- Decision record: [`docs/adr/0001-bags-native-payout.md`](docs/adr/0001-bags-native-payout.md) (updated 2026-05-09)
-- Research backing: [`docs/architecture/bags-native/RESEARCH.md`](docs/architecture/bags-native/RESEARCH.md)
-
-For any decision touching payouts, escrow, claims, or wallet linking,
-trust SPEC.md + the updated ADR over this PRD's architecture text until the PRD
-itself is rewritten.
+The config payer/deployer keypair need not equal the partner wallet. A mismatch
+requires manual partner claims, not a launch block. A manager key is optional
+only for legacy projects with an authorized delegated rebalance; it does not
+onboard claimers. Bags retains fee custody and handles claims.
 
 ---
 
 ## TL;DR
 
-GitShipt is a launchpad-leaderboard hybrid where any GitHub repo can spawn a Bags.fm token. Token fees route to that repo's top contributors through Bags-native fee sharing, with GitShipt receiving 25% of trading fees via Bags partner configuration (no launch fees). We ship the platform by launching its own token at the demo and rewarding our own contributors live.
+GitShipt launches Bags.fm tokens for eligible personal public GitHub repositories. New launches allocate the normal creator share to the linked owner wallet and GitShipt, while displaying informational daily contribution rankings. Bags handles fee custody and claims.
 
-**One-liner**: Pump.fun for open source. The repo is the project, the contributors are the rewards.
+**One-liner**: A token launchpad for eligible open-source repository owners.
 
 ---
 
@@ -61,7 +53,7 @@ This PRD has been verified against current platform docs. Material decisions and
 
 2. **Fee shares CAN be updated post-launch via admin authority**. The Bags CLI provides `bags config update` and the API provides `POST /fee-share/admin/update-config` to change fee claimers and their BPS allocations after launch. This enables dynamic contributor inclusion - new contributors can be added to the claimer set as they emerge, and inactive contributors can be removed. GitShipt platform revenue comes via the separate partner-key rail (`partner` + `partnerConfig`) which receives 25% of trading fees, independent of the 10,000 BPS contributor envelope.
 
-3. **Next.js 16.2 is current** (March 18, 2026). Cache Components, React Compiler, and Turbopack are all stable. **Critical**: `middleware.ts` is renamed to `proxy.ts` in Next.js 16. Patch level must be current to mitigate React Server Components RCE (CVE-2025-66478, CVSS 10.0, December 2025) and middleware bypass (CVE-2025-29927).
+3. **Next.js**: the current manifest pins 16.4.6. `middleware.ts` is renamed to `proxy.ts` in Next.js 16. Consult the installed documentation and security advisories when upgrading.
 
 4. **Vercel Postgres is deprecated**. Use Neon Postgres via Vercel Marketplace. The app prefers Neon's server-only `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct) variables, with `POSTGRES_URL` aliases accepted for generic Postgres compatibility.
 
@@ -69,7 +61,7 @@ This PRD has been verified against current platform docs. Material decisions and
 
 6. **Vercel security incident, April 19, 2026**. Compromised AI tool's OAuth token gave attackers access to Vercel internal systems. Non-sensitive env vars were readable. **All secrets must be flagged Sensitive in the dashboard or via API (`type: "sensitive"`).** Crypto teams are particularly exposed; cold treasury keys never touch Vercel.
 
-7. **Solana SDK**: stay on `@solana/web3.js@^1.98` (v1 line). The Bags SDK uses v1-style imports (`Connection`, `Keypair`, `PublicKey`, `VersionedTransaction`). v2 (`@solana/kit`) is GA but ecosystem migration is incomplete.
+7. **Solana SDK**: the current manifest uses `@solana/web3.js@^1.99.0` (v1 line) and `@bagsfm/bags-sdk@^1.4.4`. The Bags SDK uses v1-style imports (`Connection`, `Keypair`, `PublicKey`, `VersionedTransaction`).
 
 8. **Auth**: `better-auth` for GitHub OAuth, with a custom plugin for Sign-In With Solana. SIWS standard is published by Phantom (`@phantom/sign-in-with-solana`). `Credentials`-style provider on Auth.js v5 is the fallback if better-auth's plugin model doesn't fit.
 
@@ -105,26 +97,18 @@ This PRD has been verified against current platform docs. Material decisions and
 
 ### F1. Launch flow (Repo Owner)
 
-1. Sign in with GitHub (App install if not present).
-2. Pick a repo (we verify admin perms via App permissions).
-3. Configure token: name, symbol, supply, image, description (validated against Bags rules + our own filter).
-4. Configure leaderboard: window (default 30d), top-N (default 10).
-5. Link a Solana wallet with SIWS. Server creates Bags metadata + fee-share config, then the repo owner reviews and signs the final Bags launch transaction in their wallet. The linked wallet is the launch signer and funds any configured initial buy.
-6. Project goes live. Initial contributor index runs immediately. First snapshot at next 00:00 UTC.
+1. Sign in with GitHub and select a public personal repository owned by that user; the server verifies ownership by immutable GitHub ID.
+2. Configure token metadata and review owner rewards, including the configured normal allocation and separate deployer and partner shares.
+3. Link a Solana wallet with SIWS. The linked wallet receives the owner allocation, signs the final launch transaction, and funds any configured initial buy.
+4. Bags handles fee custody and claims. Contribution rankings are informational and do not determine owner rewards.
 
-### F2. Contribute and earn (Contributor)
+### F2. Contributor rankings
 
-1. Hit `/u/[githubUsername]` (auto-generated, public, indexed).
-2. Click "Claim earnings" → continue to Bags.
-3. Bags handles GitHub identity, wallet connection, and fee claims directly. GitShipt never holds contributor claim balances.
+Contributor profiles and rankings show indexed activity. New owner-mode launches do not automatically allocate rewards to ranked contributors. Existing contributor-mode projects retain their legacy behavior.
 
-### F3. Daily Bags rebalance (System)
+### F3. Indexing and legacy rebalances (System)
 
-1. **23:30 UTC**: indexer reconciles GitHub deltas for all live projects.
-2. **00:00 UTC**: leaderboard snapshot generated, frozen, hashed (Merkle root persisted).
-3. **00:15 UTC**: GitShipt computes snapshot-derived contributor BPS targets.
-4. **00:30 UTC**: Bags fee-share config is rebalanced via delegated manager authority when targets changed.
-5. Failures retry with exponential backoff (5m, 15m, 1h, 6h). Permanent failures escalate to admin workflow queue.
+Daily indexing and leaderboard snapshots are informational for owner mode. Owner launches do not create manager delegation or a payout schedule. Legacy contributor-mode rebalances require an authorized delegated manager and do not automatically add claimers.
 
 ### F4. Admin oversight
 
@@ -500,7 +484,7 @@ All background work runs as **Vercel Workflows** triggered by **Vercel Cron Jobs
 
 | Layer          | Choice                                                                                                                                           | Reason                                                                                                                                                     |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Web            | Next.js 16.2 (App Router, RSC, Server Actions, Turbopack) on **Vercel Fluid Compute**                                                            | Stack constraint, latest features, up to 14min execution. Patched against CVE-2025-66478 and CVE-2025-29927.                                               |
+| Web            | Next.js 16.4.6 (App Router, RSC, Server Actions, Turbopack) on **Vercel Fluid Compute**                                                            | See the manifest and installed documentation for the current version.                                               |
 | Lang           | TypeScript strict                                                                                                                                | Non-negotiable                                                                                                                                             |
 | UI             | Tailwind v4 (`@theme` directive, no `tailwind.config.js`) + shadcn/ui + Tremor (admin charts) + Lucide                                           | Standard 2026 stack                                                                                                                                        |
 | Design system  | **DESIGN.md** at project root (Google Labs spec, Apache 2.0)                                                                                     | Persistent design context for all coding agents (Claude Code, Cursor, Copilot). See companion `DESIGN.md` file.                                            |
@@ -510,7 +494,7 @@ All background work runs as **Vercel Workflows** triggered by **Vercel Cron Jobs
 | Cache / nonces | **Upstash Redis (via Vercel Marketplace)**                                                                                                       | One-click integration. Used only for cache, SIWS nonces, rate limit, idempotency keys.                                                                     |
 | Cron           | **Vercel Cron Jobs** (Pro plan required for sub-daily)                                                                                           | Native, secured via `CRON_SECRET`                                                                                                                          |
 | Auth           | **better-auth** with GitHub OAuth + custom SIWS plugin (`@phantom/sign-in-with-solana`)                                                          | Modern, declarative, extensible. Auth.js v5 fallback if SIWS plugin model proves friction.                                                                 |
-| Solana         | `@solana/web3.js@^1.98.x` (v1 line, locked post-Dec-2024 supply chain incident), `@solana/spl-token`, Helius RPC, `@bagsfm/bags-sdk`             | Bags SDK uses v1-style imports. Don't move to v2/`@solana/kit` until Bags ports.                                                                           |
+| Solana         | `@solana/web3.js@^1.99.0` (v1 line), Helius RPC, `@bagsfm/bags-sdk@^1.4.4`             | Bags SDK uses v1-style imports. Don't move to v2/`@solana/kit` until Bags ports.                                                                           |
 | Observability  | Vercel Workflows dashboard, Vercel Observability, Sentry                                                                                         | Built-in for workflows, Sentry for app errors                                                                                                              |
 | CI/CD          | GitHub Actions, preview envs on Vercel                                                                                                           | Per-PR preview                                                                                                                                             |
 | Testing        | Vitest (unit), Playwright (e2e launch flow)                                                                                                      | Realistic coverage                                                                                                                                         |
@@ -961,7 +945,7 @@ gitshipt/
 ├── AGENTS.md                         # Agent context: links to DESIGN.md spec + project conventions
 ├── .theme/tokens.json                # Generated from apps/web/app/globals.css
 ├── apps/
-│   └── web/                          # Deployable Next.js 16.2 app
+│   └── web/                          # Deployable Next.js app
 │       ├── app/                      # App Router routes and route handlers
 │       ├── components/               # App-owned chrome/features
 │       ├── lib/                      # auth, Bags, GitHub, Solana, scoring, cache, audit

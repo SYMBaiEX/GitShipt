@@ -17,11 +17,12 @@ import { tradingHalt } from "@/lib/trading-controls";
 import { serverEnv } from "@/lib/env";
 import { PublicKey } from "@solana/web3.js";
 import { BAGS_FEE_SHARE_V2_PROGRAM_ID } from "@/lib/bags/program-client";
-import { payoutSignerPublicKey } from "@/lib/solana/signer";
 import { solanaConnection } from "@/lib/solana/connection";
+import { rewardModeOf } from "@repo/shared";
+import { validateOwnerLaunchClaimers } from "./owner-claimers";
 import { assertPlatformOnlyPartner } from "@/lib/bags/partner-config";
 
-async function assertLaunchPartnerReady(): Promise<void> {
+export async function assertLaunchPartnerReady(): Promise<void> {
   const env = serverEnv();
   const partner = new PublicKey(env.BAGS_PARTNER_WALLET);
   const [config] = PublicKey.findProgramAddressSync(
@@ -31,11 +32,6 @@ async function assertLaunchPartnerReady(): Promise<void> {
   if (config.toBase58() !== env.BAGS_PARTNER_CONFIG_KEY) {
     throw new Error(
       "BAGS_PARTNER_CONFIG_KEY does not match BAGS_PARTNER_WALLET's on-chain partner configuration.",
-    );
-  }
-  if (payoutSignerPublicKey() !== env.BAGS_PARTNER_WALLET) {
-    throw new Error(
-      "BAGS_PARTNER_WALLET must match SOLANA_PAYOUT_KEYPAIR for automatic platform fee claims.",
     );
   }
   const account = await solanaConnection("confirmed").getAccountInfo(config);
@@ -220,6 +216,15 @@ export async function loadRecordedLaunchClaimers(
     )
     .where(eq(bagsFeeShareConfigs.projectId, projectId))
     .orderBy(asc(bagsClaimerSlots.slotIndex));
+  const [project] = await dbHttp
+    .select({ platformFeeBps: projects.platformFeeBps, payoutConfig: projects.payoutConfig, launchWallet: projects.bagsLaunchWallet })
+    .from(projects).where(eq(projects.id, projectId)).limit(1);
+  if (!project) throw new Error("Launch project not found.");
+  if (rewardModeOf(project.payoutConfig) === "owner") {
+    if (!project.launchWallet) throw new Error("Owner launch wallet is missing.");
+    validateOwnerLaunchClaimers(rows, project.launchWallet, project.platformFeeBps);
+    return rows;
+  }
   if (
     rows.length === 0 ||
     rows.some(
@@ -236,12 +241,6 @@ export async function loadRecordedLaunchClaimers(
       "This prepared launch has no direct contributor claimer manifest. Reconcile the old pool configuration before launching.",
     );
   }
-  const [project] = await dbHttp
-    .select({ platformFeeBps: projects.platformFeeBps })
-    .from(projects)
-    .where(eq(projects.id, projectId))
-    .limit(1);
-  if (!project) throw new Error("Launch project not found.");
   validatePlatformManifest(rows, project.platformFeeBps);
   return rows;
 }

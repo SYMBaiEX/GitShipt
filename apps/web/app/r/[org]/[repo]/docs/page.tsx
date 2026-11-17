@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { rewardModeOf } from "@repo/shared";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -43,6 +44,18 @@ async function ProjectDocsPageContent({ params }: { params: Params }) {
   const customDocs = await getProjectDocs(header.id);
   const repoUrl = `https://github.com/${header.ghOwner}/${header.ghRepo}`;
   const platformFeePct = (header.platformFeeBps / 100).toFixed(1);
+  if (rewardModeOf(header.payoutConfig) === "owner") {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-headline-lg">Owner rewards</h1>
+        <p className="text-body-md text-fg-secondary">
+          This project uses owner rewards. The linked launch wallet receives the
+          owner share of the normal creator allocation through Bags. Contributor
+          rankings are informational and do not determine payments.
+        </p>
+      </div>
+    );
+  }
   const contributorPoolPct = ((10_000 - header.platformFeeBps) / 100).toFixed(
     1,
   );

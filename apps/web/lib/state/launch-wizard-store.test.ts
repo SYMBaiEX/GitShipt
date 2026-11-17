@@ -66,8 +66,7 @@ describe("launch wizard store", () => {
     expect(state.metadata).toMatchObject({
       name: "open-source-launch-kit",
       symbol: "OSLK",
-      description:
-        "Token for sym/open-source-launch-kit. Fees redistribute to top contributors daily.",
+      description: "Token for sym/open-source-launch-kit.",
       imageUrl: repo.ownerAvatarUrl,
       website: "https://gitshipt.dev",
     });
@@ -109,6 +108,7 @@ describe("launch wizard store", () => {
       repo: null,
       metadata: null,
       leaderboard: DEFAULT_LEADERBOARD,
+      rewardMode: "owner",
       status: "idle",
       errorMessage: null,
       success: null,
@@ -128,6 +128,7 @@ describe("launch wizard store", () => {
         imageUrl: repo.ownerAvatarUrl,
       },
       leaderboard: DEFAULT_LEADERBOARD,
+      rewardMode: "contributors",
     });
 
     const state = useLaunchWizardStore.getState();
@@ -135,6 +136,9 @@ describe("launch wizard store", () => {
     expect(state.step).toBe(4);
     expect(state.repo?.fullName).toBe("sym/git-bags");
     expect(state.metadata?.description).toBe("Resumed");
+    expect(state.rewardMode).toBe("contributors");
+    state.setRewardMode("owner");
+    expect(useLaunchWizardStore.getState().rewardMode).toBe("owner");
   });
 
   test("succeedSubmit clears draftProjectId so post-launch saves don't target a stale draft", () => {
@@ -157,7 +161,8 @@ describe("launch wizard store", () => {
     useLaunchWizardStore.getState().setMetadata({
       name: "git-bags",
       symbol: "GITSHIPT",
-      description: repo.description ?? "Daily fee payouts for repo contributors",
+      description:
+        repo.description ?? "Daily fee payouts for repo contributors",
       imageUrl: repo.ownerAvatarUrl,
     });
     useLaunchWizardStore.getState().setLeaderboard(DEFAULT_LEADERBOARD);

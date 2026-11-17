@@ -1,6 +1,6 @@
 import "server-only";
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { dbHttp } from "@/db";
 import { projects } from "@/db/schema";
@@ -147,6 +147,7 @@ export async function PATCH(
       status: projects.status,
       ghOwner: projects.ghOwner,
       ghRepo: projects.ghRepo,
+      payoutConfig: projects.payoutConfig,
     })
     .from(projects)
     .where(eq(projects.id, projectId))
@@ -217,13 +218,22 @@ export async function PATCH(
           updates.tokenTelegramUrl = body.telegram || null;
         if (body.scoringConfig !== undefined)
           updates.scoringConfig = body.scoringConfig;
-        if (body.payoutConfig !== undefined)
-          updates.payoutConfig = body.payoutConfig;
+        if (body.payoutConfig !== undefined) {
+          updates.payoutConfig = body.payoutConfig.rewardMode === undefined
+            ? { ...body.payoutConfig, rewardMode: project.payoutConfig.rewardMode }
+            : body.payoutConfig;
+        }
 
-        await dbHttp
+        const [updated] = await dbHttp
           .update(projects)
           .set(updates)
-          .where(eq(projects.id, projectId));
+          .where(and(
+            eq(projects.id, projectId),
+            eq(projects.status, "draft"),
+            sql`${projects.payoutConfig}->>'rewardMode' IS NOT DISTINCT FROM ${project.payoutConfig.rewardMode ?? null}`,
+          ))
+          .returning({ id: projects.id });
+        if (!updated) throw new Error("draft_no_longer_editable");
 
         await audit({
           actorUserId: userId,
@@ -250,6 +260,7 @@ export async function PATCH(
 
     return json({ ok: true });
   } catch (e) {
+    if (e instanceof Error && e.message === "draft_no_longer_editable") return json({ error: "not_draft", message: "This project has already left draft status." }, { status: 409 });
     const message = e instanceof Error ? e.message : "Failed to update draft.";
     console.error("[projects:patch] failed:", e);
     return json(

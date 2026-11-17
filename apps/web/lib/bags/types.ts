@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PublicKey } from "@solana/web3.js";
 
 /** Bags fee-claimer social providers for identity-based wallet resolution. */
 export const BagsProviderSchema = z.enum([
@@ -307,19 +308,34 @@ export type FeeShareAdminTransferInput = z.infer<
   typeof FeeShareAdminTransferInputSchema
 >;
 
+const AdminUpdatePublicKeySchema = z.string().refine((value) => {
+  try {
+    return new PublicKey(value).toBase58() === value;
+  } catch {
+    return false;
+  }
+}, "Invalid Solana public key");
+
 export const FeeShareAdminUpdateConfigInputSchema = z.object({
-  baseMint: SolanaAddressSchema,
-  payer: SolanaAddressSchema,
+  baseMint: AdminUpdatePublicKeySchema,
+  payer: AdminUpdatePublicKeySchema,
   feeClaimers: z
     .array(
       z.object({
-        wallet: SolanaAddressSchema,
+        wallet: AdminUpdatePublicKeySchema,
         bps: z.number().int().min(0).max(10_000),
       }),
     )
     .min(1)
     .max(100),
-  additionalLookupTables: z.array(SolanaAddressSchema).optional(),
+  additionalLookupTables: z.array(AdminUpdatePublicKeySchema).transform((tables) => [...new Set(tables)]).optional(),
+}).superRefine((value, ctx) => {
+  if (value.feeClaimers.reduce((total, claimer) => total + claimer.bps, 0) !== 10_000) {
+    ctx.addIssue({ code: "custom", path: ["feeClaimers"], message: "Fee claimer BPS must total 10000." });
+  }
+  if (new Set(value.feeClaimers.map((claimer) => claimer.wallet)).size !== value.feeClaimers.length) {
+    ctx.addIssue({ code: "custom", path: ["feeClaimers"], message: "Fee claimer wallets must be unique." });
+  }
 });
 export type FeeShareAdminUpdateConfigInput = z.infer<
   typeof FeeShareAdminUpdateConfigInputSchema

@@ -4,7 +4,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { Octokit } from "@octokit/rest";
 import { auth } from "@/lib/auth";
 import { dbHttp, dbPool } from "@/db";
@@ -35,6 +35,7 @@ import { payoutSignerPublicKey } from "@/lib/solana/signer";
 import {
   loadRecordedLaunchClaimers,
   resolveDirectLaunchClaimers,
+  assertLaunchPartnerReady,
 } from "@/lib/bags/launch-claimers";
 import { verifyLaunchTransaction } from "@/lib/bags/verify-launch";
 import { acquireWorkflowLock, releaseWorkflowLock } from "@/lib/workflow-locks";
@@ -44,12 +45,15 @@ import { updateProjectCaches, updateUserCaches } from "@/lib/cache-actions";
 import {
   CreateProjectBodySchema,
   UpdateDraftBodySchema,
+  rewardModeOf,
   type CreateProjectBody,
   type UpdateDraftBody,
 } from "@repo/shared";
 import { applyDbRlsContext } from "@/lib/db-rls";
 import { isProjectsGhRepoUniqueViolation } from "@/lib/db-errors";
 import { platformFeeBps } from "@/lib/platform-fee";
+import { requirePersonalRepoOwner, RepoOwnerError } from "@/lib/github/repo-owner";
+import { buildOwnerLaunchClaimers } from "@/lib/bags/owner-claimers";
 import { resolveGitHubInstallationForRepo } from "@/lib/github/installations";
 
 /**
@@ -346,8 +350,17 @@ export async function createAndLaunchAction(
           if (!project) {
             throw new ActionError("not_found", "Project not found.", 404);
           }
-
+          const rewardMode = rewardModeOf(project.payoutConfig);
           if (!willStubLaunch) {
+            const modeGuard = canLaunchOnBags(rewardMode);
+            if (!modeGuard.ok) throw new ActionError("launch_refused", modeGuard.reason, 409, projectId);
+          }
+          if (!willStubLaunch && rewardMode === "owner") {
+            await requirePersonalRepoOwner({ userId, ghOwner: project.ghOwner, ghRepo: project.ghRepo, ghRepoId: project.ghRepoId });
+            await assertLaunchPartnerReady();
+          }
+
+          if (!willStubLaunch && rewardMode === "contributors") {
             const installationId = await ensureGitHubInstallation({
               userId,
               projectId,
@@ -459,6 +472,9 @@ export async function createAndLaunchAction(
             );
           }
 
+          if (!willStubLaunch && rewardMode === "contributors") {
+            throw new ActionError("contributor_automation_unavailable", "New contributor-reward launches are unavailable until automated Bags updates are supported.", 409, projectId);
+          }
           const feeBps = await platformFeeBps();
           if (validated.platformFeeBps !== feeBps) {
             throw new ActionError(
@@ -473,8 +489,8 @@ export async function createAndLaunchAction(
             .set({ platformFeeBps: feeBps })
             .where(eq(projects.id, projectId));
           project.platformFeeBps = feeBps;
-          const directClaimers = willStubLaunch
-            ? null
+          const directClaimers = willStubLaunch ? null : rewardMode === "owner"
+            ? buildOwnerLaunchClaimers(launchWalletAddress!, serverEnv().SOLANA_TREASURY_ADDRESS, feeBps)
             : await resolveDirectLaunchClaimers(
                 projectId,
                 project.payoutConfig.maxClaimers ?? 50,
@@ -539,7 +555,7 @@ export async function createAndLaunchAction(
                 updatedAt: new Date(),
               })
               .where(
-                and(eq(projects.id, projectId), eq(projects.status, "draft")),
+                and(eq(projects.id, projectId), eq(projects.status, "draft"), sql`${projects.payoutConfig}->>'rewardMode' IS NOT DISTINCT FROM ${project.payoutConfig.rewardMode ?? null}`),
               )
               .returning({ id: projects.id });
             if (!checkpoint)
@@ -556,6 +572,7 @@ export async function createAndLaunchAction(
               baseMint: tokenInfo.tokenMint,
               adminPubkey: launchWallet,
               claimers: directClaimers,
+              rewardMode,
               isInitFinalized: false,
               steadyStateCadenceHours:
                 project.payoutConfig.steadyStateCadenceHours ?? 72,
@@ -757,6 +774,7 @@ export async function createAndLaunchAction(
     );
     return result;
   } catch (e) {
+    if (e instanceof RepoOwnerError) return { ok: false, error: e.code, message: e.message, status: e.status };
     if (e instanceof ActionError) {
       return {
         ok: false,
@@ -845,6 +863,10 @@ export async function completeLaunchAction(
     if (!project) {
       throw new ActionError("not_found", "Project not found.", 404, projectId);
     }
+    const rewardMode = rewardModeOf(project.payoutConfig);
+    if (rewardMode === "owner") {
+      await requirePersonalRepoOwner({ userId, ghOwner: project.ghOwner, ghRepo: project.ghRepo, ghRepoId: project.ghRepoId });
+    }
     if (project.status === "live" && project.tokenMint) {
       return {
         ok: true,
@@ -925,6 +947,7 @@ export async function completeLaunchAction(
           baseMint: ready.config.tokenMint,
           adminPubkey: launchWalletAddress,
           claimers,
+          rewardMode,
           steadyStateCadenceHours:
             project.payoutConfig?.steadyStateCadenceHours ?? 72,
         }),
@@ -997,6 +1020,7 @@ export async function completeLaunchAction(
       note: "Bags launch transaction broadcast. Token is live.",
     };
   } catch (e) {
+    if (e instanceof RepoOwnerError) return { ok: false, error: e.code, message: e.message, status: e.status, projectId };
     if (e instanceof ActionError) {
       return {
         ok: false,
@@ -1435,6 +1459,7 @@ export async function saveDraftAction(
           id: string;
           status: string;
           ownerUserId: string;
+          payoutConfig: typeof projects.$inferSelect.payoutConfig;
         } | null = null;
         if (existingProjectId) {
           const [row] = await dbHttp
@@ -1442,6 +1467,7 @@ export async function saveDraftAction(
               id: projects.id,
               status: projects.status,
               ownerUserId: projects.ownerUserId,
+              payoutConfig: projects.payoutConfig,
             })
             .from(projects)
             .where(eq(projects.id, existingProjectId))
@@ -1460,6 +1486,7 @@ export async function saveDraftAction(
               id: projects.id,
               status: projects.status,
               ownerUserId: projects.ownerUserId,
+              payoutConfig: projects.payoutConfig,
             })
             .from(projects)
             .where(
@@ -1502,12 +1529,12 @@ export async function saveDraftAction(
             twitter: validated.twitter ?? "",
             telegram: validated.telegram ?? "",
             scoringConfig: validated.scoringConfig,
-            payoutConfig: validated.payoutConfig,
+            payoutConfig: { ...validated.payoutConfig, rewardMode: body.payoutConfig.rewardMode ?? existing.payoutConfig.rewardMode },
           };
           // Sanity check the partial through the same Zod schema the PATCH uses.
           UpdateDraftBodySchema.parse(updates);
 
-          await dbHttp
+          const [updatedDraft] = await dbHttp
             .update(projects)
             .set({
               name: updates.name!,
@@ -1521,7 +1548,13 @@ export async function saveDraftAction(
               payoutConfig: updates.payoutConfig!,
               updatedAt: new Date(),
             })
-            .where(eq(projects.id, existing.id));
+            .where(and(
+              eq(projects.id, existing.id),
+              eq(projects.status, "draft"),
+              sql`${projects.payoutConfig}->>'rewardMode' IS NOT DISTINCT FROM ${existing.payoutConfig.rewardMode ?? null}`,
+            ))
+            .returning({ id: projects.id });
+          if (!updatedDraft) throw new ActionError("not_draft", "This project has already left draft status.", 409);
 
           await audit({
             actorUserId: userId,

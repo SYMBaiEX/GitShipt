@@ -101,8 +101,8 @@ async function PrivacyPageContent() {
         <LegalSection index={4} title="How we use your data">
           <p>
             We use the data above to operate the leaderboard, compute
-            contributor scores, dispatch on-chain payouts to the correct
-            wallets, authenticate sessions, prevent abuse via rate limiting and
+            contributor scores, configure Bags fee sharing, authenticate
+            sessions, prevent abuse via rate limiting and
             audit review, and respond to support requests. We do not use your
             data for advertising or profiling, and we do not sell it.
           </p>

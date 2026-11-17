@@ -109,8 +109,9 @@ export function RepoPicker({ selectedId, onSelect }: RepoPickerProps) {
       <header className="space-y-2 lg:pt-1">
         <h2 className="text-headline-sm">Pick a repository</h2>
         <p className="text-body-md text-fg-secondary">
-          Choose the GitHub repo to back this token. We verify your admin
-          permission server-side at launch.
+          Choose a public personal repository you own. Organization repositories
+          and repositories owned by another user are not eligible for owner
+          rewards. Ownership is verified at launch.
         </p>
         {state.data?.visibilityNote ? (
           <p className="rounded-md border border-border-strong bg-surface-elevated px-3 py-2 text-body-sm text-fg-muted">

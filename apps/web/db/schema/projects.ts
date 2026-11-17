@@ -137,6 +137,7 @@ export interface InstallPreferences {
 }
 
 export interface PayoutConfig {
+  rewardMode?: "owner" | "contributors";
   topN: number;
   tierWeights: number[]; // must sum to 1.0
   claimThresholdLamports: number;

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { rewardModeOf } from "@repo/shared";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -38,7 +39,10 @@ export default function ProjectSnapshotsPage({
 }) {
   return (
     <Suspense fallback={null}>
-      <ProjectSnapshotsPageContent params={params} searchParams={searchParams} />
+      <ProjectSnapshotsPageContent
+        params={params}
+        searchParams={searchParams}
+      />
     </Suspense>
   );
 }
@@ -55,6 +59,7 @@ async function ProjectSnapshotsPageContent({
   if (!data) notFound();
 
   const { header } = data;
+  const ownerRewards = rewardModeOf(header.payoutConfig) === "owner";
   const slug = `${header.ghOwner}/${header.ghRepo}`;
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
 
@@ -86,20 +91,31 @@ async function ProjectSnapshotsPageContent({
         ]}
       />
 
+      {ownerRewards ? (
+        <p className="text-body-sm text-fg-secondary">
+          Snapshots show informational rankings and do not allocate owner
+          rewards.
+        </p>
+      ) : null}
+
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SummaryTile
           label="Snapshots shown"
           value={snapshots.length.toLocaleString("en-US")}
         />
-        <SummaryTile
-          label="Paid cycles"
-          value={visibleTotals.paid.toLocaleString("en-US")}
-        />
-        <SummaryTile
-          label="Fees captured"
-          value={formatSol(visibleTotals.fees, 4)}
-          mono
-        />
+        {!ownerRewards ? (
+          <>
+            <SummaryTile
+              label="Paid cycles"
+              value={visibleTotals.paid.toLocaleString("en-US")}
+            />
+            <SummaryTile
+              label="Fees captured"
+              value={formatSol(visibleTotals.fees, 4)}
+              mono
+            />
+          </>
+        ) : null}
       </section>
 
       <Card depth="raised" padding="none" className="overflow-hidden">
@@ -109,15 +125,21 @@ async function ProjectSnapshotsPageContent({
           <>
             <div className="grid grid-cols-[minmax(0,1fr)_110px_110px_140px_170px_96px] items-center gap-3 border-b border-border bg-surface-elevated/40 px-5 py-2.5 text-label-sm text-fg-muted">
               <div>When</div>
-              <div className="text-right">Status</div>
-              <div className="text-right">Recipients</div>
-              <div className="text-right">Fees</div>
+              <div className="text-right">{ownerRewards ? "" : "Status"}</div>
+              <div className="text-right">
+                {ownerRewards ? "" : "Recipients"}
+              </div>
+              <div className="text-right">{ownerRewards ? "" : "Fees"}</div>
               <div className="text-right">Merkle root</div>
               <div />
             </div>
             <ul className="divide-y divide-border">
               {snapshots.map((row) => (
-                <SnapshotRow key={row.id} row={row} />
+                <SnapshotRow
+                  key={row.id}
+                  row={row}
+                  informational={ownerRewards}
+                />
               ))}
             </ul>
           </>

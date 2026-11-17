@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { rewardModeOf } from "@repo/shared";
 import { getProjectPageData } from "@/lib/queries/project-page";
 import { getTokenStats } from "@/lib/queries/token-stats";
 import { ProjectHeader } from "./_components/ProjectHeader";
@@ -27,7 +28,7 @@ export async function generateMetadata({
     title: `${data.header.name} · Leaderboard`,
     description:
       data.header.description ??
-      `Daily on-chain payouts for contributors to ${data.header.ghOwner}/${data.header.ghRepo}.`,
+      `Token and contribution rankings for ${data.header.ghOwner}/${data.header.ghRepo}.`,
   };
 }
 
@@ -38,11 +39,7 @@ export async function generateMetadata({
  * renders the leaderboard content so navigating between project tabs does not
  * remount the sidebar or briefly fall back to visitor state.
  */
-export default function ProjectPage({
-  params,
-}: {
-  params: Promise<Params>;
-}) {
+export default function ProjectPage({ params }: { params: Promise<Params> }) {
   return (
     <Suspense fallback={null}>
       <ProjectPageContent params={params} />
@@ -50,11 +47,7 @@ export default function ProjectPage({
   );
 }
 
-async function ProjectPageContent({
-  params,
-}: {
-  params: Promise<Params>;
-}) {
+async function ProjectPageContent({ params }: { params: Promise<Params> }) {
   const { org, repo } = await params;
   const data = await getProjectPageData(org, repo);
   if (!data) {
@@ -63,6 +56,7 @@ async function ProjectPageContent({
 
   const { header, leaderboard, pool, recentPayouts, nextPayoutAt } = data;
   const tokenStats = await getTokenStats(header);
+  const ownerRewards = rewardModeOf(header.payoutConfig) === "owner";
 
   return (
     <>
@@ -93,12 +87,24 @@ async function ProjectPageContent({
           aria-label="Project economics"
           className="flex min-w-0 flex-col gap-3 lg:col-start-2 lg:row-span-2 lg:row-start-2 lg:min-h-0 lg:overflow-y-auto lg:[scrollbar-width:thin] lg:[scrollbar-color:var(--border-strong)_transparent]"
         >
-          <NextPayoutCountdown targetIso={nextPayoutAt.toISOString()} />
-          <PoolOverviewCard pool={pool} projectStatus={header.status} />
-          <RecentPayoutsFeed
-            payouts={recentPayouts}
-            projectSlug={header.slug}
-          />
+          {ownerRewards ? (
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <h2 className="text-label-md text-fg">Owner rewards</h2>
+              <p className="mt-2 text-body-sm text-fg-secondary">
+                The configured owner wallet receives the owner share through
+                Bags. Contributor rankings are informational.
+              </p>
+            </div>
+          ) : (
+            <>
+              <NextPayoutCountdown targetIso={nextPayoutAt.toISOString()} />
+              <PoolOverviewCard pool={pool} projectStatus={header.status} />
+              <RecentPayoutsFeed
+                payouts={recentPayouts}
+                projectSlug={header.slug}
+              />
+            </>
+          )}
         </aside>
 
         {/* Row 3 col 1: leaderboard fills the remaining vertical space */}

@@ -3,6 +3,8 @@ import { dbHttp } from "@/db";
 import { sql } from "drizzle-orm";
 import { hasCredentials, productionReadiness, serverEnv } from "@/lib/env";
 import { noStoreJson } from "@/lib/no-store-response";
+import { payoutSignerPublicKey } from "@/lib/solana/signer";
+import { PublicKey } from "@solana/web3.js";
 
 
 /**
@@ -16,7 +18,7 @@ import { noStoreJson } from "@/lib/no-store-response";
  */
 export async function GET(req: Request): Promise<Response> {
   const strict = new URL(req.url).searchParams.get("strict") === "1";
-  const status: Record<string, "ok" | "stub" | "fail"> = {
+  const status: Record<string, "ok" | "stub" | "fail" | "optional"> = {
     db: "stub",
     redis: "stub",
     bags: hasCredentials.bags() ? "ok" : "stub",
@@ -25,7 +27,8 @@ export async function GET(req: Request): Promise<Response> {
     githubApp: hasCredentials.githubApp() ? "ok" : "stub",
     solana: hasCredentials.solana() ? "ok" : "stub",
     payoutKey: hasCredentials.payoutKey() ? "ok" : "stub",
-    managerKey: hasCredentials.managerKey() ? "ok" : "stub",
+    managerKey: hasCredentials.managerKey() ? "ok" : "optional",
+    treasuryWallet: "stub",
     heliusWebhook: hasCredentials.heliusWebhook() ? "ok" : "stub",
     cron: hasCredentials.cron() ? "ok" : "stub",
   };
@@ -59,6 +62,24 @@ export async function GET(req: Request): Promise<Response> {
   }
 
   const env = serverEnv();
+  if (env.SOLANA_TREASURY_ADDRESS) {
+    try {
+      status.treasuryWallet = new PublicKey(env.SOLANA_TREASURY_ADDRESS).toBase58() === env.SOLANA_TREASURY_ADDRESS ? "ok" : "fail";
+    } catch {
+      status.treasuryWallet = "fail";
+    }
+  }
+  let payoutPublicKey: string | null = null;
+  let partnerClaimMode: "automatic" | "manual" | "unavailable" = "unavailable";
+  if (hasCredentials.payoutKey()) {
+    try {
+      payoutPublicKey = payoutSignerPublicKey();
+      if (!payoutPublicKey) status.payoutKey = "fail";
+      else partnerClaimMode = payoutPublicKey === env.BAGS_PARTNER_WALLET ? "automatic" : "manual";
+    } catch {
+      status.payoutKey = "fail";
+    }
+  }
   const overrides = {
     emergencyKillSwitch: env.EMERGENCY_KILL_SWITCH,
     killSwitchEnabled: env.KILL_SWITCH_ENABLED,
@@ -86,6 +107,10 @@ export async function GET(req: Request): Promise<Response> {
       status,
       production,
       overrides,
+      payoutPublicKey,
+      partnerClaimMode,
+      warnings: partnerClaimMode === "manual" ? ["Partner fees require manual claims from the partner wallet."] : [],
+      contributorAutomation: "unavailable",
       stubMode,
       at: new Date().toISOString(),
     },

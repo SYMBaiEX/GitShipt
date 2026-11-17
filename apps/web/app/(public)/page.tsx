@@ -117,9 +117,9 @@ async function LandingPageContent() {
             </h1>
 
             <p className="max-w-xl text-body-md text-fg-secondary">
-              GitShipt mints a Bags.fm token for any GitHub repo and streams the
-              trading fees back to its contributors through Bags-native fee
-              sharing.
+              Launch a Bags.fm token for an eligible personal GitHub repository.
+              The linked owner wallet receives creator rewards through Bags.
+              Contribution rankings are informational.
             </p>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-caption">

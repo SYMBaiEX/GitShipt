@@ -8,23 +8,24 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # GitShipt — agent context
 
-You are working in **GitShipt**, a Solana token launchpad that pays out trading fees to a GitHub repo's top contributors daily. Read these two files first; they bind every decision:
+You are working in **GitShipt**, a Solana token launchpad. New launches use owner rewards for eligible personal public GitHub repositories; daily contributor rankings are informational. Read these files first; they bind every decision:
 
 1. **`DESIGN.md`** — Google Labs DESIGN.md spec defining the cypherpunk-dark visual system. Two palettes (dark canonical + light mirror).
 2. **`gitshipt-prd.md`** — full product spec: architecture, data model, Bags integration, security model, page tree, permissions matrix.
+3. **`SPEC.md`** — current product invariants, including the owner-rewards debut model.
 
 If anything in these files conflicts with your training data, the file wins.
 
 ## Stack pins (verified November 2026)
 
-- **Runtime**: Bun 1.4.4 workspace monorepo, Next.js 16.4 (App Router, Server Actions, Turbopack, React Compiler), React 19.3, Node 26 LTS.
+- **Runtime**: Bun 1.4.4 workspace monorepo, Next.js 16.4.6 (App Router, Server Actions, Turbopack, React Compiler), React 19.3.1, Node 26.
 - **Bun HTTP/3**: Bun's `http3: true` / `protocol: "http3"` APIs are experimental. Keep them out of production Next/Vercel and money-moving paths.
 - **DB**: Neon Postgres via Vercel Marketplace. The app accepts `DATABASE_URL` / `DATABASE_URL_UNPOOLED` from the Neon integration, plus `POSTGRES_URL` / `POSTGRES_URL_NON_POOLING` aliases for generic Postgres compatibility. Runtime DB access uses Drizzle; Neon URLs use the Neon serverless driver path and generic Postgres uses `postgres-js`.
 - **Cache / nonces / rate-limit**: Upstash Redis.
 - **Background**: Vercel Workflows (`workflow` package, `'use workflow'` / `'use step'` directives). **Step idempotency is NOT automatic** — pass `getStepMetadata().stepId` as the key for any external API call.
 - **Auth**: `better-auth` with GitHub OAuth + custom SIWS plugin (`@phantom/sign-in-with-solana`).
-- **Solana**: `@solana/web3.js@^1.98.x` (v1 line; do not use `@solana/kit`).
-- **Bags**: `@bagsfm/bags-sdk` Token Launch v2. Claim namespace is `sdk.fee.*` (not `sdk.feeClaim.*`).
+- **Solana**: `@solana/web3.js@^1.99.0` (v1 line; do not use `@solana/kit`).
+- **Bags**: `@bagsfm/bags-sdk@^1.4.4` Token Launch v2. Claim namespace is `sdk.fee.*` (not `sdk.feeClaim.*`).
 - **UI**: Tailwind v4 (`@theme inline`, no `tailwind.config.js`) + `@repo/ui` shadcn-style primitives + Lucide + Geist / Geist Mono.
 - **Theming**: `next-themes` with `attribute="data-theme"`, `defaultTheme="system"`, `disableTransitionOnChange`, `suppressHydrationWarning` on `<html>`.
 
@@ -55,6 +56,12 @@ If anything in these files conflicts with your training data, the file wins.
 ## Day-1 status (April 25, 2026)
 
 Foundation in progress: scaffold + design system + DB schema + auth shells + first workflow. See plan at `~/.claude/plans/you-are-building-gitshipt-moonlit-wand.md`.
+
+## Current rewards model
+
+New launches require a public personal repository owned by the signed-in GitHub user, verified by immutable GitHub ID. The linked launch wallet receives the owner share of the normal creator allocation: 90% at the default 10% GitShipt platform allocation. GitShipt's deployer and Bags partner shares are separate. These are shares of their respective pools, not a tax on total trading volume. Owner mode has no manager delegation or payout schedule; rankings do not determine rewards. Organization launches and new contributor-mode launches are blocked. Existing projects without an explicit reward mode remain legacy contributor mode.
+
+`SOLANA_PAYOUT_KEYPAIR` is the config payer/deployer, not necessarily the partner wallet. A partner-wallet mismatch requires manual partner claims and does not block launch. `SOLANA_MANAGER_KEYPAIR` is optional for legacy projects with an authorized delegated rebalance; do not promise owner self-service delegation.
 
 ## When you hit a credential blocker
 

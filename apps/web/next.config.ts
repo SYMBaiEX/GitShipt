@@ -60,6 +60,10 @@ const nextConfig: NextConfig = {
   },
   devIndicators: { position: "top-right" },
   allowedDevOrigins: ["127.0.0.1"],
+  // Workflow's externalized Vercel OIDC helper resolves jose at runtime.
+  outputFileTracingIncludes: {
+    "/*": ["./node_modules/jose/**/*", "../../node_modules/jose/**/*"],
+  },
   transpilePackages: ["@repo/lib", "@repo/shared", "@repo/ui"],
 
   images: {

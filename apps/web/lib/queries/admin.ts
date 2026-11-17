@@ -159,7 +159,11 @@ async function getOpsKpisUncached(
     dbHttp
       .select({ c: count() })
       .from(snapshots)
-      .where(eq(snapshots.status, "frozen")),
+      .innerJoin(projects, eq(projects.id, snapshots.projectId))
+      .where(and(
+        eq(snapshots.status, "frozen"),
+        sql`${projects.payoutConfig}->>'rewardMode' IS DISTINCT FROM 'owner'`,
+      )),
     dbHttp
       .select({ c: count() })
       .from(payouts)

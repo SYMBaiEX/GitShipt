@@ -22,7 +22,6 @@ import { Spinner } from "@repo/ui";
 import { FormError } from "@/components/shared/FormError";
 import { RepoPicker } from "./RepoPicker";
 import { TokenMetadataForm } from "./TokenMetadataForm";
-import { LeaderboardConfigForm } from "./LeaderboardConfigForm";
 import { ReviewAndSign } from "./ReviewAndSign";
 import { ManagerDelegationStep } from "./ManagerDelegationStep";
 import { DexscreenerOrderDialog } from "@/components/bags/DexscreenerOrderDialog";
@@ -38,6 +37,7 @@ import {
   DEFAULT_SCORING_CONFIG,
   DEFAULT_STEADY_STATE_CADENCE_HOURS,
   defaultTierWeights,
+  rewardModeOf,
   type CreateProjectBody,
   type ScoringConfigInput,
   type PayoutConfigInput,
@@ -115,6 +115,8 @@ export function WizardShell({
   const repo = useLaunchWizardStore((state) => state.repo);
   const metadata = useLaunchWizardStore((state) => state.metadata);
   const leaderboard = useLaunchWizardStore((state) => state.leaderboard);
+  const rewardMode = useLaunchWizardStore((state) => state.rewardMode);
+  const setRewardMode = useLaunchWizardStore((state) => state.setRewardMode);
   const status = useLaunchWizardStore((state) => state.status);
   const errorMessage = useLaunchWizardStore((state) => state.errorMessage);
   const success = useLaunchWizardStore((state) => state.success);
@@ -201,6 +203,7 @@ export function WizardShell({
         draft.payoutConfig,
         draft.platformFeeBps,
       ),
+      rewardMode: rewardModeOf(draft.payoutConfig),
     });
   }, [draft, draftProjectId, hydrateFromDraft]);
 
@@ -224,6 +227,12 @@ export function WizardShell({
   async function handleLaunch() {
     if (!repo || !metadata) {
       failSubmit("Missing repo or token metadata. Restart the wizard.");
+      return;
+    }
+    if (rewardMode !== "owner") {
+      failSubmit(
+        "Automatic contributor rewards are unavailable for new launches. Convert this draft to owner rewards to continue.",
+      );
       return;
     }
     if (
@@ -265,6 +274,7 @@ export function WizardShell({
         windowDays: leaderboard.windowDays,
       },
       payoutConfig: {
+        rewardMode,
         topN: leaderboard.topN,
         tierWeights: leaderboard.tierWeights,
         claimThresholdLamports: leaderboard.claimThresholdLamports,
@@ -393,6 +403,7 @@ export function WizardShell({
         windowDays: leaderboard.windowDays,
       },
       payoutConfig: {
+        rewardMode,
         topN: leaderboard.topN,
         tierWeights: leaderboard.tierWeights,
         claimThresholdLamports: leaderboard.claimThresholdLamports,
@@ -442,7 +453,9 @@ export function WizardShell({
       <div className="mx-auto w-full max-w-4xl px-4 py-4 sm:px-6 lg:py-6 space-y-4">
         <h1 className="sr-only">Launch a repo token</h1>
         <LaunchResult result={success} onViewProject={handleViewProject} />
-        {!success.stub && success.status === "live" ? (
+        {rewardMode === "contributors" &&
+        !success.stub &&
+        success.status === "live" ? (
           <ManagerDelegationStep
             projectId={success.projectId}
             cluster={cluster}
@@ -505,11 +518,24 @@ export function WizardShell({
                 className="mb-4"
               />
             ) : null}
-            <LeaderboardConfigForm
-              initial={{ ...leaderboard, platformFeeBps }}
-              onBack={() => goToStep(2)}
-              onSubmit={setLeaderboard}
-            />
+            {rewardMode === "contributors" ? (
+              <div className="space-y-4">
+                <p className="text-body-md text-fg-secondary">
+                  Automatic contributor rewards are unavailable for new
+                  launches. This legacy draft retains its original mode until
+                  you choose to convert it.
+                </p>
+                <Button type="button" onClick={() => setRewardMode("owner")}>
+                  Use owner rewards
+                </Button>
+              </div>
+            ) : (
+              <OwnerRewardsConfig
+                platformFeeBps={platformFeeBps}
+                onBack={() => goToStep(2)}
+                onContinue={() => setLeaderboard(leaderboard)}
+              />
+            )}
           </>
         ) : step === 4 && repo && metadata ? (
           <>
@@ -522,6 +548,7 @@ export function WizardShell({
               />
             ) : null}
             <ReviewAndSign
+              rewardMode={rewardMode}
               repo={repo}
               metadata={metadata}
               leaderboard={{ ...leaderboard, platformFeeBps }}
@@ -566,6 +593,53 @@ export function WizardShell({
           onSave={handleSaveDraft}
         />
       ) : null}
+    </div>
+  );
+}
+
+function OwnerRewardsConfig({
+  platformFeeBps,
+  onBack,
+  onContinue,
+}: {
+  platformFeeBps: number;
+  onBack: () => void;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <h2 className="text-headline-sm">Owner rewards</h2>
+      <p className="text-body-md text-fg-secondary">
+        The linked launch wallet receives the owner share of the normal creator
+        allocation. Contribution rankings are informational and do not determine
+        rewards. Only eligible personal repositories owned by the signed-in
+        GitHub user can launch.
+      </p>
+      <dl className="space-y-2 border-y border-border py-4">
+        <div className="flex justify-between gap-4">
+          <dt>Owner normal allocation</dt>
+          <dd className="text-mono-md">
+            {((10000 - platformFeeBps) / 100).toFixed(2)}%
+          </dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt>GitShipt normal allocation</dt>
+          <dd className="text-mono-md">{(platformFeeBps / 100).toFixed(2)}%</dd>
+        </div>
+      </dl>
+      <p className="text-body-sm text-fg-secondary">
+        GitShipt also receives the mandatory deployer share and a separate Bags
+        partner share. These allocations are not a percentage of total trading
+        volume.
+      </p>
+      <div className="flex justify-between gap-3">
+        <Button type="button" variant="ghost" onClick={onBack}>
+          Back
+        </Button>
+        <Button type="button" onClick={onContinue}>
+          Review launch
+        </Button>
+      </div>
     </div>
   );
 }
@@ -766,7 +840,7 @@ function LaunchResult({
           {result.stub
             ? "No real Bags.fm token was created. We persisted a test draft so you can preview the project page UX."
             : result.status === "launch_configured"
-              ? "Bags token metadata and fee-share config are ready. The project will not enter payout rotation until the final launch transaction is broadcast."
+              ? "Bags token metadata and fee-share config are ready. The token is not live until the final launch transaction is broadcast."
               : "Your project is live on Bags.fm and now appears on the public leaderboard."}
         </CardDescription>
       </header>
@@ -943,7 +1017,7 @@ function StepIndicator({ current }: { current: LaunchWizardStep }) {
   const labels: Record<LaunchWizardStep, string> = {
     1: "Repo",
     2: "Token",
-    3: "Leaderboard",
+    3: "Rewards",
     4: "Launch",
   };
   return (
@@ -1001,9 +1075,9 @@ function SignedOutPrompt() {
     <div className="space-y-4">
       <h2 className="text-headline-sm">Sign in to continue</h2>
       <p className="text-body-md text-fg-secondary">
-        Start with GitHub so GitShipt can verify repo admin access. Before the
-        final launch you will also install the GitShipt App and link a Solana
-        wallet for the initial buy signature.
+        Sign in with GitHub to select a personal repository you own. Before
+        launch, link a Solana wallet to receive owner rewards and sign the
+        launch transaction.
       </p>
       <Button asChild>
         <Link href="/auth/signin?next=/launch">Sign in with GitHub</Link>

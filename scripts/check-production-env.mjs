@@ -134,13 +134,20 @@ const REQUIRED = [
     name: "SOLANA_PAYOUT_KEYPAIR",
     scope: "Solana",
     sensitive: true,
-    note: "Base58 hot payout keypair. Never use the cold treasury key. (legacy v1.0; deleted in Phase 6)",
+    note: "Hot config payer/deployer signer. Never use a cold treasury key.",
   },
   {
-    name: "SOLANA_MANAGER_KEYPAIR",
+    name: "SOLANA_TREASURY_ADDRESS",
     scope: "Solana",
-    sensitive: true,
-    note: "Base58 keypair holding the on-chain fee-share-config admin role per project. manager — BPS-rebalance authority only.",
+    sensitive: false,
+    note: "Public wallet receiving GitShipt's normal-recipient allocation.",
+  },
+  {
+    name: "SECRETS_SENSITIVE_ATTESTED",
+    scope: "Launch safety",
+    sensitive: false,
+    expected: "true",
+    note: "Set only after reviewing Secret protection for all production credentials.",
   },
   {
     name: "CRON_SECRET",
@@ -167,12 +174,6 @@ const RECOMMENDED = [
     scope: "Database",
     sensitive: true,
     note: "Useful for migrations and direct administrative DB work.",
-  },
-  {
-    name: "ADMIN_EMAIL_ALLOWLIST",
-    scope: "Admin",
-    sensitive: false,
-    note: "Bootstrap operator allowlist if your deployment workflow uses it.",
   },
 ];
 
@@ -303,16 +304,6 @@ function validate(env) {
   const bagsKey = valueOf(env, "BAGS_API_KEY");
   if (bagsKey && !bagsKey.startsWith("bags_prod_")) {
     warnings.push("BAGS_API_KEY does not look like a production key.");
-  }
-
-  const platformBps = Number(valueOf(env, "PLATFORM_FEE_BPS_DEFAULT") || "0");
-  if (platformBps !== 0) {
-    addMissing({
-      name: "PLATFORM_FEE_BPS_DEFAULT=0",
-      scope: "Bags",
-      sensitive: false,
-      note: "Platform revenue uses the Bags partner config, not a contributor deduction.",
-    });
   }
 
   const dbUrl = valueOfAny(

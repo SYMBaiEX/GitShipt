@@ -6,7 +6,7 @@ import { LegalSection } from "@/app/legal/_components/LegalSection";
 export const metadata: Metadata = {
   title: "Terms of Service · GitShipt",
   description:
-    "Terms governing use of GitShipt — a Solana token launchpad that pays trading fees back to GitHub repository contributors.",
+    "Terms governing use of GitShipt, a Solana token launchpad for eligible GitHub repository owners.",
 };
 
 const LAST_UPDATED = "2026-04-26";
@@ -35,9 +35,8 @@ async function TermsPageContent() {
         </p>
         <p className="text-body-md text-fg-secondary">
           These terms govern your use of GitShipt, a hackathon-stage launchpad
-          that mints Solana tokens for open-source repositories and routes a
-          share of trading fees to the repository&apos;s top contributors. Read
-          carefully before launching a project or linking a wallet.
+          for eligible personal open-source repositories. Read carefully before
+          launching a project or linking a wallet.
         </p>
       </header>
 
@@ -63,11 +62,9 @@ async function TermsPageContent() {
             are launched through the Bags.fm SDK on the Solana network.
           </p>
           <p>
-            When the token trades, a configured share of the swap fees is
-            allocated to the repository&apos;s top contributors through
-            Bags-native fee sharing, ranked by an automated scoring workflow
-            that runs on a daily cadence. Contributors claim eligible fees
-            directly through Bags.
+            New owner-reward launches allocate the normal creator share between
+            the linked owner wallet and GitShipt. Bags handles fee custody and
+            claims. Rankings do not allocate rewards in owner mode.
           </p>
         </LegalSection>
 
@@ -108,11 +105,11 @@ async function TermsPageContent() {
         <LegalSection index={5} title="Trading fees and payouts">
           <p>
             GitShipt does not custody user funds. Trades occur on-chain through
-            Bags.fm liquidity. Contributor fee allocations are registered with
-            Bags, and contributors claim eligible fees directly through Bags.
-            GitShipt may run automated workflows to refresh contributor basis
-            points and claim GitShipt partner fees, but those workflows do not
-            take custody of contributor balances.
+            Bags.fm liquidity. Fee allocations are registered with Bags, and
+            eligible recipients claim directly through Bags. GitShipt may run
+            automated workflows to refresh contributor basis points and claim
+            GitShipt partner fees, but those workflows do not take custody of
+            contributor balances.
           </p>
           <p>
             We do not promise any specific payout amount, claim availability,

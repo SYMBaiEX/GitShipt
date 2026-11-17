@@ -323,7 +323,7 @@ export function stubsAllowed(): boolean {
  * Safety check: should we allow a real Bags launch transaction?
  * Mainnet creation requires explicit opt-in and the platform partner rail.
  */
-export function canLaunchOnBags():
+export function canLaunchOnBags(mode: "owner" | "contributors" = "owner"):
   | { ok: true }
   | { ok: false; reason: string } {
   const env = serverEnv();
@@ -336,7 +336,7 @@ export function canLaunchOnBags():
   if (!env.BAGS_PARTNER_CONFIG_KEY) {
     return { ok: false, reason: "BAGS_PARTNER_CONFIG_KEY missing" };
   }
-  if (!env.SOLANA_MANAGER_KEYPAIR) {
+  if (mode === "contributors" && !env.SOLANA_MANAGER_KEYPAIR) {
     return { ok: false, reason: "SOLANA_MANAGER_KEYPAIR missing" };
   }
   if (env.EMERGENCY_KILL_SWITCH || env.KILL_SWITCH_ENABLED) {
@@ -413,7 +413,7 @@ export function productionReadiness(): ProductionReadiness {
     ["BAGS_PARTNER_CONFIG_KEY", env.BAGS_PARTNER_CONFIG_KEY],
     ["HELIUS_RPC_URL", env.HELIUS_RPC_URL],
     ["SOLANA_PAYOUT_KEYPAIR", env.SOLANA_PAYOUT_KEYPAIR],
-    ["SOLANA_MANAGER_KEYPAIR", env.SOLANA_MANAGER_KEYPAIR],
+    ["SOLANA_TREASURY_ADDRESS", env.SOLANA_TREASURY_ADDRESS],
     ["HELIUS_WEBHOOK_AUTH_TOKEN", env.HELIUS_WEBHOOK_AUTH_TOKEN],
     ["CRON_SECRET", env.CRON_SECRET],
     ["IDEMPOTENCY_KEY_SECRET", env.IDEMPOTENCY_KEY_SECRET],

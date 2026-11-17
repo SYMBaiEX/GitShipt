@@ -1,0 +1,20 @@
+diff --git a/lib/parse.js b/lib/parse.js
+index caa2b86aa5a567df33cef4bda3c7a97794f439f8..37ff0ee459e62a0ade216f7272715b5de1b107c4 100644
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -510,9 +510,10 @@ const parse = (input, options) => {
+   const extglobClose = token => {
+-    const literal = input.slice(token.startIndex, state.index + 1);
+-    const body = input.slice(token.startIndex + 2, state.index);
+-    const analysis = analyzeRepeatedExtglob(body, opts);
+-
+-    if ((token.type === 'plus' || token.type === 'star') && analysis.risky) {
++    // CVE-2026-112366: never compile an unbounded repeated extglob. Keep
++    // upstream's flat character-class rewrite where it is available.
++    if (token.type === 'plus' || token.type === 'star') {
++      const literal = input.slice(token.startIndex, state.index + 1);
++      const body = input.slice(token.startIndex + 2, state.index);
++      const analysis = analyzeRepeatedExtglob(body, { ...opts, maxExtglobRecursion: 0 });
+       const safeOutput = analysis.safeOutput
+         ? (token.output ? '' : ONE_CHAR) + (opts.capture ? `(${analysis.safeOutput})` : analysis.safeOutput)
+         : undefined;

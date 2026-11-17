@@ -48,7 +48,8 @@
     "db:seed:tracked": "cd apps/web && bun --env-file=../../.env.local run scripts/seed-tracked-projects.ts",
     "env:check": "NODE_ENV=production bun scripts/check-production-env.mjs",
     "env:template": "bun scripts/check-production-env.mjs --print-template",
-    "security:audit": "bun scripts/check-bun-audit.mjs",
+    "security:patches": "node scripts/check-picomatch-patches.mjs",
+    "security:audit": "bun run security:patches && bun scripts/check-bun-audit.mjs",
     "bun:http3:check": "bun scripts/check-bun-http3.mjs",
     "theme:export": "bun scripts/theme-export.mjs",
     "theme:lint": "bun scripts/theme-lint.mjs",
@@ -61,5 +62,9 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "typescript": "npm:@typescript/typescript6@^6.0.2"
+  },
+  "patchedDependencies": {
+    "picomatch@2.3.2": "patches/picomatch@2.3.2.patch",
+    "picomatch@4.0.7": "patches/picomatch@4.0.7.patch"
   }
 }

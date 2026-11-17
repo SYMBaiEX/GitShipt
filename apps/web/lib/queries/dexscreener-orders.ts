@@ -85,7 +85,7 @@ export async function getActiveDexscreenerOrderForProject(
   projectId: string,
 ): Promise<DexscreenerOrderSummary | null> {
   "use cache";
-  cacheLife("dashboard");
+  cacheLife("auth");
   cacheTag(cacheTags.project(projectId));
   cacheTag(cacheTags.dashboardProject(projectId));
   return getActiveDexscreenerOrderForProjectUncached(projectId);

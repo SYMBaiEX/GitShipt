@@ -1,4 +1,5 @@
 import { Github } from "@repo/ui";
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -12,6 +13,11 @@ import { AuditLogViewer } from "@/components/admin/AuditLogViewer";
 import { getAuditLogs, getProjectAdminDetail } from "@/lib/queries/admin";
 import { formatRelativeTime } from "@repo/lib";
 import { ProjectGodModeControls } from "./_components/ProjectGodModeControls";
+
+export const metadata: Metadata = {
+  title: "Admin project",
+  robots: { index: false, follow: false },
+};
 
 export default function AdminProjectDetailPage({
   params,
@@ -99,7 +105,6 @@ async function AdminProjectDetailPageContent({
           projectId={project.id}
           projectName={project.name}
           status={project.status}
-          platformFeeBps={project.platformFeeBps}
           scoringConfigJson={JSON.stringify(scoringConfig, null, 2)}
           payoutConfigJson={JSON.stringify(payoutConfig, null, 2)}
         />

@@ -17,14 +17,21 @@ import {
 } from "@/lib/env";
 import { bags } from "@/lib/bags/client";
 import { payoutSignerPublicKey } from "@/lib/solana/signer";
-import { recordLaunch } from "@/lib/bags/launch-integration";
+import {
+  recordLaunch,
+  verifyRecordedFeeShareHeader,
+} from "@/lib/bags/launch-integration";
 import {
   loadRecordedLaunchClaimers,
   resolveDirectLaunchClaimers,
 } from "@/lib/bags/launch-claimers";
-import { LaunchProjectResponseSchema } from "@repo/shared";
+import {
+  LaunchProjectRequestSchema,
+  LaunchProjectResponseSchema,
+} from "@repo/shared";
 import { revalidateProjectCaches } from "@/lib/cache";
 import { acquireWorkflowLock, releaseWorkflowLock } from "@/lib/workflow-locks";
+import { platformFeeBps } from "@/lib/platform-fee";
 
 export const maxDuration = 300;
 
@@ -81,13 +88,20 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const userId = session.user.id;
-  const body = (await req.json().catch(() => null)) as {
-    launchWalletAddress?: unknown;
-  } | null;
-  const launchWalletAddress =
-    typeof body?.launchWalletAddress === "string"
-      ? body.launchWalletAddress.trim()
-      : null;
+  const parsedBody = LaunchProjectRequestSchema.safeParse(
+    await req.json().catch(() => ({})),
+  );
+  if (!parsedBody.success) {
+    return NextResponse.json(
+      {
+        error: "invalid_body",
+        message: "Invalid launch wallet or reviewed fee.",
+      },
+      { status: 400 },
+    );
+  }
+  const body = parsedBody.data;
+  const launchWalletAddress = body.launchWalletAddress ?? null;
 
   const rl = await check("project-mutate", `launch:${userId}:${projectId}`);
   if (!rl.success) {
@@ -135,6 +149,21 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
   // cached stub response.
   const willStubMode = !canLaunchOnBags().ok || !hasCredentials.bags();
   if (!willStubMode) {
+    if (
+      typeof body?.reviewedPlatformFeeBps !== "number" ||
+      !Number.isInteger(body.reviewedPlatformFeeBps) ||
+      body.reviewedPlatformFeeBps < 0 ||
+      body.reviewedPlatformFeeBps > 10_000
+    ) {
+      return NextResponse.json(
+        {
+          error: "fee_review_required",
+          message:
+            "Review and acknowledge the platform allocation in reviewedPlatformFeeBps before launching.",
+        },
+        { status: 400 },
+      );
+    }
     if (!launchWalletAddress) {
       return NextResponse.json(
         {
@@ -227,6 +256,13 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
           }
 
           if (project.status === "launch_configured" && !willStubMode) {
+            if (body?.reviewedPlatformFeeBps !== project.platformFeeBps) {
+              throw new LaunchError(
+                "platform_fee_changed",
+                "The prepared launch has different fee terms. Review its recorded allocation.",
+                409,
+              );
+            }
             const ready = readConfiguredLaunch(project);
             if (!ready.ok) {
               throw new LaunchError(
@@ -252,6 +288,7 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
               );
             }
             await loadRecordedLaunchClaimers(projectId);
+            await verifyRecordedFeeShareHeader(projectId);
             const prepared = await bags.createLaunchTransactionForWallet({
               tokenMint: ready.config.tokenMint,
               metadataUrl: ready.config.metadataUrl,
@@ -305,19 +342,26 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
             );
           }
 
+          const feeBps = await platformFeeBps();
+          if (!willStubMode && body?.reviewedPlatformFeeBps !== feeBps) {
+            throw new LaunchError(
+              "platform_fee_changed",
+              "The platform fee changed. Review the updated launch terms.",
+              409,
+            );
+          }
+          await dbHttp
+            .update(projects)
+            .set({ platformFeeBps: feeBps })
+            .where(eq(projects.id, projectId));
+          project.platformFeeBps = feeBps;
           const directClaimers = willStubMode
             ? null
             : await resolveDirectLaunchClaimers(
                 projectId,
                 project.payoutConfig.maxClaimers ?? 50,
+                feeBps,
               );
-          if (!willStubMode && project.platformFeeBps !== 0) {
-            throw new LaunchError(
-              "legacy_platform_fee",
-              "Set the legacy platform fee to zero. GitShipt revenue comes from the Bags partner configuration.",
-              409,
-            );
-          }
           if (!willStubMode && !project.ghInstallationId) {
             throw new LaunchError(
               "github_app_required",
@@ -373,6 +417,44 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
             );
           }
 
+          const initialBuyLamports = serverEnv().BAGS_INITIAL_BUY_LAMPORTS;
+          if (!isStub) {
+            const [checkpoint] = await dbHttp
+              .update(projects)
+              .set({
+                status: "launch_configured",
+                tokenMint: tokenInfo.tokenMint,
+                bagsConfigKey: null,
+                bagsLaunchWallet: launchWallet,
+                bagsPoolClaimerWallet: poolClaimerWallet,
+                bagsTokenMetadata: tokenInfo.tokenMetadata,
+                bagsInitialBuyLamports: initialBuyLamports,
+                platformFeeBps: feeBps,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(eq(projects.id, projectId), eq(projects.status, "draft")),
+              )
+              .returning({ id: projects.id });
+            if (!checkpoint)
+              throw new LaunchError(
+                "launch_checkpoint_failed",
+                "Unable to checkpoint the fee configuration. No fee-config transaction was sent.",
+                409,
+              );
+          }
+          if (directClaimers) {
+            await recordLaunch({
+              projectId,
+              baseMint: tokenInfo.tokenMint,
+              adminPubkey: launchWallet,
+              claimers: directClaimers,
+              isInitFinalized: false,
+              steadyStateCadenceHours:
+                project.payoutConfig.steadyStateCadenceHours ?? 72,
+            });
+          }
+
           const feeShareConfig = await bags.createFeeShareConfig({
             payer,
             admin: isStub ? undefined : launchWallet,
@@ -389,14 +471,13 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
                   },
                 ],
             platformFeeWallet: serverEnv().SOLANA_TREASURY_ADDRESS,
-            shareFee: project.platformFeeBps,
+            shareFee: directClaimers ? 0 : feeBps,
           });
 
           const configuredAt = new Date();
           const configuredStatus = isStub
             ? "simulated_live"
             : "launch_configured";
-          const initialBuyLamports = serverEnv().BAGS_INITIAL_BUY_LAMPORTS;
           const [configured] = await dbHttp
             .update(projects)
             .set({
@@ -421,17 +502,6 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
               "Failed to persist Bags launch configuration before final launch.",
               500,
             );
-          }
-
-          if (directClaimers) {
-            await recordLaunch({
-              projectId,
-              baseMint: tokenInfo.tokenMint,
-              adminPubkey: launchWallet,
-              claimers: directClaimers,
-              steadyStateCadenceHours:
-                project.payoutConfig.steadyStateCadenceHours ?? 72,
-            });
           }
 
           await audit({
@@ -477,6 +547,7 @@ export async function POST(req: Request, ctx: RouteContext): Promise<Response> {
                 409,
               );
             }
+            await verifyRecordedFeeShareHeader(projectId);
             const prepared = await bags.createLaunchTransactionForWallet({
               tokenMint: tokenInfo.tokenMint,
               metadataUrl: tokenInfo.tokenMetadata,

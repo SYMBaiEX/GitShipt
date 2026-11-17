@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  Banknote,
   Pause,
   Power,
   RefreshCcw,
@@ -17,7 +16,6 @@ import {
   forceSnapshot,
   recomputeLeaderboard,
   overrideScoringConfig,
-  updateProjectPlatformFeeBps,
 } from "@/app/admin/actions";
 import { ScoringConfigSchema } from "@repo/shared";
 
@@ -34,25 +32,21 @@ export function ProjectGodModeControls({
   projectId,
   projectName,
   status,
-  platformFeeBps,
   scoringConfigJson,
   payoutConfigJson,
 }: {
   projectId: string;
   projectName: string;
   status: Status;
-  platformFeeBps: number;
   scoringConfigJson: string;
   payoutConfigJson: string;
 }) {
   const [openModal, setOpenModal] = React.useState<
-    null | "pause" | "kill" | "fee"
+    null | "pause" | "kill"
   >(null);
-  const [feeBps, setFeeBps] = React.useState(platformFeeBps);
   const [scoring, setScoring] = React.useState(scoringConfigJson);
   const [scoringErr, setScoringErr] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState<string | null>(null);
-  const feeLocked = status !== "draft";
 
   async function handleForceSnapshot() {
     setBusy("snapshot");
@@ -136,51 +130,6 @@ export function ProjectGodModeControls({
         >
           <RefreshCcw className="size-4" /> Re-compute leaderboard
         </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setOpenModal("fee")}
-          disabled={feeLocked}
-        >
-          <Banknote className="size-4" /> Update fee share
-        </Button>
-      </div>
-
-      <div className="rounded-md border border-border/60 bg-surface-elevated/60 p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-label-md text-fg">Project fee share</p>
-            <p className="text-body-sm text-fg-secondary">
-              Platform{" "}
-              <span className="text-mono-sm">{platformFeeBps} bps</span> ·
-              contributor pool{" "}
-              <span className="text-mono-sm">
-                {10_000 - platformFeeBps} bps
-              </span>
-            </p>
-          </div>
-          {feeLocked ? (
-            <p className="max-w-sm text-right text-caption text-fg-muted">
-              Locked after launch configuration because Bags fee-share config is
-              not dynamically editable.
-            </p>
-          ) : (
-            <div className="min-w-52">
-              <label className="flex items-center justify-between text-label-sm text-fg-secondary">
-                <span>New platform bps</span>
-                <span className="text-mono-sm text-fg">{feeBps}</span>
-              </label>
-              <input
-                type="number"
-                min={200}
-                step={25}
-                value={feeBps}
-                onChange={(e) => setFeeBps(Number(e.target.value))}
-                className="h-10 w-full rounded-md border border-border bg-surface px-3 text-mono-md text-fg outline-none focus:border-primary"
-              />
-            </div>
-          )}
-        </div>
       </div>
 
       <details className="rounded-md border border-border/60 bg-surface-elevated/60 p-3">
@@ -256,29 +205,6 @@ export function ProjectGodModeControls({
           return await killProject({ projectId, ...p });
         }}
         successToast={`${projectName} killed — payouts halted`}
-      />
-      <DestructiveConfirmModal
-        open={openModal === "fee"}
-        onOpenChange={(o) => setOpenModal(o ? "fee" : null)}
-        title="Update project fee share"
-        description={
-          <>
-            Sets this draft project to{" "}
-            <span className="text-mono-sm">{feeBps} bps</span> platform share
-            and <span className="text-mono-sm">{10_000 - feeBps} bps</span>{" "}
-            contributor-pool share before Bags launch config is created.
-          </>
-        }
-        targetName={projectName}
-        confirmLabel="Update fee share"
-        action={async (p) => {
-          return await updateProjectPlatformFeeBps({
-            projectId,
-            bps: feeBps,
-            ...p,
-          });
-        }}
-        successToast={`${projectName} fee share updated to ${feeBps} bps`}
       />
     </div>
   );

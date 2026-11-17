@@ -8,6 +8,18 @@
 
 ## Architecture pointer (2026-05-09)
 
+**November 17, 2026 update:** [ADR 0002](docs/adr/0002-platform-revenue.md)
+supersedes historical fee economics below. GitShipt earns the Bags partner
+share, the config-payer deployer share, and a configurable default 10% of the
+remaining normal creator allocation. These percentages have different
+denominators. The global admin default applies to new configurations only.
+Recipient changes after launch require Bags' token-admin authorization and
+local-manifest reconciliation. Owner-only manager delegation was proven to
+fail on mainnet; new daily-rebalance setup requires Bags program-admin support.
+Daily manager rebalances do not onboard new contributors automatically.
+Historical SDK limits and version statements below are not a current release
+checklist.
+
 The architecture sections below this pointer reflect the **corrected understanding** of Bags fee-share capabilities. GitShipt uses a Bags-native architecture with:
 
 - **Manager role** (delegated to GitShipt): BPS rebalancing within claimer set

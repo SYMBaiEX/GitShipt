@@ -22,8 +22,8 @@ If this README disagrees with those files, the spec wins.
 
 ## Stack
 
-- Bun 1.3.13 workspace monorepo with `bun.lock`
-- Next.js 16.2 App Router, React 19.2, React Compiler, Turbopack, Node 22
+- Bun 1.4.4 workspace monorepo with `bun.lock`
+- Next.js 16.4 App Router, React 19.3, React Compiler, Turbopack, Node 26 LTS
 - TypeScript strict with `noUncheckedIndexedAccess`
 - Tailwind v4 with `@theme inline`, shadcn-style primitives in `@repo/ui`,
   Lucide, Geist, Geist Mono
@@ -131,9 +131,14 @@ Core variables:
 - `HELIUS_RPC_URL`, `SOLANA_MANAGER_KEYPAIR`, and the legacy
   `SOLANA_PAYOUT_KEYPAIR` gate are required before live Bags fee-share config
   transactions can be signed.
-- GitShipt platform revenue is claimed by `BAGS_PARTNER_WALLET` through Bags.
-  Keep the legacy `PLATFORM_FEE_BPS_DEFAULT=0`; contributor fees are never pooled
-  in a GitShipt wallet.
+- GitShipt receives partner revenue, config-payer deployer revenue, and a
+  normal-recipient treasury allocation. The global `fees.platform_bps` admin
+  setting defaults to 1,000 BPS (10%) for new launches only. The legacy
+  `PLATFORM_FEE_BPS_DEFAULT` environment variable does not control live launches.
+  Contributor rewards remain directly claimable through Bags. See
+  [the revenue decision](docs/adr/0002-platform-revenue.md) for exact denominators,
+  post-launch permissions, and recovery limits, and
+  [owner admin bootstrap](docs/admin-bootstrap.md) for provisioning SYMBaiEX.
 - `BAGS_ALLOW_PROD_LAUNCH=true` explicitly enables mainnet token creation once
   the required services are configured. Its default is false.
 - `CRON_SECRET` protects cron/admin automation endpoints.
@@ -313,7 +318,7 @@ Important deployment settings:
 - Build command: `bun run build`
 - Development command: `bun run dev -- --port $PORT`
 - Output directory: `apps/web/.next`
-- Local Bun pin: `1.3.13`
+- Local Bun pin: `1.4.4`
 - Vercel Bun runtime: `1.x` in `vercel.json`, so Vercel uses its latest
   supported Bun 1.x runtime while package metadata keeps local installs pinned.
 - Function region: `iad1`, colocated with the current US East Neon/Redis setup.
@@ -322,13 +327,10 @@ Important deployment settings:
 
 ### Bun HTTP/3
 
-Bun HTTP/3 support (`Bun.serve({ h3: true })` and experimental
-`fetch(..., { protocol: "http3" })`) landed on Bun `main` after the 1.3.13
-stable release. GitShipt stays on stable Bun for production Next/Vercel builds;
-use `bun upgrade --canary` locally and run `bun run bun:http3:check` before
-testing those APIs. Do not wire HTTP/3-only behavior into money-moving Bags or
-Solana paths until Bun ships the feature in a stable release and the target API
-origin is verified to support it.
+Bun HTTP/3 support (`Bun.serve({ http3: true })` and
+`fetch(..., { protocol: "http3" })`) remains experimental in Bun 1.4.
+Run `bun run bun:http3:check` before local experiments. Do not use HTTP/3-only
+behavior in production or money-moving Bags or Solana paths.
 
 The Vercel project must have the Marketplace Neon/Postgres and Redis variables,
 GitHub OAuth/App variables, Bags variables, Solana variables, and `CRON_SECRET`

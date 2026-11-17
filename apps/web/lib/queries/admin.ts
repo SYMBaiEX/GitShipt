@@ -11,6 +11,8 @@ import {
   payoutRecipients,
   projectMemberships,
   apiKeys,
+  bagsClaimEvents,
+  bagsClaimerSlots,
   type ScoringConfig,
   type PayoutConfig,
 } from "@/db/schema";
@@ -20,6 +22,7 @@ import {
   eq,
   gte,
   isNull,
+  isNotNull,
   like,
   or,
   sql,
@@ -68,27 +71,55 @@ const AuditFilterSchema = z.object({
   actorUserId: z.string().min(1).max(128).optional(),
   targetType: z.string().min(1).max(80).optional(),
   targetId: z.string().min(1).max(160).optional(),
-  sinceHours: z.number().int().min(1).max(24 * 30).optional(),
+  sinceHours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 30)
+    .optional(),
   sinceMs: z.number().int().positive().optional(),
   limit: z.number().int().min(1).max(500).optional(),
 });
 const PlatformConfigKeySchema = z.string().min(1).max(200);
 const IdListSchema = z.array(z.string().min(1).max(128)).max(500);
 
-function normalizeProjectStatusFilter(filter?: {
-  status?: string;
-}): { status?: z.infer<typeof ProjectStatusFilterSchema> } {
+/** Indexed direct claims by the configured treasury wallet, not a chain-wide total. */
+export async function getIndexedTreasuryClaims(
+  wallet: string,
+): Promise<string> {
+  const [row] = await dbHttp
+    .select({
+      total: sql<string>`COALESCE(SUM(${bagsClaimEvents.lamports}), 0)::text`,
+    })
+    .from(bagsClaimEvents)
+    .where(
+      and(
+        eq(bagsClaimEvents.userPubkey, wallet),
+        eq(bagsClaimEvents.kind, "user_claim_v2"),
+        sql`EXISTS (SELECT 1 FROM ${bagsClaimerSlots} WHERE ${bagsClaimerSlots.feeShareConfigId} = ${bagsClaimEvents.feeShareConfigId} AND ${bagsClaimerSlots.claimerPubkey} = ${bagsClaimEvents.userPubkey})`,
+      ),
+    );
+  return row?.total ?? "0";
+}
+
+function normalizeProjectStatusFilter(filter?: { status?: string }): {
+  status?: z.infer<typeof ProjectStatusFilterSchema>;
+} {
   return { status: ProjectStatusFilterSchema.parse(filter?.status) };
 }
 
-function normalizePayoutStatusFilter(filter?: {
-  status?: string;
-}): { status?: z.infer<typeof PayoutStatusFilterSchema> } {
+function normalizePayoutStatusFilter(filter?: { status?: string }): {
+  status?: z.infer<typeof PayoutStatusFilterSchema>;
+} {
   return { status: PayoutStatusFilterSchema.parse(filter?.status) };
 }
 
 export interface OpsKpis {
   activeProjects: number;
+  totalProjects: number;
+  launchedProjects: number;
+  contributors: number;
+  users: number;
   frozenAwaitingPayout: number;
   failedPayouts: number;
   hotWalletSol: number | null;
@@ -98,11 +129,33 @@ export interface OpsKpis {
 async function getOpsKpisUncached(
   hotWalletLamports: number | null,
 ): Promise<OpsKpis> {
-  const [activeRows, frozenRows, failedRows, escrowRows] = await Promise.all([
+  const [
+    activeRows,
+    totalRows,
+    launchedRows,
+    contributorRows,
+    userRows,
+    frozenRows,
+    failedRows,
+    escrowRows,
+  ] = await Promise.all([
     dbHttp
       .select({ c: count() })
       .from(projects)
       .where(eq(projects.status, "live")),
+    dbHttp.select({ c: count() }).from(projects),
+    dbHttp
+      .select({ c: count() })
+      .from(projects)
+      .where(
+        and(
+          inArray(projects.status, ["live", "paused", "killed"]),
+          isNotNull(projects.tokenMint),
+          isNull(projects.simulatedAt),
+        ),
+      ),
+    dbHttp.select({ c: count() }).from(contributors),
+    dbHttp.select({ c: count() }).from(users),
     dbHttp
       .select({ c: count() })
       .from(snapshots)
@@ -122,6 +175,10 @@ async function getOpsKpisUncached(
 
   return {
     activeProjects: activeRows[0]?.c ?? 0,
+    totalProjects: totalRows[0]?.c ?? 0,
+    launchedProjects: launchedRows[0]?.c ?? 0,
+    contributors: contributorRows[0]?.c ?? 0,
+    users: userRows[0]?.c ?? 0,
     frozenAwaitingPayout: frozenRows[0]?.c ?? 0,
     failedPayouts: failedRows[0]?.c ?? 0,
     hotWalletSol,

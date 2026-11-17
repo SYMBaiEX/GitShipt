@@ -4,22 +4,7 @@ const AUDIT_LEVEL = "high";
 const TODAY = new Date();
 
 const ALLOWED = new Map(
-  [
-    {
-      package: "bigint-buffer",
-      advisory: "GHSA-3gc7-fjrx-p6mg",
-      severity: "high",
-      owner: "platform",
-      expires: "2026-06-15",
-    },
-    {
-      package: "fast-xml-builder",
-      advisory: "GHSA-5wm8-gmm8-39j9",
-      severity: "high",
-      owner: "platform",
-      expires: "2026-06-15",
-    },
-  ].map((entry) => [`${entry.package}:${entry.advisory}`, entry]),
+  [].map((entry) => [`${entry.package}:${entry.advisory}`, entry]),
 );
 
 const proc = Bun.spawnSync({
@@ -75,7 +60,9 @@ for (const [pkg, advisories] of Object.entries(audit)) {
 if (violations.length > 0) {
   console.error("High+ audit advisories need action:");
   for (const violation of violations) console.error(`- ${violation}`);
-  console.error("Document temporary exceptions in docs/security-audit-exceptions.md.");
+  console.error(
+    "Document temporary exceptions in docs/security-audit-exceptions.md.",
+  );
   process.exit(1);
 }
 

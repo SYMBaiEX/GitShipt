@@ -37,6 +37,9 @@ import { managerSigner } from "@/lib/solana/manager-signer";
 import { buildManagerUpdateFeeConfigIx } from "@/lib/bags/program-client";
 import {
   allocateBpsByScore,
+  PLATFORM_CLAIMER_MARKER,
+  validatePlatformManifest,
+  isRebalanceableConfig,
   hashRebalancePlan,
   type BpsAllocationResult,
   type ClaimerSlotInput,
@@ -171,13 +174,16 @@ export async function loadRebalanceContextStep(
     .limit(1);
   if (!config) return null;
 
-  if (config.isUpdateFinalized) return null;
-  if (config.isUpdateLocked) return null;
+  if (!isRebalanceableConfig(config)) return null;
 
   const slotRows = await dbHttp
     .select()
     .from(bagsClaimerSlots)
     .where(eq(bagsClaimerSlots.feeShareConfigId, config.id));
+  const [project] = await dbHttp.select({ platformFeeBps: projects.platformFeeBps })
+    .from(projects).where(eq(projects.id, schedule.projectId)).limit(1);
+  if (!project) throw new Error("Rebalance project not found.");
+  validatePlatformManifest(slotRows, project.platformFeeBps);
   const slots = slotRows
     .sort((a, b) => a.slotIndex - b.slotIndex)
     .map<ClaimerSlotInput>((row) => ({
@@ -188,6 +194,10 @@ export async function loadRebalanceContextStep(
           : null,
       contributorId: row.contributorId,
       currentBps: row.currentBps,
+      reservedBps:
+        row.provider === "wallet" && row.socialHandle === PLATFORM_CLAIMER_MARKER && !row.contributorId
+          ? row.initialBps
+          : undefined,
     }));
 
   const [latestSnapshot] = await dbHttp

@@ -23,7 +23,6 @@ import {
   TokenClaimStatsSchema,
   TopTokenByLifetimeFeesSchema,
   PoolConfigKeysResponseSchema,
-  PartnerConfigSchema,
   PartnerClaimStatsSchema,
   TransactionWithBlockhashSchema,
   TradeQuoteInputSchema,
@@ -93,6 +92,7 @@ import {
   type SimulationDigest,
 } from "@/lib/solana/simulation";
 import { readThroughCache } from "@/lib/read-through-cache";
+import { decodePartnerConfig } from "./partner-config";
 
 /**
  * Typed Bags.fm client. Behavior:
@@ -693,6 +693,12 @@ const localBagsStubs = {
 };
 
 export const bags = {
+  async getAdminTokenMints(wallet: string): Promise<string[]> {
+    const { PublicKey } = await import("@solana/web3.js");
+    const sdk = await getSdk();
+    const result = await sdk.feeShareAdmin.getAdminTokenMints(new PublicKey(wallet));
+    return z.array(z.string().min(32).max(44)).parse(result);
+  },
   hasCredentials: hasCredentials.bags,
 
   /**
@@ -1295,16 +1301,15 @@ export const bags = {
     if (!hasCredentials.bags()) {
       throw new Error("BAGS_API_KEY is required for partner config reads.");
     }
-    return bagsReadCache(`partner-config:${partnerWallet}`, 300, async () => {
-      const [{ PublicKey }, sdk] = await Promise.all([
-        import("@solana/web3.js"),
-        getSdk(),
-      ]);
-      const raw = await sdk.partner.getPartnerConfig(
-        new PublicKey(partnerWallet),
-      );
-      return PartnerConfigSchema.parse(normalizePublicKeyFields(raw));
-    });
+    const { PublicKey } = await import("@solana/web3.js");
+    const wallet = new PublicKey(partnerWallet);
+    const [address] = PublicKey.findProgramAddressSync(
+      [Buffer.from("partner_config"), wallet.toBuffer()],
+      new PublicKey("FEE2tBhCKAt7shrod19QttSVREUYPiyMzoku1mL1gqVK"),
+    );
+    const account = await solanaConnection("finalized").getAccountInfo(address);
+    if (!account) throw new Error("Bags partner configuration not found.");
+    return decodePartnerConfig(address, account);
   },
 
   async getPartnerClaimStats(

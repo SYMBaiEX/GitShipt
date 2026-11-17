@@ -29,6 +29,7 @@ import {
   recordLaunch,
   prepareManagerDelegationTransaction,
   confirmManagerDelegation,
+  verifyRecordedFeeShareHeader,
 } from "@/lib/bags/launch-integration";
 import { payoutSignerPublicKey } from "@/lib/solana/signer";
 import {
@@ -48,6 +49,7 @@ import {
 } from "@repo/shared";
 import { applyDbRlsContext } from "@/lib/db-rls";
 import { isProjectsGhRepoUniqueViolation } from "@/lib/db-errors";
+import { platformFeeBps } from "@/lib/platform-fee";
 import { resolveGitHubInstallationForRepo } from "@/lib/github/installations";
 
 /**
@@ -220,6 +222,7 @@ export async function createAndLaunchAction(
         // (ghOwner, ghRepo) UNIQUE).
         let projectId: string;
         let isExistingLive = false;
+        const initialFeeBps = await platformFeeBps();
 
         try {
           const txResult = await dbp.transaction(async (tx) => {
@@ -240,7 +243,7 @@ export async function createAndLaunchAction(
                 tokenTwitterUrl: validated.twitter ?? null,
                 tokenTelegramUrl: validated.telegram ?? null,
                 status: "draft",
-                platformFeeBps: validated.platformFeeBps,
+                platformFeeBps: initialFeeBps,
                 scoringConfig: validated.scoringConfig,
                 payoutConfig: validated.payoutConfig,
               })
@@ -269,7 +272,7 @@ export async function createAndLaunchAction(
               ghOwner: validated.ghOwner,
               ghRepo: validated.ghRepo,
               ghRepoId: validated.ghRepoId,
-              platformFeeBps: validated.platformFeeBps,
+              platformFeeBps: initialFeeBps,
             },
           });
         } catch (e) {
@@ -364,6 +367,14 @@ export async function createAndLaunchAction(
           }
 
           if (project.status === "launch_configured") {
+            if (validated.platformFeeBps !== project.platformFeeBps) {
+              throw new ActionError(
+                "platform_fee_changed",
+                "This prepared launch has different fee terms. Review its recorded allocation before proceeding.",
+                409,
+                projectId,
+              );
+            }
             const ready = readConfiguredLaunch(project);
             if (!ready.ok) {
               throw new ActionError(
@@ -390,6 +401,7 @@ export async function createAndLaunchAction(
               );
             }
             await loadRecordedLaunchClaimers(projectId);
+            await verifyRecordedFeeShareHeader(projectId);
             const prepared = await bags.createLaunchTransactionForWallet({
               tokenMint: ready.config.tokenMint,
               metadataUrl: ready.config.metadataUrl,
@@ -447,20 +459,27 @@ export async function createAndLaunchAction(
             );
           }
 
+          const feeBps = await platformFeeBps();
+          if (validated.platformFeeBps !== feeBps) {
+            throw new ActionError(
+              "platform_fee_changed",
+              "The platform fee changed. Refresh and review the updated launch terms.",
+              409,
+              projectId,
+            );
+          }
+          await dbHttp
+            .update(projects)
+            .set({ platformFeeBps: feeBps })
+            .where(eq(projects.id, projectId));
+          project.platformFeeBps = feeBps;
           const directClaimers = willStubLaunch
             ? null
             : await resolveDirectLaunchClaimers(
                 projectId,
                 project.payoutConfig.maxClaimers ?? 50,
+                feeBps,
               );
-          if (!willStubLaunch && project.platformFeeBps !== 0) {
-            throw new ActionError(
-              "legacy_platform_fee",
-              "Set the legacy platform fee to zero. GitShipt revenue comes from the Bags partner configuration.",
-              409,
-              projectId,
-            );
-          }
 
           // Bags step 1: token info
           const tokenInfo = await bags.createTokenInfo({
@@ -504,6 +523,45 @@ export async function createAndLaunchAction(
             );
           }
 
+          const initialBuyLamports = serverEnv().BAGS_INITIAL_BUY_LAMPORTS;
+          if (!isStub) {
+            const [checkpoint] = await dbHttp
+              .update(projects)
+              .set({
+                status: "launch_configured",
+                tokenMint: tokenInfo.tokenMint,
+                bagsConfigKey: null,
+                bagsLaunchWallet: launchWallet,
+                bagsPoolClaimerWallet: poolClaimerWallet,
+                bagsTokenMetadata: tokenInfo.tokenMetadata,
+                bagsInitialBuyLamports: initialBuyLamports,
+                platformFeeBps: feeBps,
+                updatedAt: new Date(),
+              })
+              .where(
+                and(eq(projects.id, projectId), eq(projects.status, "draft")),
+              )
+              .returning({ id: projects.id });
+            if (!checkpoint)
+              throw new ActionError(
+                "launch_checkpoint_failed",
+                "Unable to checkpoint the fee configuration. No fee-config transaction was sent.",
+                409,
+                projectId,
+              );
+          }
+          if (directClaimers) {
+            await recordLaunch({
+              projectId,
+              baseMint: tokenInfo.tokenMint,
+              adminPubkey: launchWallet,
+              claimers: directClaimers,
+              isInitFinalized: false,
+              steadyStateCadenceHours:
+                project.payoutConfig.steadyStateCadenceHours ?? 72,
+            });
+          }
+
           // Bags step 2: fee-share config
           const feeShareConfig = await bags.createFeeShareConfig({
             payer,
@@ -517,18 +575,17 @@ export async function createAndLaunchAction(
               : [
                   {
                     wallet: poolClaimerWallet,
-                    bps: 10_000 - validated.platformFeeBps,
+                    bps: 10_000 - feeBps,
                   },
                 ],
             platformFeeWallet: serverEnv().SOLANA_TREASURY_ADDRESS,
-            shareFee: validated.platformFeeBps,
+            shareFee: directClaimers ? 0 : feeBps,
           });
 
           const configuredAt = new Date();
           const configuredStatus = isStub
             ? "simulated_live"
             : "launch_configured";
-          const initialBuyLamports = serverEnv().BAGS_INITIAL_BUY_LAMPORTS;
           const [configured] = await dbHttp
             .update(projects)
             .set({
@@ -555,17 +612,6 @@ export async function createAndLaunchAction(
             );
           }
 
-          if (directClaimers) {
-            await recordLaunch({
-              projectId,
-              baseMint: tokenInfo.tokenMint,
-              adminPubkey: launchWallet,
-              claimers: directClaimers,
-              steadyStateCadenceHours:
-                project.payoutConfig.steadyStateCadenceHours ?? 72,
-            });
-          }
-
           await audit({
             actorUserId: userId,
             action: "project.launch",
@@ -576,7 +622,7 @@ export async function createAndLaunchAction(
               tokenMint: tokenInfo.tokenMint,
               bagsConfigKey: feeShareConfig.configKey,
               stub: isStub,
-              platformFeeBps: validated.platformFeeBps,
+              platformFeeBps: project.platformFeeBps,
               feeShareConfigSignatures: feeShareConfig.txSignatures,
               launchWallet: isStub ? null : launchWallet,
               poolClaimerWallet,
@@ -606,6 +652,7 @@ export async function createAndLaunchAction(
                 409,
               );
             }
+            await verifyRecordedFeeShareHeader(projectId);
             const prepared = await bags.createLaunchTransactionForWallet({
               tokenMint: tokenInfo.tokenMint,
               metadataUrl: tokenInfo.tokenMetadata,
@@ -660,7 +707,7 @@ export async function createAndLaunchAction(
               tokenMint: tokenInfo.tokenMint,
               bagsConfigKey: feeShareConfig.configKey,
               stub: isStub,
-              platformFeeBps: validated.platformFeeBps,
+              platformFeeBps: project.platformFeeBps,
               feeShareConfigSignatures: feeShareConfig.txSignatures,
               launchSignature,
               launchWallet: isStub ? null : launchWallet,
@@ -841,6 +888,7 @@ export async function completeLaunchAction(
       );
     }
 
+    await verifyRecordedFeeShareHeader(projectId);
     await verifyLaunchTransaction({
       signature,
       tokenMint: ready.config.tokenMint,
@@ -1455,7 +1503,6 @@ export async function saveDraftAction(
             telegram: validated.telegram ?? "",
             scoringConfig: validated.scoringConfig,
             payoutConfig: validated.payoutConfig,
-            platformFeeBps: validated.platformFeeBps,
           };
           // Sanity check the partial through the same Zod schema the PATCH uses.
           UpdateDraftBodySchema.parse(updates);
@@ -1472,7 +1519,6 @@ export async function saveDraftAction(
               tokenTelegramUrl: updates.telegram ? updates.telegram : null,
               scoringConfig: updates.scoringConfig!,
               payoutConfig: updates.payoutConfig!,
-              platformFeeBps: updates.platformFeeBps!,
               updatedAt: new Date(),
             })
             .where(eq(projects.id, existing.id));
@@ -1513,7 +1559,7 @@ export async function saveDraftAction(
               tokenTwitterUrl: validated.twitter ?? null,
               tokenTelegramUrl: validated.telegram ?? null,
               status: "draft",
-              platformFeeBps: validated.platformFeeBps,
+              platformFeeBps: await platformFeeBps(),
               scoringConfig: validated.scoringConfig,
               payoutConfig: validated.payoutConfig,
             })

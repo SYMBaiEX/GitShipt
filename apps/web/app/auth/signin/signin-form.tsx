@@ -5,12 +5,9 @@ import Link from "next/link";
 import { Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { authClient } from "@/lib/auth/client";
-import { useSearchParams } from "next/navigation";
 import { Button } from "@repo/ui";
 
-export function SignInForm() {
-  const params = useSearchParams();
-  const next = params.get("next") ?? "/dashboard";
+export function SignInForm({ next }: { next: string }) {
   const [isLoading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

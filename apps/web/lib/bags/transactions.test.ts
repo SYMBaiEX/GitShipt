@@ -8,6 +8,7 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import bs58 from "bs58";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import {
   assertBagsTransactionSafeToSign,
@@ -72,6 +73,91 @@ function bagsInstructionTransaction(data: Uint8Array): Transaction {
 }
 
 describe("normalizeBagsTransaction", () => {
+  it("normalizes actual Bags SDK Solana instances while preserving partial signatures", async () => {
+    const require = createRequire(import.meta.url);
+    const bagsRequire = createRequire(require.resolve("@bagsfm/bags-sdk"));
+    const sdkWeb3 = bagsRequire(
+      "@solana/web3.js",
+    ) as typeof import("@solana/web3.js");
+    expect(sdkWeb3.VersionedTransaction).not.toBe(VersionedTransaction);
+    expect(sdkWeb3.Transaction).not.toBe(Transaction);
+
+    const payer = sdkWeb3.Keypair.generate();
+    const cosigner = sdkWeb3.Keypair.generate();
+    const instruction = new sdkWeb3.TransactionInstruction({
+      programId: sdkWeb3.SystemProgram.programId,
+      keys: [{ pubkey: cosigner.publicKey, isSigner: true, isWritable: false }],
+      data: Buffer.alloc(0),
+    });
+    const legacy = new sdkWeb3.Transaction({
+      feePayer: payer.publicKey,
+      recentBlockhash: RECENT_BLOCKHASH,
+    }).add(instruction);
+    legacy.partialSign(payer);
+    const message = new sdkWeb3.TransactionMessage({
+      payerKey: payer.publicKey,
+      recentBlockhash: RECENT_BLOCKHASH,
+      instructions: [instruction],
+    }).compileToV0Message();
+    const versioned = new sdkWeb3.VersionedTransaction(message);
+    versioned.sign([payer]);
+
+    for (const tx of [legacy, versioned]) {
+      const bytes =
+        tx instanceof sdkWeb3.Transaction
+          ? tx.serialize({
+              requireAllSignatures: false,
+              verifySignatures: false,
+            })
+          : tx.serialize();
+      const normalized = await normalizeBagsTransaction(tx);
+      expect(normalized).toBeInstanceOf(VersionedTransaction);
+      expect(Buffer.from(normalized.serialize())).toEqual(Buffer.from(bytes));
+      const originalSignature =
+        tx instanceof sdkWeb3.Transaction
+          ? tx.signatures[0]?.signature
+          : tx.signatures[0];
+      expect(originalSignature).toBeTruthy();
+      expect(
+        Buffer.from((normalized as VersionedTransaction).signatures[0]!),
+      ).toEqual(Buffer.from(originalSignature!));
+    }
+  });
+
+  it("rejects invalid serialized bytes from foreign objects", async () => {
+    await expect(
+      normalizeBagsTransaction({ serialize: () => "not bytes" }),
+    ).rejects.toThrow(/invalid serialized transaction bytes/);
+    await expect(
+      normalizeBagsTransaction({ serialize: () => Uint8Array.of(1, 2, 3) }),
+    ).rejects.toThrow(/unsupported serialized transaction/);
+  });
+
+  it("applies signer safety checks after normalizing a foreign transaction", async () => {
+    const require = createRequire(import.meta.url);
+    const sdkWeb3 = createRequire(require.resolve("@bagsfm/bags-sdk"))(
+      "@solana/web3.js",
+    ) as typeof import("@solana/web3.js");
+    const signer = sdkWeb3.Keypair.generate();
+    const tx = new sdkWeb3.Transaction({
+      feePayer: signer.publicKey,
+      recentBlockhash: RECENT_BLOCKHASH,
+    }).add(
+      sdkWeb3.SystemProgram.transfer({
+        fromPubkey: signer.publicKey,
+        toPubkey: sdkWeb3.Keypair.generate().publicKey,
+        lamports: 1,
+      }),
+    );
+    const normalized = await normalizeBagsTransaction(tx);
+    await expect(
+      assertBagsTransactionSafeToSign(
+        normalized,
+        new PublicKey(signer.publicKey.toBytes()),
+      ),
+    ).rejects.toThrow(/direct SOL transfer/);
+  });
+
   it("passes through legacy Transaction instances", async () => {
     const tx = legacyTransaction();
 

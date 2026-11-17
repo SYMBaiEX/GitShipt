@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   allocateBpsByScore,
   hashRebalancePlan,
+  validatePlatformManifest,
+  isRebalanceableConfig,
   type ClaimerSlotInput,
   type LeaderboardScoreInput,
 } from "./bps-plan";
@@ -84,6 +86,24 @@ describe("allocateBpsByScore", () => {
     expect(r.matchedSlots).toBe(1);
   });
 
+  it("preserves fixed wallet allocations across contributor rebalances", () => {
+    const slots = [slot(0), slot(1), slot(2, {
+      githubLogin: null,
+      contributorId: null,
+      currentBps: 1000,
+      reservedBps: 1000,
+    })];
+    expect(allocateBpsByScore(slots, [lb("contrib_1", "user1", 1)]).bps)
+      .toEqual([0, 9000, 1000]);
+  });
+
+  it("rejects excessive reserved allocations", () => {
+    expect(() => allocateBpsByScore([
+      slot(0, { reservedBps: 6000 }),
+      slot(1, { reservedBps: 5000 }),
+    ], [lb("contrib_0", "user0", 1)])).toThrow("exceed");
+  });
+
   it("matches by contributorId first, falls back to ghUsername", () => {
     // Slot has contributorId but the leaderboard entry uses a different ID
     // — should fall back to ghUsername match.
@@ -118,6 +138,31 @@ describe("allocateBpsByScore", () => {
     expect(r.bps.reduce((a, b) => a + b, 0)).toBe(10_000);
     // Slots 0..3 get the +1 (deterministic tie-break).
     expect(r.bps).toEqual([1429, 1429, 1429, 1429, 1428, 1428, 1428]);
+  });
+});
+
+describe("isRebalanceableConfig", () => {
+  it("requires initialized and unlocked configuration", () => {
+    const ready = { isInitFinalized: true, isUpdateLocked: false, isUpdateFinalized: false };
+    expect(isRebalanceableConfig(ready)).toBe(true);
+    expect(isRebalanceableConfig({ ...ready, isInitFinalized: false })).toBe(false);
+    expect(isRebalanceableConfig({ ...ready, isUpdateLocked: true })).toBe(false);
+    expect(isRebalanceableConfig({ ...ready, isUpdateFinalized: true })).toBe(false);
+  });
+});
+
+describe("validatePlatformManifest", () => {
+  const treasury = { provider: "wallet", socialHandle: "gitshipt:platform", contributorId: null, initialBps: 1000 };
+  it("accepts an explicit matching platform slot", () => {
+    expect(() => validatePlatformManifest([treasury], 1000)).not.toThrow();
+  });
+  it("does not infer a platform slot in legacy manifests", () => {
+    expect(() => validatePlatformManifest([{ ...treasury, socialHandle: null }], 1000)).toThrow(/manifest/);
+    expect(() => validatePlatformManifest([], 0)).not.toThrow();
+  });
+  it("rejects changed or duplicate reservations", () => {
+    expect(() => validatePlatformManifest([treasury], 2000)).toThrow(/manifest/);
+    expect(() => validatePlatformManifest([treasury, treasury], 1000)).toThrow(/manifest/);
   });
 });
 

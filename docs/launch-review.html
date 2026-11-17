@@ -1,28 +1,96 @@
 <!doctype html>
 <html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>GitShipt Launch Review</title>
-<style>body{font:16px/1.6 system-ui;max-width:850px;margin:40px auto;padding:0 24px;color:#202124}h1,h2{line-height:1.2}li{margin:10px 0}code{font-size:14px}.status{border-left:4px solid #b3261e;padding-left:16px}a{color:#174ea6}</style>
-<h1>GitShipt Launch Review</h1>
-<p>November 17, 2026. Review of the repo, debut-token launch flow, platform fee wiring, and production readiness.</p>
-<p class="status"><strong>Mainnet readiness: blocked.</strong> Security grade: C. Code quality: B. These are review assessments, not audit certifications.</p>
-<h2>Remaining blockers</h2>
-<ul>
-<li><strong>Critical security release gate:</strong> the dependency audit reports high/critical advisories in the locked tree, including Next.js and Better Auth. Update affected dependencies to their advisory-patched ranges and repeat all checks. The expired bigint-buffer exception must be resolved, not silently renewed.</li>
-<li><strong>Production configuration:</strong> the real Vercel project is <code>symbiexs-projects/gitshipt</code>, aliased by both GitShipt and GitBags domains. Credential names are present; strict health returns 503 for missing Sensitive-secret attestation. Review non-sensitive database credentials before attesting. Enable the new mainnet creation flag only after readiness passes.</li>
-<li><strong>Operational verification:</strong> on-chain partner rate, owner signing, manager delegation, first rebalance, and partner claiming have not been tested against funded production wallets. Public tests do not substitute for this.</li>
-</ul>
-<h2>Code corrections</h2>
-<ul>
-<li>Fixed boolean env parsing; explicit mainnet opt-in; kill switches apply to creation and partner claims.</li>
-<li>Replaced live contributor-pool allocations with direct, Bags-linked contributor claimers totaling 10,000 BPS. The owner remains config admin.</li>
-<li>Added per-project launch serialization, persisted direct-recipient manifests, and confirmed transaction/mint/payer verification.</li>
-<li>Required the 2,500 BPS Bags partner configuration and matching platform claim signer; removed the launcher's legacy treasury deduction control.</li>
-<li>Blocked legacy live admin launches, restricted rebalance scheduling to live projects, restored lint compatibility, and redacted database URLs from errors.</li>
-</ul>
-<h2>Limits</h2>
-<p>Typecheck, lint, theme lint, production build, and 280 unit/integration tests pass. Playwright: 4 passed and 7 DB-fixture checks skipped. Dependency audit fails. The authenticated money flow was not exercised.</p>
-<p>The debut is limited to 15 linked contributor slots until lookup-table preparation is implemented. Index the draft before launching. Config creation followed by a DB failure requires reconciliation. No token, funding transfer, private-key retrieval, or fee claim was executed.</p>
-<p><a href="debut-launch.md">Full findings, setup, debut procedure, and verification limits</a>.</p>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GitShipt Launch Review</title>
+  <style>
+    body {
+      font: 16px/1.6 system-ui;
+      max-width: 850px;
+      margin: 40px auto;
+      padding: 0 24px;
+      color: #202124;
+    }
+    h1,
+    h2 {
+      line-height: 1.2;
+    }
+    li {
+      margin: 10px 0;
+    }
+    code {
+      font-size: 14px;
+    }
+    .status {
+      border-left: 4px solid #b3261e;
+      padding-left: 16px;
+    }
+    a {
+      color: #174ea6;
+    }
+  </style>
+  <h1>GitShipt Launch Review</h1>
+  <p>
+    November 17, 2026. Current upgrade, revenue, admin, and debut-token
+    readiness.
+  </p>
+  <p class="status">
+    <strong>Mainnet creation remains disabled.</strong> A read-only mainnet
+    simulation proved that the owner-only manager-delegation transaction fails
+    with Unauthorized. Bags program-admin authorization is required before daily
+    automated rebalancing can be promised.
+  </p>
+  <h2>Implemented</h2>
+  <ul>
+    <li>
+      Latest application dependencies, TypeScript 7 compiler, ESLint 10, and a
+      version-6 compatibility API for framework and lint integrations.
+    </li>
+    <li>
+      No high or critical dependency advisories; the vulnerable native
+      bigint-buffer is replaced by a tested pure-JavaScript implementation.
+    </li>
+    <li>
+      Separate partner, deployer, and normal treasury allocations. The
+      configurable default is 10% of the normal recipient pool for new configs,
+      not 10% of trading volume.
+    </li>
+    <li>
+      Launch fee snapshots, preserved platform BPS during rebalances,
+      pre-broadcast checkpoints, documented fixed-header checks and API admin
+      attestation.
+    </li>
+    <li>
+      Verified SYMBaiEX admin provisioning with audit record, removal of
+      email-based promotion, and honest separate revenue metrics.
+    </li>
+    <li>
+      Accessible mobile navigation, reduced-motion behavior, and updated
+      rendering boundaries.
+    </li>
+  </ul>
+  <h2>Remaining Gates</h2>
+  <ul>
+    <li>
+      Resolve Bags manager authorization. Do not bypass the guard or mark
+      delegation complete manually.
+    </li>
+    <li>
+      Rotate the API key exposed in chat, review production secret visibility,
+      and verify actual signer and partner bindings before enabling creation.
+    </li>
+    <li>
+      Verify a controlled funded debut, first rebalance and claims. Deployer
+      claiming is not automated; recipient payload decoding is not independently
+      verified.
+    </li>
+  </ul>
+  <p>
+    No token launch, funding transfer, private-key retrieval, or real claim
+    transaction was performed.
+  </p>
+  <p>
+    <a href="debut-launch.md">Full evidence and debut procedure</a> ·
+    <a href="adr/0002-platform-revenue.md">Revenue and permissions decision</a>
+  </p>
 </html>

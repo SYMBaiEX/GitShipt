@@ -249,8 +249,13 @@ export const DraftProjectRecordSchema = z.object({
 export type DraftProjectRecord = z.infer<typeof DraftProjectRecordSchema>;
 
 // ============================================================
-// POST /api/projects/[id]/launch response
+// POST /api/projects/[id]/launch
 // ============================================================
+
+export const LaunchProjectRequestSchema = z.object({
+  launchWalletAddress: z.string().trim().min(32).max(64).optional(),
+  reviewedPlatformFeeBps: z.number().int().min(0).max(10_000).optional(),
+});
 
 export const LaunchProjectResponseSchema = z.object({
   projectId: z.string(),
@@ -318,7 +323,7 @@ export type RepoEnrichment = z.infer<typeof RepoEnrichmentSchema>;
 
 export const DEFAULT_TOP_N = 10;
 export const DEFAULT_WINDOW_DAYS = 30;
-export const DEFAULT_PLATFORM_FEE_BPS = 0;
+export const DEFAULT_PLATFORM_FEE_BPS = 1000;
 export const DEFAULT_CLAIM_THRESHOLD_LAMPORTS = 100_000_000; // 0.1 SOL
 export const LAMPORTS_PER_SOL_NUMBER = 1_000_000_000;
 

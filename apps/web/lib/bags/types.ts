@@ -216,6 +216,8 @@ export const PartnerConfigSchema = z
   .object({
     partner: SolanaAddressSchema,
     bps: z.number().int().min(0).max(10_000),
+    feeCollectionMode: z.number().int().min(0).max(2),
+    feeCollectionPlatformBps: z.number().int().min(0).max(10_000),
     bump: z.number().int().optional(),
     totalClaimedFees: z.coerce.bigint(),
     totalAccumulatedFees: z.coerce.bigint(),

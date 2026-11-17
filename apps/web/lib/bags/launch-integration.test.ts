@@ -95,6 +95,12 @@ describe("recordLaunch — input validation", () => {
     vi.unstubAllGlobals();
   });
 
+  it("does not prepare unverified owner-only manager delegation", async () => {
+    const { prepareManagerDelegationTransaction } = await import("./launch-integration");
+    await expect(prepareManagerDelegationTransaction("project"))
+      .rejects.toThrow(/Manager delegation is unavailable/);
+  });
+
   it("rejects empty claimers array", async () => {
     const { recordLaunch } = await import("./launch-integration");
     await expect(recordLaunch(baseInput([]))).rejects.toThrow(

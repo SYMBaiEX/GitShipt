@@ -149,12 +149,13 @@ export function ManagerDelegationStep({
           <ShieldCheck className="size-5" />
         </div>
         <div className="space-y-1">
-          <h3 className="text-headline-sm">Delegate manager role to GitShipt</h3>
+          <h3 className="text-headline-sm">
+            Delegate manager role to GitShipt
+          </h3>
           <p className="text-body-sm text-fg-secondary">
-            One last on-chain step. GitShipt will sign BPS rebalances on
-            your configured cadence — but the manager role can&apos;t drain
-            funds, replace claimers, or change the partner config. You
-            stay the admin and can revoke at any time.
+            Automated rebalancing requires an authorized Bags manager
+            delegation. Owner-only delegation is not supported. Contact GitShipt
+            support before enabling this project&apos;s schedule.
           </p>
         </div>
       </div>
@@ -174,11 +175,7 @@ export function ManagerDelegationStep({
         </p>
       </div>
 
-      <DelegationBody
-        state={state}
-        cluster={cluster}
-        onSign={handleSign}
-      />
+      <DelegationBody state={state} cluster={cluster} onSign={handleSign} />
     </div>
   );
 }
@@ -241,9 +238,8 @@ function DelegationBody({
             {state.message}
           </div>
           <p className="text-body-sm text-fg-secondary">
-            You can retry from your project dashboard at any time. Until
-            this delegation lands, BPS rebalances are paused for this
-            project.
+            You can retry from your project dashboard at any time. Until this
+            delegation lands, BPS rebalances are paused for this project.
           </p>
         </div>
       );

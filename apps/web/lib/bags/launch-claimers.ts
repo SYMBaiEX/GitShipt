@@ -4,16 +4,22 @@ import {
   bagsClaimerSlots,
   bagsFeeShareConfigs,
   contributors,
+  projects,
 } from "@/db/schema";
 import { bags } from "@/lib/bags/client";
 import type { LaunchClaimerInput } from "@/lib/bags/launch-integration";
-import { allocateBpsByScore } from "@/lib/payouts/bps-plan";
+import {
+  allocateBpsByScore,
+  PLATFORM_CLAIMER_MARKER,
+  validatePlatformManifest,
+} from "@/lib/payouts/bps-plan";
 import { tradingHalt } from "@/lib/trading-controls";
 import { serverEnv } from "@/lib/env";
 import { PublicKey } from "@solana/web3.js";
 import { BAGS_FEE_SHARE_V2_PROGRAM_ID } from "@/lib/bags/program-client";
 import { payoutSignerPublicKey } from "@/lib/solana/signer";
 import { solanaConnection } from "@/lib/solana/connection";
+import { assertPlatformOnlyPartner } from "@/lib/bags/partner-config";
 
 async function assertLaunchPartnerReady(): Promise<void> {
   const env = serverEnv();
@@ -39,11 +45,7 @@ async function assertLaunchPartnerReady(): Promise<void> {
     );
   }
   const state = await bags.getPartnerConfig();
-  if (state.partner !== env.BAGS_PARTNER_WALLET || state.bps !== 2_500) {
-    throw new Error(
-      "Bags partner configuration must name the GitShipt partner wallet with a 2500 BPS fee rate.",
-    );
-  }
+  assertPlatformOnlyPartner(state, env.BAGS_PARTNER_WALLET);
 }
 
 export interface LaunchCandidate {
@@ -56,6 +58,7 @@ export interface LaunchCandidate {
 export function buildDirectLaunchClaimers(
   candidates: LaunchCandidate[],
   resolved: Array<{ username: string; wallet: string | null }>,
+  platform?: { wallet: string; bps: number },
 ): LaunchClaimerInput[] {
   const wallets = new Map(
     resolved.map((r) => [r.username.toLowerCase(), r.wallet]),
@@ -83,15 +86,39 @@ export function buildDirectLaunchClaimers(
     contributorId: c.id,
     currentBps: 0,
   }));
+  if (
+    platform &&
+    (!Number.isInteger(platform.bps) ||
+      platform.bps < 0 ||
+      platform.bps > 10_000)
+  ) {
+    throw new Error("Invalid platform fee allocation.");
+  }
+  if (platform?.bps && keys.includes(platform.wallet)) {
+    throw new Error(
+      "Platform treasury wallet must be distinct from contributor wallets.",
+    );
+  }
   const plan = allocateBpsByScore(
-    slots,
+    platform?.bps
+      ? [
+          ...slots,
+          {
+            slotIndex: slots.length,
+            githubLogin: null,
+            contributorId: null,
+            currentBps: platform.bps,
+            reservedBps: platform.bps,
+          },
+        ]
+      : slots,
     linked.map((c) => ({
       contributorId: c.id,
       ghUsername: c.ghUsername,
       score: c.score,
     })),
   );
-  return linked
+  const claimers: LaunchClaimerInput[] = linked
     .map((c, slotIndex) => ({
       slotIndex,
       claimerPubkey: keys[slotIndex]!,
@@ -102,11 +129,22 @@ export function buildDirectLaunchClaimers(
     }))
     .filter((c) => c.initialBps > 0)
     .map((c, slotIndex) => ({ ...c, slotIndex }));
+  if (platform?.bps)
+    claimers.push({
+      slotIndex: claimers.length,
+      claimerPubkey: platform.wallet,
+      provider: "wallet",
+      socialHandle: PLATFORM_CLAIMER_MARKER,
+      contributorId: null,
+      initialBps: platform.bps,
+    });
+  return claimers;
 }
 
 export async function resolveDirectLaunchClaimers(
   projectId: string,
   maxClaimers: number,
+  platformFeeBps: number,
 ): Promise<LaunchClaimerInput[]> {
   const halt = await tradingHalt(projectId);
   if (halt.halted)
@@ -142,10 +180,19 @@ export async function resolveDirectLaunchClaimers(
   const resolved = await bags.resolveLaunchWalletsBulk(
     rows.map((c) => ({ provider: "github", username: c.ghUsername })),
   );
-  const claimers = buildDirectLaunchClaimers(rows, resolved);
+  const treasury = serverEnv().SOLANA_TREASURY_ADDRESS;
+  if (platformFeeBps > 0 && !treasury)
+    throw new Error(
+      "SOLANA_TREASURY_ADDRESS is required for the platform fee allocation.",
+    );
+  const claimers = buildDirectLaunchClaimers(
+    rows,
+    resolved,
+    treasury ? { wallet: treasury, bps: platformFeeBps } : undefined,
+  );
   if (claimers.length > 15)
     throw new Error(
-      "Launches with more than 15 linked contributors need the Bags lookup-table setup. Reduce maxClaimers to 15 for the debut launch.",
+      "Launches with more than 15 fee claimers, including the platform wallet, need Bags lookup-table setup. Reduce maxClaimers and retry.",
     );
   return claimers;
 }
@@ -175,11 +222,26 @@ export async function loadRecordedLaunchClaimers(
     .orderBy(asc(bagsClaimerSlots.slotIndex));
   if (
     rows.length === 0 ||
-    rows.some((r) => r.provider !== "github" || !r.contributorId)
+    rows.some(
+      (r) =>
+        !(r.provider === "github" && r.contributorId) &&
+        !(
+          r.provider === "wallet" &&
+          r.socialHandle === PLATFORM_CLAIMER_MARKER &&
+          !r.contributorId
+        ),
+    )
   ) {
     throw new Error(
       "This prepared launch has no direct contributor claimer manifest. Reconcile the old pool configuration before launching.",
     );
   }
+  const [project] = await dbHttp
+    .select({ platformFeeBps: projects.platformFeeBps })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  if (!project) throw new Error("Launch project not found.");
+  validatePlatformManifest(rows, project.platformFeeBps);
   return rows;
 }

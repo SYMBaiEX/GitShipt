@@ -573,14 +573,29 @@ function compose(
 
 // ─── The component ────────────────────────────────────────────────────────
 
-export function AppSidebar({
+export function AppSidebar(props: AppSidebarProps) {
+  if (props.surface.kind === "public") {
+    return <AppSidebarContent {...props} fromOrigin={null} />;
+  }
+  return (
+    <React.Suspense fallback={<AppSidebarContent {...props} fromOrigin={null} />}>
+      <AppSidebarWithSearchParams {...props} />
+    </React.Suspense>
+  );
+}
+
+function AppSidebarWithSearchParams(props: AppSidebarProps) {
+  const searchParams = useSearchParams();
+  return <AppSidebarContent {...props} fromOrigin={searchParams.get("from")} />;
+}
+
+function AppSidebarContent({
   surface,
   footerSlot,
   activeKey,
-}: AppSidebarProps) {
+  fromOrigin,
+}: AppSidebarProps & { fromOrigin: string | null }) {
   const pathname = usePathname() ?? "/";
-  const searchParams = useSearchParams();
-  const fromOrigin = searchParams?.get("from") ?? null;
   const chromeUser = useSessionChrome();
   const { collapsed } = useSidebar();
   const setRouteChrome = useAuthenticatedRouteStore(

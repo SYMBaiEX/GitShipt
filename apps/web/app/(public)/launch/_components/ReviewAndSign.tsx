@@ -156,19 +156,22 @@ export function ReviewAndSign({
           </div>
           <div className="space-y-2 border-t border-border pt-3">
             <StatusLine
-              label="Contributor pool"
+              label="Contributors' normal allocation"
               value={
                 <span className="text-mono-sm">{contributorPoolPct}%</span>
               }
             />
             <StatusLine
-              label="Contributor-envelope deduction"
+              label="GitShipt normal allocation"
               value={<span className="text-mono-sm">{platformFeePct}%</span>}
             />
             <StatusLine
-              label="Bags partner rate"
-              value={<span className="text-mono-sm">25%</span>}
+              label="GitShipt deployer share"
+              value={
+                <span className="text-mono-sm">25% of gross creator pool</span>
+              }
             />
+            <StatusLine label="Bags partner share" value="Per Bags config" />
             <StatusLine
               label="Initial buy"
               value={<span className="text-mono-sm">{launchCostLabel}</span>}
@@ -281,13 +284,18 @@ export function ReviewAndSign({
           <dl className="grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
             <Row k="Scoring window" v={`${leaderboard.windowDays} days`} mono />
             <Row k="Paid ranks" v={String(leaderboard.topN)} mono />
+            <Row k="GitShipt normal allocation" v={`${platformFeePct}%`} mono />
             <Row
-              k="Contributor-envelope deduction"
-              v={`${platformFeePct}%`}
+              k="GitShipt deployer share"
+              v="25% of gross creator pool"
               mono
             />
-            <Row k="Bags partner rate" v="25%" mono />
-            <Row k="Contributor pool" v={`${contributorPoolPct}%`} mono />
+            <Row k="Bags partner share" v="Per Bags config" />
+            <Row
+              k="Contributors' normal allocation"
+              v={`${contributorPoolPct}%`}
+              mono
+            />
             <Row
               k="Rank split"
               v={`${(tierSum * 100).toFixed(1)}%`}

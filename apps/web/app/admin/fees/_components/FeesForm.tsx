@@ -6,7 +6,9 @@ import { DestructiveConfirmModal } from "@/components/admin/DestructiveConfirmMo
 import { updateFeesBps } from "@/app/admin/actions";
 
 export function FeesForm({ currentBps }: { currentBps: number }) {
-  const [bps, setBps] = React.useState(currentBps);
+  const [input, setInput] = React.useState(String(currentBps));
+  const bps = Number(input);
+  const valid = /^\d+$/.test(input) && Number.isInteger(bps) && bps <= 10000;
   const [open, setOpen] = React.useState(false);
   const dirty = bps !== currentBps;
 
@@ -27,19 +29,20 @@ export function FeesForm({ currentBps }: { currentBps: number }) {
         </label>
         <input
           type="number"
-          min={200}
-          step={25}
-          value={bps}
-          onChange={(e) => setBps(Number(e.target.value))}
+          min={0}
+          max={10000}
+          step={1}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
           className="h-10 w-full rounded-md border border-border bg-surface px-3 text-mono-md text-fg outline-none focus:border-primary"
         />
-        <div className="text-caption text-fg-muted">Minimum 200 bps.</div>
+        <div className="text-caption text-fg-muted">0–10,000 bps.</div>
       </div>
       <div className="flex justify-end">
         <Button
           variant="primary"
           size="sm"
-          disabled={!dirty}
+          disabled={!dirty || !valid}
           onClick={() => setOpen(true)}
         >
           Save fee
@@ -54,7 +57,8 @@ export function FeesForm({ currentBps }: { currentBps: number }) {
           <>
             New fee will be <span className="text-mono-sm">{bps} bps</span> (
             <span className="text-mono-sm">{(bps / 100).toFixed(2)}%</span>).
-            Applies to every active project on the next snapshot.
+            Applies to new launch configurations only. Existing launches keep
+            their configured allocation.
           </>
         }
         targetName="platform.fees.bps"

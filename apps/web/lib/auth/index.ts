@@ -6,22 +6,10 @@
 import "@/db/rls-storage-init";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { eq } from "drizzle-orm";
 import { dbPool } from "@/db";
 import * as schema from "@/db/schema";
 import { serverEnv, hasCredentials } from "@/lib/env";
 import { establishDbUserContext, enterDbAnonymousContext } from "@/lib/db-rls";
-
-function adminEmailAllowlist(): Set<string> {
-  const raw = serverEnv().ADMIN_EMAIL_ALLOWLIST;
-  if (!raw) return new Set();
-  return new Set(
-    raw
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean),
-  );
-}
 
 /**
  * better-auth instance. Boots lazily so the app can render in stub mode
@@ -82,21 +70,6 @@ function buildOptions(): BetterAuthOptions {
       cookies: {
         sessionToken: {
           attributes: { sameSite: "lax", secure: true, httpOnly: true },
-        },
-      },
-    },
-    databaseHooks: {
-      user: {
-        create: {
-          after: async (user) => {
-            const email = (user as { email?: string }).email;
-            if (!email) return;
-            if (!adminEmailAllowlist().has(email.toLowerCase())) return;
-            await dbPool()
-              .update(schema.users)
-              .set({ role: "super_admin" })
-              .where(eq(schema.users.id, (user as { id: string }).id));
-          },
         },
       },
     },

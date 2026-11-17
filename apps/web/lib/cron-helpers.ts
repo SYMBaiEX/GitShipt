@@ -2,7 +2,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { start } from "workflow/api";
 
-type WorkflowFnRef = Parameters<typeof start>[0];
+type WorkflowFnRef = () => Promise<unknown>;
 
 /**
  * Wrap `workflow/api`'s `start()` so a missing/disabled Vercel Workflows

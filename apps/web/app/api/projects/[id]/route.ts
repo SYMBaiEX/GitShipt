@@ -215,8 +215,6 @@ export async function PATCH(
           updates.tokenTwitterUrl = body.twitter || null;
         if (body.telegram !== undefined)
           updates.tokenTelegramUrl = body.telegram || null;
-        if (body.platformFeeBps !== undefined)
-          updates.platformFeeBps = body.platformFeeBps;
         if (body.scoringConfig !== undefined)
           updates.scoringConfig = body.scoringConfig;
         if (body.payoutConfig !== undefined)

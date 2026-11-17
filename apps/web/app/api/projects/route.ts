@@ -17,6 +17,7 @@ import {
 } from "@repo/shared";
 import { applyDbRlsContext } from "@/lib/db-rls";
 import { isProjectsGhRepoUniqueViolation } from "@/lib/db-errors";
+import { platformFeeBps } from "@/lib/platform-fee";
 
 /**
  * POST /api/projects — create a draft project.
@@ -137,6 +138,7 @@ export async function POST(req: Request): Promise<Response> {
     const result = await withIdempotency(
       idempotencyKey,
       async () => {
+        const feeBps = await platformFeeBps();
         const { projectId } = await dbp.transaction(async (tx) => {
           await applyDbRlsContext(tx);
           const [inserted] = await tx
@@ -155,7 +157,7 @@ export async function POST(req: Request): Promise<Response> {
               tokenTwitterUrl: body.twitter ?? null,
               tokenTelegramUrl: body.telegram ?? null,
               status: "draft",
-              platformFeeBps: body.platformFeeBps,
+              platformFeeBps: feeBps,
               scoringConfig: body.scoringConfig,
               payoutConfig: body.payoutConfig,
             })
@@ -187,7 +189,7 @@ export async function POST(req: Request): Promise<Response> {
             website: body.website,
             twitter: body.twitter,
             telegram: body.telegram,
-            platformFeeBps: body.platformFeeBps,
+            platformFeeBps: feeBps,
           },
           ip,
           userAgent,

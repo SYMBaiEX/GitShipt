@@ -15,10 +15,10 @@ You are working in **GitShipt**, a Solana token launchpad that pays out trading 
 
 If anything in these files conflicts with your training data, the file wins.
 
-## Stack pins (verified April 2026)
+## Stack pins (verified November 2026)
 
-- **Runtime**: Bun 1.3.13 workspace monorepo, Next.js 16.2 (App Router, Server Actions, Turbopack, React Compiler), React 19.2, Node 22.
-- **Bun HTTP/3**: Bun's `h3: true` / `protocol: "http3"` APIs landed after the 1.3.13 stable release. Use canary only for local experiments; keep production Next/Vercel and money-moving paths on stable Bun until Bun publishes HTTP/3 in a stable release.
+- **Runtime**: Bun 1.4.4 workspace monorepo, Next.js 16.4 (App Router, Server Actions, Turbopack, React Compiler), React 19.3, Node 26 LTS.
+- **Bun HTTP/3**: Bun's `http3: true` / `protocol: "http3"` APIs are experimental. Keep them out of production Next/Vercel and money-moving paths.
 - **DB**: Neon Postgres via Vercel Marketplace. The app accepts `DATABASE_URL` / `DATABASE_URL_UNPOOLED` from the Neon integration, plus `POSTGRES_URL` / `POSTGRES_URL_NON_POOLING` aliases for generic Postgres compatibility. Runtime DB access uses Drizzle; Neon URLs use the Neon serverless driver path and generic Postgres uses `postgres-js`.
 - **Cache / nonces / rate-limit**: Upstash Redis.
 - **Background**: Vercel Workflows (`workflow` package, `'use workflow'` / `'use step'` directives). **Step idempotency is NOT automatic** — pass `getStepMetadata().stepId` as the key for any external API call.

@@ -7,10 +7,7 @@ import bs58 from "bs58";
 
 export type BagsTransaction = Transaction | VersionedTransaction;
 export type BagsInstructionPolicy =
-  | "none"
-  | "fee-claim"
-  | "partner-claim"
-  | "fee-config";
+  "none" | "fee-claim" | "partner-claim" | "fee-config";
 
 type Web3Module = typeof import("@solana/web3.js");
 type StaticMessage = {
@@ -103,10 +100,7 @@ function deserializeBytes(
   );
 }
 
-function deserializeString(
-  value: string,
-  web3: Web3Module,
-): BagsTransaction {
+function deserializeString(value: string, web3: Web3Module): BagsTransaction {
   const trimmed = value.trim();
   const errors: string[] = [];
 
@@ -151,6 +145,16 @@ export async function normalizeBagsTransaction(
   }
 
   if (isRecord(transaction)) {
+    if (typeof transaction.serialize === "function") {
+      const bytes: unknown = transaction.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      });
+      if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+        throw new Error("Bags returned invalid serialized transaction bytes.");
+      }
+      return deserializeBytes(bytes, web3);
+    }
     const candidate = nestedTransactionCandidate(transaction);
     if (candidate !== undefined && candidate !== transaction) {
       return normalizeBagsTransaction(candidate);
@@ -210,7 +214,10 @@ function assertKnownBagsFeeShareInstructions(
     const keys = transaction.message.staticAccountKeys;
     for (const instruction of transaction.message.compiledInstructions) {
       const program = keys[instruction.programIdIndex];
-      if (!program && (transaction.message.addressTableLookups?.length ?? 0) > 0) {
+      if (
+        !program &&
+        (transaction.message.addressTableLookups?.length ?? 0) > 0
+      ) {
         throw new Error(
           `${operation}: refusing to validate Bags instruction whose program id is only available through an unresolved address lookup table.`,
         );

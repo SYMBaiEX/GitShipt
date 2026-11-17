@@ -268,7 +268,7 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
         post: {
           summary: "Launch a configured project on Bags",
           description:
-            "Idempotent. Per-user/project rate limit: 12/min. Returns the token mint and Bags fee-share config key on success. Stub mode and real launches share separate idempotency namespaces.",
+            "Idempotent. Per-user/project rate limit: 12/min. Live preparation requires the linked owner wallet and explicit acknowledgment of the current normal-recipient platform BPS. Returns an unsigned final transaction; preparing it does not mean the token is live. Stub and real launches have separate idempotency namespaces.",
           security: [{ session: [] }],
           parameters: [
             {
@@ -284,11 +284,42 @@ export function buildOpenApiSpec(appUrl: string): OpenApiSpec {
               schema: { type: "string", pattern: "^[A-Za-z0-9_\\-:.]{8,128}$" },
             },
           ],
+          requestBody: {
+            description:
+              "Required for live launch preparation; optional for stub mode.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["launchWalletAddress", "reviewedPlatformFeeBps"],
+                  properties: {
+                    launchWalletAddress: {
+                      type: "string",
+                      minLength: 32,
+                      maxLength: 64,
+                    },
+                    reviewedPlatformFeeBps: {
+                      type: "integer",
+                      minimum: 0,
+                      maximum: 10000,
+                    },
+                  },
+                },
+              },
+            },
+          },
           responses: {
-            "200": { description: "Launched." },
+            "200": {
+              description:
+                "Unsigned launch prepared, existing token returned, or stub simulated.",
+            },
             "400": INVALID_BODY,
             "401": NOT_AUTHENTICATED,
             "403": { description: "Permission denied." },
+            "409": {
+              description:
+                "Reviewed fee changed or prepared launch requires reconciliation.",
+            },
             "429": RATE_LIMITED,
             "503": {
               description:

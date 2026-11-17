@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import { connection } from "next/server";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SessionChromeProvider } from "@/components/auth/SessionChromeProvider";
 import { Toaster } from "@/components/providers/Toaster";
+import { Telemetry } from "@/components/providers/Telemetry";
 import { SkipLink } from "@/components/shared/SkipLink";
 import { getSessionUser } from "@/lib/auth/session";
 import "./globals.css";
@@ -98,17 +98,25 @@ export default function RootLayout({
     >
       <body className="min-h-screen bg-app-gradient text-fg antialiased">
         <SkipLink />
+        <Suspense fallback={null}>
+          <RequestMarker />
+        </Suspense>
         <ThemeProvider>
           <Suspense fallback={null}>
             <SessionShell>{children}</SessionShell>
           </Suspense>
           <Toaster />
         </ThemeProvider>
-        <Analytics />
-        <SpeedInsights />
+        <Telemetry />
       </body>
     </html>
   );
+}
+
+async function RequestMarker() {
+  // Session chrome depends on the incoming request, even when its shell streams.
+  await connection();
+  return null;
 }
 
 async function SessionShell({

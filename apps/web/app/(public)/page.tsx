@@ -186,50 +186,22 @@ async function LandingPageContent() {
 function TokenLaunchCarousel({ launches }: { launches: LandingLaunchToken[] }) {
   if (launches.length === 0) return null;
 
-  const loopItems = repeatLaunches(launches, 8);
-
   return (
     <section
       aria-label="Newest token launches"
-      className="gitshipt-token-carousel mx-auto overflow-hidden lg:w-[1088px] 2xl:w-[1120px]"
+      className="mx-auto overflow-x-auto lg:w-[1088px] 2xl:w-[1120px]"
     >
-      <div className="gitshipt-token-carousel-track flex w-max py-1">
-        <div className="flex gap-2 pr-2">
-          {loopItems.map((launch, index) => (
-            <TokenLaunchCard
-              key={`${launch.id}-${index}`}
-              launch={launch}
-              clone={false}
-              priorityImage={index < 5}
-            />
-          ))}
-        </div>
-        <div className="flex gap-2 pr-2" aria-hidden="true">
-          {loopItems.map((launch, index) => (
-            <TokenLaunchCard
-              key={`${launch.id}-clone-${index}`}
-              launch={launch}
-              clone
-              priorityImage={false}
-            />
-          ))}
-        </div>
+      <div className="flex w-max gap-2 py-1">
+        {launches.map((launch, index) => (
+          <TokenLaunchCard
+            key={launch.id}
+            launch={launch}
+            priorityImage={index < 5}
+          />
+        ))}
       </div>
     </section>
   );
-}
-
-function repeatLaunches(
-  launches: LandingLaunchToken[],
-  minimum: number,
-): LandingLaunchToken[] {
-  if (launches.length >= minimum) return launches;
-
-  return Array.from({ length: minimum }, (_, index) => {
-    const launch = launches[index % launches.length];
-    if (!launch) throw new Error("repeatLaunches requires at least one launch");
-    return launch;
-  });
 }
 
 function HeroArtwork() {
@@ -291,11 +263,9 @@ function HeroShip() {
 
 function TokenLaunchCard({
   launch,
-  clone,
   priorityImage,
 }: {
   launch: LandingLaunchToken;
-  clone: boolean;
   priorityImage: boolean;
 }) {
   const avatar = launch.imageUrl ?? `https://github.com/${launch.ghOwner}.png`;
@@ -304,8 +274,7 @@ function TokenLaunchCard({
   return (
     <Link
       href={`/r/${launch.slug}`}
-      tabIndex={clone ? -1 : undefined}
-      className="group flex min-w-[164px] items-center gap-2 rounded-lg border border-border/60 bg-surface/40 px-2.5 py-2 transition-colors hover:border-border-strong hover:bg-surface-elevated/50 sm:min-w-[184px] lg:min-w-[196px] 2xl:min-w-[208px]"
+      className="group flex min-w-[164px] items-center gap-2 rounded-lg border border-border/60 bg-surface/40 px-2.5 py-2 transition-colors hover:border-border-strong hover:bg-surface-elevated/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:min-w-[184px] lg:min-w-[196px] 2xl:min-w-[208px]"
     >
       <span className="relative size-8 shrink-0 overflow-hidden rounded-md bg-surface-elevated">
         <Image

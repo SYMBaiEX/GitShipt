@@ -25,6 +25,21 @@ describe("direct launch claimers", () => {
       /No scored contributors/,
     );
   });
+  it("reserves the platform share and apportions the remainder", () => {
+    const plan = buildDirectLaunchClaimers(candidates, [
+      { username: "symbaiex", wallet: "wallet-a" },
+      { username: "dexploarer", wallet: "wallet-b" },
+    ], { wallet: "treasury", bps: 1000 });
+    expect(plan.map((c) => [c.claimerPubkey, c.initialBps])).toEqual([
+      ["wallet-a", 6750], ["wallet-b", 2250], ["treasury", 1000],
+    ]);
+    expect(plan[2]).toMatchObject({ provider: "wallet", socialHandle: "gitshipt:platform" });
+  });
+  it("rejects a treasury wallet shared by a contributor", () => {
+    expect(() => buildDirectLaunchClaimers(candidates, [
+      { username: "symbaiex", wallet: "wallet-a" },
+    ], { wallet: "wallet-a", bps: 1000 })).toThrow(/distinct/);
+  });
   it("skips rounded-to-zero allocations and keeps slot indices dense", () => {
     const plan = buildDirectLaunchClaimers(
       [

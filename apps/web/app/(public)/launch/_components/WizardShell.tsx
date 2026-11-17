@@ -82,6 +82,7 @@ export interface WizardShellProps {
   /** Server-rendered: true when BAGS_API_KEY is missing (stub mode). */
   isStubMode: boolean;
   initialBuyLamports: number;
+  platformFeeBps: number;
   /** Server-loaded draft to resume. Null for a fresh wizard run. */
   draft: DraftHydration | null;
 }
@@ -90,6 +91,7 @@ export function WizardShell({
   signedIn,
   isStubMode,
   initialBuyLamports,
+  platformFeeBps,
   draft,
 }: WizardShellProps) {
   const router = useRouter();
@@ -269,7 +271,7 @@ export function WizardShell({
         steadyStateCadenceHours: leaderboard.steadyStateCadenceHours,
         maxClaimers: leaderboard.maxClaimers,
       },
-      platformFeeBps: leaderboard.platformFeeBps,
+      platformFeeBps,
     };
 
     // Fresh idempotency key per click so we never replay a cached result
@@ -397,7 +399,7 @@ export function WizardShell({
         steadyStateCadenceHours: leaderboard.steadyStateCadenceHours,
         maxClaimers: leaderboard.maxClaimers,
       },
-      platformFeeBps: leaderboard.platformFeeBps,
+      platformFeeBps,
     };
 
     try {
@@ -504,7 +506,7 @@ export function WizardShell({
               />
             ) : null}
             <LeaderboardConfigForm
-              initial={leaderboard}
+              initial={{ ...leaderboard, platformFeeBps }}
               onBack={() => goToStep(2)}
               onSubmit={setLeaderboard}
             />
@@ -522,7 +524,7 @@ export function WizardShell({
             <ReviewAndSign
               repo={repo}
               metadata={metadata}
-              leaderboard={leaderboard}
+              leaderboard={{ ...leaderboard, platformFeeBps }}
               launchWalletAddress={launchWalletAddress}
               walletConnected={connected}
               walletLinked={launchWalletLinked}

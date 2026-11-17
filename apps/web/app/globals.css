@@ -1849,35 +1849,6 @@ body {
   will-change: transform;
 }
 
-.gitshipt-token-carousel {
-  mask-image: linear-gradient(
-    to right,
-    transparent 0,
-    black 5%,
-    black 95%,
-    transparent 100%
-  );
-}
-
-.gitshipt-token-carousel-track {
-  animation: gitshipt-token-carousel-scroll 36s linear infinite;
-  will-change: transform;
-}
-
-.gitshipt-token-carousel:hover .gitshipt-token-carousel-track {
-  animation-play-state: paused;
-}
-
-@keyframes gitshipt-token-carousel-scroll {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-
-  to {
-    transform: translate3d(-50%, 0, 0);
-  }
-}
-
 @keyframes gitshipt-flag-anchor-sway {
   0% {
     transform: rotate(-0.18deg) translate3d(0, 0, 0);
@@ -1930,8 +1901,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .gitshipt-ship-float,
   .gitshipt-flag-wave,
-  .gitshipt-flag-art,
-  .gitshipt-token-carousel-track {
+  .gitshipt-flag-art {
     animation: none;
   }
 }

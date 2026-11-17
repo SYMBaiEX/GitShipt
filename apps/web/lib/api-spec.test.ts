@@ -79,4 +79,11 @@ describe("buildOpenApiSpec", () => {
       expect(responses["429"], `${path} missing 429`).toBeDefined();
     }
   });
+
+  it("documents live fee acknowledgment and unsigned launch preparation", () => {
+    const operation = JSON.stringify(spec.paths["/api/projects/{id}/launch"]);
+    expect(operation).toContain("reviewedPlatformFeeBps");
+    expect(operation).toContain("unsigned");
+    expect(operation).toContain('"409"');
+  });
 });

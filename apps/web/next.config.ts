@@ -37,6 +37,7 @@ const nextConfig: NextConfig = {
   // (function, args) tuple; their tags participate in revalidateTag. Without
   // this flag the directive is a no-op.
   cacheComponents: true,
+  partialPrefetching: false,
 
   // Named cacheLife profiles consumed by `cacheLife("<name>")`. We name them
   // after the read pattern, not the duration, so call sites read clearly:
@@ -59,21 +60,6 @@ const nextConfig: NextConfig = {
   },
   devIndicators: { position: "top-right" },
   allowedDevOrigins: ["127.0.0.1"],
-  // serverExternalPackages doubles as the workflow step-bundle externals
-  // list. Each entry stays out of the static bundle graph and is resolved
-  // by Node's require at runtime — required for:
-  //
-  //   - better-auth: package's exports map fans into kysely/prisma/mongo
-  //     adapters that Turbopack would pull into the SSR chunk graph.
-  //   - @solana/web3.js: peer deps (@solana/codecs-numbers, rpc-websockets)
-  //     that esbuild can't statically resolve in the workflow step bundle
-  //     even with a hoisted node_modules layout.
-  serverExternalPackages: [
-    "better-auth",
-    "@solana/web3.js",
-    "@solana/codecs-numbers",
-    "rpc-websockets",
-  ],
   transpilePackages: ["@repo/lib", "@repo/shared", "@repo/ui"],
 
   images: {

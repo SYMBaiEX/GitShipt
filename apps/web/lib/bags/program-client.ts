@@ -9,14 +9,12 @@
  * official `bags-cli` reference integration uses the admin role for
  * everything for that reason.
  *
- * The on-chain program nevertheless implements a proper manager role
- * with strictly narrower authority (BPS rebalance only — cannot drain
- * funds, cannot replace claimer pubkeys, cannot set partner, cannot
- * reassign admin). Per the SPEC's principle-of-least-privilege
- * stance and docs/adr/0001-bags-native-payout.md, GitShipt holds the
- * manager role, NOT the admin role. The launch wallet (project owner)
- * remains admin and can revoke manager via `update_fee_config_manager`
- * if our keypair is ever compromised.
+ * Owner-only manager delegation is not supported: a mainnet simulation
+ * confirmed that the setter requires the Bags program administrator.
+ * See docs/debut-launch.md. These builders are lower-level instruction
+ * encoders, not evidence that an arbitrary owner can authorize them.
+ * The app's rebalance path uses persisted recipient slots; do not infer
+ * stronger deployed-program authority limits from the IDL alone.
  *
  * This module builds the Anchor instructions directly using the IDL
  * bundled with `@bagsfm/bags-sdk`. It returns `TransactionInstruction`s;
@@ -148,7 +146,7 @@ export function __resetProgramForTests(): void {
 
 export interface SetManagerArgs {
   connection: Connection;
-  /** The on-chain admin (typically the launching wallet's pubkey). */
+  /** Admin signer required by the Bags program. */
   admin: PublicKey;
   /** Pays for the tx; usually the same as `admin`. */
   payer: PublicKey;
@@ -161,14 +159,12 @@ export interface SetManagerArgs {
 /**
  * Build a `update_fee_config_manager` instruction.
  *
- * Admin-gated: caller MUST be the on-chain admin of the fee-share config
- * (which is the launching wallet immediately post-launch, or whoever it
- * was last transferred to via `getTransferAdminTransaction`).
+ * Bags program-admin gated (verified by unsigned mainnet simulation).
+ * A project owner's wallet alone cannot authorize it.
  *
  * After this instruction lands, the `newManager` pubkey can call
  * `manager_update_fee_config`, `manager_transfer_fee_config`, and
- * `manager_waive_fee_config`. The admin retains the ability to call
- * this instruction again to rotate or revoke the manager.
+ * `manager_waive_fee_config` subject to the program's authority checks.
  */
 export async function buildSetManagerIx(
   args: SetManagerArgs,

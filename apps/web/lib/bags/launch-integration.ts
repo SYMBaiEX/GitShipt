@@ -10,12 +10,8 @@
  *     rows. Throws if a config already exists for the project — there is
  *     no replay path; the launch wizard owns the single attempt.
  *
- *  2. `prepareManagerDelegationTransaction` — builds the unsigned
- *     `update_fee_config_manager` instruction for the project owner
- *     (admin) to sign in their browser wallet. Sets the GitShipt manager
- *     keypair as the on-chain manager. Returns base64-serialized v0 tx
- *     + the manager pubkey expected to land in
- *     `bags_fee_share_configs.manager_pubkey`.
+ *  2. `prepareManagerDelegationTransaction` — refuses the unsupported
+ *     owner-only flow until Bags-authorized delegation is integrated.
  *
  *  3. `confirmManagerDelegation` — after the project owner broadcasts
  *     the signed tx, verifies on-chain that the config's manager now
@@ -23,12 +19,7 @@
  *     the audit entry.
  */
 
-import {
-  Connection,
-  PublicKey,
-  TransactionMessage,
-  VersionedTransaction,
-} from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { eq, inArray } from "drizzle-orm";
 import { dbHttp, dbPool } from "@/db";
 import {
@@ -37,16 +28,19 @@ import {
   bagsFeeShareConfigs,
   contributors,
   payoutSchedules,
+  projects,
 } from "@/db/schema";
 import { audit } from "@/lib/audit";
 import { serverEnv, hasCredentials } from "@/lib/env";
 import {
-  buildSetManagerIx,
   deriveFeeShareAuthorityPda,
   deriveFeeShareConfigPda,
   WSOL_MINT,
 } from "@/lib/bags/program-client";
 import { managerSigner } from "@/lib/solana/manager-signer";
+import { verifyFeeShareHeader } from "@/lib/bags/fee-share-header";
+import { bags } from "@/lib/bags/client";
+import { solanaConnection } from "@/lib/solana/connection";
 
 type ClaimerProvider = (typeof bagsClaimerProviderEnum.enumValues)[number];
 
@@ -73,6 +67,8 @@ export interface RecordLaunchInput {
   /** Project owner / launching wallet (initial on-chain admin). */
   adminPubkey: string;
   claimers: LaunchClaimerInput[];
+  /** False while the fee config has not yet been verified on-chain. */
+  isInitFinalized?: boolean;
   /** 72 (3d) | 120 (5d) | 168 (7d). Default is 72. */
   steadyStateCadenceHours: 72 | 120 | 168;
 }
@@ -81,6 +77,64 @@ export interface RecordLaunchResult {
   feeShareConfigId: string;
   payoutScheduleId: string;
   feeShareConfigPda: string;
+}
+
+/** Verify documented fixed header fields and separately attest admin via Bags API.
+ * The runtime claimer payload is not decoded by the published IDL. */
+export async function verifyRecordedFeeShareHeader(
+  projectId: string,
+): Promise<void> {
+  const [config] = await dbHttp
+    .select()
+    .from(bagsFeeShareConfigs)
+    .where(eq(bagsFeeShareConfigs.projectId, projectId))
+    .limit(1);
+  if (!config) throw new Error("Fee-share manifest is missing.");
+  const [project] = await dbHttp
+    .select({
+      tokenMint: projects.tokenMint,
+      launchWallet: projects.bagsLaunchWallet,
+    })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  if (
+    !project ||
+    project.tokenMint !== config.baseMint ||
+    project.launchWallet !== config.adminPubkey
+  ) {
+    throw new Error("Fee-share manifest does not match the prepared launch.");
+  }
+  const [expectedPda] = deriveFeeShareConfigPda(
+    new PublicKey(config.baseMint),
+    new PublicKey(config.quoteMint),
+  );
+  if (expectedPda.toBase58() !== config.feeShareConfigPda)
+    throw new Error("Fee-share configuration PDA mismatch.");
+  const env = serverEnv();
+  if (!env.BAGS_PARTNER_CONFIG_KEY)
+    throw new Error(
+      "BAGS_PARTNER_CONFIG_KEY is required for fee-share verification.",
+    );
+  const account = await solanaConnection("confirmed").getAccountInfo(
+    new PublicKey(config.feeShareConfigPda),
+  );
+  if (!account) throw new Error("Fee-share configuration account not found.");
+  verifyFeeShareHeader({
+    owner: account.owner,
+    data: account.data,
+    baseMint: new PublicKey(config.baseMint),
+    quoteMint: new PublicKey(config.quoteMint),
+    partner: new PublicKey(env.BAGS_PARTNER_WALLET),
+    partnerConfig: new PublicKey(env.BAGS_PARTNER_CONFIG_KEY),
+  });
+  const adminMints = await bags.getAdminTokenMints(config.adminPubkey);
+  if (!adminMints.includes(config.baseMint))
+    throw new Error("Bags admin-list API did not attest the launch admin.");
+  await dbHttp
+    .update(bagsFeeShareConfigs)
+    .set({ isInitFinalized: true, updatedAt: new Date() })
+    .where(eq(bagsFeeShareConfigs.id, config.id));
 }
 
 /**
@@ -161,7 +215,7 @@ export async function recordLaunch(
         adminPubkey: input.adminPubkey,
         managerPubkey: null, // populated by confirmManagerDelegation
         claimerCount: input.claimers.length,
-        isInitFinalized: true, // Bags' SDK auto-finalizes at launch
+        isInitFinalized: input.isInitFinalized ?? true,
         isUpdateLocked: false,
         isUpdateFinalized: false,
       })
@@ -344,77 +398,15 @@ export interface PreparedManagerDelegation {
 }
 
 /**
- * Build an unsigned `update_fee_config_manager` v0 transaction for the
- * project owner (admin) to sign in their browser wallet.
- *
- * Reads the fee-share-config from `bags_fee_share_configs`, derives the
- * setManager instruction via `program-client`, fetches a recent blockhash,
- * and serializes a partially-signed v0 tx with the admin as fee payer.
- * The browser wallet signs and broadcasts.
- *
- * Throws if:
- *  - hasCredentials.solana() / hasCredentials.managerKey() are false
- *    (we cannot offer a manager pubkey to set)
- *  - The project doesn't have a bags_fee_share_configs row (record launch first)
- *  - The mirror row already has a manager_pubkey (already delegated)
+ * Owner-only delegation fails mainnet simulation with Unauthorized (6009).
+ * Never ask the owner's wallet to fund this unsupported transaction.
  */
 export async function prepareManagerDelegationTransaction(
   projectId: string,
 ): Promise<PreparedManagerDelegation> {
-  if (!hasCredentials.managerKey()) {
-    throw new Error(
-      "SOLANA_MANAGER_KEYPAIR is not configured; cannot offer a manager pubkey.",
-    );
-  }
-  const env = serverEnv();
-  if (!env.HELIUS_RPC_URL) {
-    throw new Error("HELIUS_RPC_URL is required to prepare a delegation tx.");
-  }
-  const [config] = await dbHttp
-    .select()
-    .from(bagsFeeShareConfigs)
-    .where(eq(bagsFeeShareConfigs.projectId, projectId))
-    .limit(1);
-  if (!config) {
-    throw new Error(
-      `no bags_fee_share_configs row for project ${projectId}; mirror first`,
-    );
-  }
-  if (config.managerPubkey) {
-    throw new Error(
-      `manager already delegated to ${config.managerPubkey} for project ${projectId}`,
-    );
-  }
-
-  const connection = new Connection(env.HELIUS_RPC_URL, "confirmed");
-  const newManagerPk = managerSigner().publicKey;
-  const adminPk = new PublicKey(config.adminPubkey);
-  const baseMintPk = new PublicKey(config.baseMint);
-  const quoteMintPk = new PublicKey(config.quoteMint);
-
-  const ix = await buildSetManagerIx({
-    connection,
-    admin: adminPk,
-    payer: adminPk,
-    newManager: newManagerPk,
-    baseMint: baseMintPk,
-    quoteMint: quoteMintPk,
-  });
-
-  const { blockhash } = await connection.getLatestBlockhash("confirmed");
-  const message = new TransactionMessage({
-    payerKey: adminPk,
-    recentBlockhash: blockhash,
-    instructions: [ix],
-  }).compileToV0Message();
-  const tx = new VersionedTransaction(message);
-  // No partial sign — the project owner signs in-browser.
-
-  return {
-    transactionBase64: Buffer.from(tx.serialize()).toString("base64"),
-    managerPubkey: newManagerPk.toBase58(),
-    feeShareConfigId: config.id,
-  };
+  throw new Error(
+    `Manager delegation is unavailable for project ${projectId}: Bags program-admin authorization is required. Contact GitShipt support for integration assistance.`,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -443,6 +435,10 @@ export async function confirmManagerDelegation(
     );
   }
   const env = serverEnv();
+  if (!env.BAGS_PARTNER_CONFIG_KEY)
+    throw new Error(
+      "BAGS_PARTNER_CONFIG_KEY is required for fee-share verification.",
+    );
   if (!env.HELIUS_RPC_URL) {
     throw new Error("HELIUS_RPC_URL is required to confirm a delegation tx.");
   }
@@ -475,11 +471,7 @@ export async function confirmManagerDelegation(
     );
   }
 
-  // Read the on-chain FeeShareConfig and verify the manager field
-  // matches what we expect. Layout per IDL FeeShareConfigHeader:
-  //   8 disc + 32 base_mint + 32 quote_mint + 32 partner + 32 partner_config
-  //   + 32 manager + ...
-  // → manager pubkey starts at offset 8+32+32+32+32 = 136.
+  // Verify the documented header before reading its manager field.
   const accountInfo = await connection.getAccountInfo(
     new PublicKey(config.feeShareConfigPda),
     { commitment: "confirmed" },
@@ -489,9 +481,14 @@ export async function confirmManagerDelegation(
       `fee_share_config account ${config.feeShareConfigPda} not found on-chain`,
     );
   }
-  const onChainManager = new PublicKey(
-    accountInfo.data.subarray(136, 136 + 32),
-  );
+  const onChainManager = verifyFeeShareHeader({
+    owner: accountInfo.owner,
+    data: accountInfo.data,
+    baseMint: new PublicKey(config.baseMint),
+    quoteMint: new PublicKey(config.quoteMint),
+    partner: new PublicKey(env.BAGS_PARTNER_WALLET),
+    partnerConfig: new PublicKey(env.BAGS_PARTNER_CONFIG_KEY),
+  }).manager;
   if (!onChainManager.equals(expectedManager)) {
     throw new Error(
       `on-chain manager ${onChainManager.toBase58()} does not match our manager keypair ${expectedManager.toBase58()} — delegation tx may have set a different pubkey`,

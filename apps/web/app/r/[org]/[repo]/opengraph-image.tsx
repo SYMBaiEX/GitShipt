@@ -2,7 +2,6 @@ import { ImageResponse } from "next/og";
 
 import { getProjectPageData } from "@/lib/queries/project-page";
 
-export const runtime = "nodejs";
 export const alt = "GitShipt project leaderboard";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";

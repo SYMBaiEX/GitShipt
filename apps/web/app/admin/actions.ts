@@ -18,6 +18,7 @@ import { auth } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { deriveKey, withIdempotency } from "@/lib/idempotency";
 import { requirePermission } from "@/lib/auth/permissions";
+import { PlatformFeeBpsSchema } from "@/lib/auth/platform-fee-schema";
 import {
   destructiveAction,
   DestructiveActionError,
@@ -837,7 +838,7 @@ export async function forceSnapshot(
 // ---------------------------------------------------------------------------
 
 const UpdateFeesSchema = DestructiveBaseSchema.extend({
-  bps: z.number().int().min(200).max(10_000),
+  bps: PlatformFeeBpsSchema,
 });
 
 export async function updateFeesBps(
@@ -891,82 +892,9 @@ export async function updateFeesBps(
   return { ok: true, bps: parsed.bps };
 }
 
-const UpdateProjectFeeShareSchema = DestructiveBaseSchema.extend({
-  projectId: z.string().min(1),
-  bps: z.number().int().min(200).max(10_000),
-});
-
 const ClaimPartnerFeesSchema = DestructiveBaseSchema.extend({
   partnerWallet: z.string().min(32).optional(),
 });
-
-export async function updateProjectPlatformFeeBps(
-  input: unknown,
-): Promise<{ ok: true; bps: number }> {
-  const parsed = UpdateProjectFeeShareSchema.parse(input);
-  const ctx = await requireSession();
-
-  const [proj] = await dbHttp
-    .select({
-      id: projects.id,
-      name: projects.name,
-      status: projects.status,
-      platformFeeBps: projects.platformFeeBps,
-      bagsConfigKey: projects.bagsConfigKey,
-    })
-    .from(projects)
-    .where(eq(projects.id, parsed.projectId))
-    .limit(1);
-  if (!proj) throw new Error("project_not_found");
-
-  if (proj.status !== "draft" || proj.bagsConfigKey) {
-    throw new Error("fee_share_locked_after_launch_config");
-  }
-
-  await withIdempotency(
-    parsed.idempotencyKey ??
-      deriveKey("admin-project-fee", proj.id, parsed.bps, ctx.userId),
-    async () => {
-      await destructiveAction(
-        {
-          actorUserId: ctx.userId,
-          permission: "platform.fees.update",
-          projectId: proj.id,
-          reason: parsed.reason,
-          targetName: proj.name,
-          typedConfirmation: parsed.typedConfirmation,
-          mfaConfirmedAtMs: parsed.mfaConfirmedAtMs,
-          ip: ctx.ip,
-          userAgent: ctx.userAgent,
-        },
-        {
-          action: "fees.update",
-          targetType: "project",
-          targetId: proj.id,
-          metadata: {
-            kind: "project_platform_fee_bps",
-            previousBps: proj.platformFeeBps,
-            bps: parsed.bps,
-            contributorPoolBps: 10_000 - parsed.bps,
-          },
-        },
-        async () => {
-          await dbHttp
-            .update(projects)
-            .set({ platformFeeBps: parsed.bps, updatedAt: new Date() })
-            .where(eq(projects.id, proj.id));
-        },
-      );
-      return { ok: true } as const;
-    },
-    { scope: `admin:project-fee:${proj.id}:${ctx.userId}` },
-  );
-
-  revalidatePath(`/admin/projects/${proj.id}`);
-  revalidatePath("/admin/fees");
-  await updateProjectCaches(proj.id);
-  return { ok: true, bps: parsed.bps };
-}
 
 export async function claimPartnerFees(input: unknown): Promise<
   | {

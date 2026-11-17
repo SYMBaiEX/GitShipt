@@ -4,13 +4,35 @@
  * Given (a) the project's current claimer slots in fixed slot-index order
  * and (b) the latest snapshot's leaderboard with per-contributor scores,
  * compute the BPS array to write on-chain — proportional to score, with
- * absent contributors zeroed, and rounding ensuring the total is exactly
- * 10000.
+ * absent contributors zeroed and fixed wallet allocations reserved, with
+ * rounding ensuring the total is exactly 10000.
  *
  * Pure function, no I/O — easy to unit test and reason about. The
  * workflow step helper that wraps this concern is responsible for
  * loading the inputs and persisting the result.
  */
+
+export const PLATFORM_CLAIMER_MARKER = "gitshipt:platform";
+
+export function isRebalanceableConfig(config: {
+  isInitFinalized: boolean;
+  isUpdateLocked: boolean;
+  isUpdateFinalized: boolean;
+}): boolean {
+  return config.isInitFinalized && !config.isUpdateLocked && !config.isUpdateFinalized;
+}
+
+export function validatePlatformManifest(
+  slots: ReadonlyArray<{ provider: string; socialHandle: string | null; contributorId: string | null; initialBps: number }>,
+  platformFeeBps: number,
+): void {
+  const platform = slots.filter((slot) => slot.provider === "wallet" && slot.socialHandle === PLATFORM_CLAIMER_MARKER && !slot.contributorId);
+  if (!Number.isInteger(platformFeeBps) || platformFeeBps < 0 || platformFeeBps > 10_000 ||
+    (platformFeeBps > 0 && (platform.length !== 1 || platform[0]!.initialBps !== platformFeeBps)) ||
+    (platformFeeBps === 0 && platform.length !== 0)) {
+    throw new Error("Platform fee manifest does not match the launch snapshot; reconcile before proceeding.");
+  }
+}
 
 export interface ClaimerSlotInput {
   slotIndex: number;
@@ -21,6 +43,8 @@ export interface ClaimerSlotInput {
   contributorId: string | null;
   /** Current BPS — used as the fallback if the new plan would be all-zero. */
   currentBps: number;
+  /** Fixed launch allocation for a non-contributor wallet slot. */
+  reservedBps?: number;
 }
 
 export interface LeaderboardScoreInput {
@@ -47,7 +71,7 @@ export interface BpsAllocationResult {
 /**
  * Compute new BPS for each slot, proportional to the matching
  * contributor's score in the latest snapshot. Slots with no matching
- * scoring contributor (including absent and non-github slots) get 0.
+ * scoring contributor get 0 unless they have an explicit reserved allocation.
  *
  * Distribution algorithm:
  *   1. Build matched-score array per slot (0 if no match).
@@ -70,12 +94,22 @@ export function allocateBpsByScore(
     return { bps: [], preservedPrevious: false, matchedSlots: 0 };
   }
 
+  const reservedBps = slots.reduce((sum, slot) => {
+    const reserved = slot.reservedBps ?? 0;
+    if (!Number.isInteger(reserved) || reserved < 0 || reserved > 10_000) {
+      throw new Error("Invalid reserved claimer allocation");
+    }
+    return sum + reserved;
+  }, 0);
+  if (reservedBps > 10_000) throw new Error("Reserved allocations exceed 10000 bps");
+  const contributorBudget = 10_000 - reservedBps;
+
   // Index leaderboard by contributorId AND ghUsername (lowercased) for
   // robust matching against either resolution path.
   const byContributorId = new Map<string, number>();
   const byUsername = new Map<string, number>();
   for (const entry of leaderboard) {
-    if (entry.score <= 0) continue;
+    if (!Number.isFinite(entry.score) || entry.score <= 0) continue;
     byContributorId.set(entry.contributorId, entry.score);
     byUsername.set(entry.ghUsername.toLowerCase(), entry.score);
   }
@@ -86,10 +120,10 @@ export function allocateBpsByScore(
   for (let i = 0; i < n; i++) {
     const slot = slots[i]!;
     let s = 0;
-    if (slot.contributorId) {
+    if (slot.reservedBps === undefined && slot.contributorId) {
       s = byContributorId.get(slot.contributorId) ?? 0;
     }
-    if (s === 0 && slot.githubLogin) {
+    if (slot.reservedBps === undefined && s === 0 && slot.githubLogin) {
       s = byUsername.get(slot.githubLogin) ?? 0;
     }
     scores[i] = s;
@@ -106,8 +140,8 @@ export function allocateBpsByScore(
   }
 
   // Proportional allocation with largest-remainder rounding.
-  const exact = scores.map((s) => (s / totalScore) * 10_000);
-  const floors = exact.map((v) => Math.floor(v));
+  const exact = scores.map((s) => (s / totalScore) * contributorBudget);
+  const floors = exact.map((v, i) => slots[i]!.reservedBps ?? Math.floor(v));
   const remainders = exact.map((v, i) => ({
     index: i,
     frac: v - Math.floor(v),
@@ -117,13 +151,14 @@ export function allocateBpsByScore(
 
   // Distribute the remainder by largest fractional residue, ties broken
   // by lower slot index (deterministic).
-  remainders.sort((a, b) => {
+  const eligibleRemainders = remainders.filter((r) => slots[r.index]!.reservedBps === undefined);
+  eligibleRemainders.sort((a, b) => {
     if (b.frac !== a.frac) return b.frac - a.frac;
     return a.index - b.index;
   });
   const bps = floors.slice();
-  for (let i = 0; i < remainder && i < remainders.length; i++) {
-    bps[remainders[i]!.index]! += 1;
+  for (let i = 0; i < remainder && i < eligibleRemainders.length; i++) {
+    bps[eligibleRemainders[i]!.index]! += 1;
   }
   // Sanity: only meaningful if there were positive scores.
   const sum = bps.reduce((a, b) => a + b, 0);

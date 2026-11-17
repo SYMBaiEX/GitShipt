@@ -6,16 +6,17 @@ import { Badge } from "@repo/ui";
 import { AuditLogViewer } from "@/components/admin/AuditLogViewer";
 import {
   getAuditLogs,
+  getIndexedTreasuryClaims,
   getPartnerFeeShareSummary,
-  getPlatformConfigValue,
 } from "@/lib/queries/admin";
 import { hasCredentials, productionReadiness, serverEnv } from "@/lib/env";
 import { bags } from "@/lib/bags/client";
+import { getDeployerBalances } from "@/lib/bags/deployer";
+import { platformFeeBps } from "@/lib/platform-fee";
 import { payoutSignerPublicKey } from "@/lib/solana/signer";
-import { formatAddress, formatRelativeTime } from "@repo/lib";
+import { formatAddress, formatRelativeTime, formatSol } from "@repo/lib";
 import { FeesForm } from "./_components/FeesForm";
 import { PartnerFeesClaimForm } from "./_components/PartnerFeesClaimForm";
-
 
 export default function AdminFeesPage() {
   return (
@@ -28,13 +29,8 @@ export default function AdminFeesPage() {
 async function AdminFeesPageContent() {
   await requireAdminPage("admin.access", "/admin");
 
-  const stored = await getPlatformConfigValue<{
-    value: number;
-    updatedBy: string;
-  }>("fees.platform_bps");
   const env = serverEnv();
-  const envDefault = env.PLATFORM_FEE_BPS_DEFAULT;
-  const currentBps = stored?.value ?? envDefault;
+  const currentBps = await platformFeeBps();
   const readiness = productionReadiness();
   let partnerStats: { claimedFees: string; unclaimedFees: string } | null =
     null;
@@ -53,6 +49,10 @@ async function AdminFeesPageContent() {
   } catch {
     payoutSignerWallet = null;
   }
+  const deployerBalances =
+    payoutSignerWallet && hasCredentials.bags()
+      ? await getDeployerBalances(payoutSignerWallet).catch(() => null)
+      : null;
   const partnerClaimUnavailableReason = !env.BAGS_PARTNER_CONFIG_KEY
     ? "Set BAGS_PARTNER_CONFIG_KEY before claiming partner revenue."
     : !hasCredentials.bags()
@@ -62,7 +62,7 @@ async function AdminFeesPageContent() {
         : partnerStats && BigInt(partnerStats.unclaimedFees) <= 0n
           ? "No unclaimed partner fees are available."
           : null;
-  const [summary, auditRows] = await Promise.all([
+  const [summary, auditRows, indexedTreasuryClaims] = await Promise.all([
     getPartnerFeeShareSummary(),
     getAuditLogs({
       actionPrefixes: [
@@ -75,6 +75,9 @@ async function AdminFeesPageContent() {
       sinceHours: 24,
       limit: 50,
     }),
+    env.SOLANA_TREASURY_ADDRESS
+      ? getIndexedTreasuryClaims(env.SOLANA_TREASURY_ADDRESS).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -82,8 +85,9 @@ async function AdminFeesPageContent() {
       <header>
         <h1 className="text-headline-md">Platform fees</h1>
         <p className="text-body-sm text-fg-secondary">
-          Operator view for GitShipt fee share, Bags partner attribution, and
-          API-key security posture.
+          GitShipt revenue comprises the Bags deployer share, Bags partner
+          share, and its configured share of the normal recipient allocation.
+          These streams are reported separately.
         </p>
       </header>
 
@@ -94,16 +98,16 @@ async function AdminFeesPageContent() {
               <Banknote className="size-4 text-fg-muted" /> Platform fee BPS
             </CardTitle>
             <CardDescription>
-              Global default for new launches. Draft projects can be overridden
-              from their admin detail page before Bags launch config is created.
+              Default share of the normal recipient allocation for new launch
+              configurations. Existing launches retain their configured share.
             </CardDescription>
           </CardHeader>
           <FeesForm currentBps={currentBps} />
           <div className="mt-3 flex items-center gap-2 text-caption text-fg-muted">
             <Badge variant="default" size="sm">
-              env default
+              built-in default
             </Badge>
-            <span className="text-mono-sm">{envDefault} bps</span>
+            <span className="text-mono-sm">1000 bps</span>
           </div>
         </Card>
 
@@ -161,6 +165,59 @@ async function AdminFeesPageContent() {
 
       <section className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <MetricCard
+          icon={Banknote}
+          title="Bags deployer share"
+          rows={[
+            [
+              "Wallet",
+              payoutSignerWallet
+                ? formatAddress(payoutSignerWallet, 6, 4)
+                : "not configured",
+            ],
+            [
+              "Claimable",
+              deployerBalances
+                ? formatSol(BigInt(deployerBalances.totalClaimableLamports), 4)
+                : "unavailable",
+            ],
+            [
+              "Vault claimable",
+              deployerBalances
+                ? formatSol(BigInt(deployerBalances.vaultClaimableLamports), 4)
+                : "unavailable",
+            ],
+            [
+              "Token positions",
+              deployerBalances
+                ? deployerBalances.positions.length
+                : "unavailable",
+            ],
+            ["Lifetime claimed", "unavailable"],
+          ]}
+          footer="Vault claimable is included in the claimable total. Lifetime claimed is not available from this source."
+        />
+        <MetricCard
+          icon={Banknote}
+          title="Normal recipient allocation"
+          rows={[
+            ["New launch default", `${currentBps} bps`],
+            [
+              "Treasury wallet",
+              env.SOLANA_TREASURY_ADDRESS
+                ? formatAddress(env.SOLANA_TREASURY_ADDRESS, 6, 4)
+                : "not configured",
+            ],
+            [
+              "Indexed direct claims",
+              indexedTreasuryClaims === null
+                ? "unavailable"
+                : formatSol(BigInt(indexedTreasuryClaims), 4),
+            ],
+            ["Pending", "unavailable"],
+          ]}
+          footer="Indexed direct claims may be incomplete; pending balances are not included."
+        />
+        <MetricCard
           icon={Split}
           title="Fee-share rollout"
           rows={[
@@ -184,7 +241,6 @@ async function AdminFeesPageContent() {
             ["Average project", `${summary.avgPlatformFeeBps} bps`],
             ["Minimum project", `${summary.minPlatformFeeBps} bps`],
             ["Maximum project", `${summary.maxPlatformFeeBps} bps`],
-            ["Contributor pool", `${10_000 - currentBps} bps`],
           ]}
         />
         <MetricCard

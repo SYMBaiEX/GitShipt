@@ -5,14 +5,12 @@ import {
   Coins,
   Layers,
   Sparkles,
-  Vault,
   Wallet,
   Workflow,
 } from "lucide-react";
 import Link from "next/link";
 import { requireAdminPage } from "@/lib/auth/page-guards";
 import { Card, CardHeader, CardTitle, CardDescription } from "@repo/ui";
-import { Badge } from "@repo/ui";
 import { Pill } from "@repo/ui";
 import { StatTile } from "@/components/shared/StatTile";
 import {
@@ -73,14 +71,9 @@ async function AdminOpsPageContent() {
             Live system snapshot · {formatRelativeTime(new Date())}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="success" dot>
-            Live
-          </Badge>
-        </div>
       </header>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
           label="Active projects"
           value={kpis.activeProjects.toString()}
@@ -110,13 +103,39 @@ async function AdminOpsPageContent() {
           sub={hotPubkey ?? "no signer configured"}
           icon={Wallet}
         />
-        <StatTile
-          label="GitShipt custody"
-          value="0.0000 SOL"
-          icon={Vault}
-          sub="Contributor claims stay in Bags"
-        />
       </section>
+
+      <section
+        className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+        aria-label="Platform totals"
+      >
+        <StatTile
+          label="Projects"
+          value={kpis.totalProjects.toString()}
+          icon={Layers}
+        />
+        <StatTile
+          label="Launched tokens"
+          value={kpis.launchedProjects.toString()}
+          icon={Coins}
+        />
+        <StatTile
+          label="Contributor records"
+          value={kpis.contributors.toString()}
+          icon={Activity}
+        />
+        <StatTile label="Users" value={kpis.users.toString()} icon={Wallet} />
+      </section>
+
+      <p className="text-body-sm text-fg-secondary">
+        Lifetime trading fee volume and platform receipts are not available as
+        verified platform-wide totals. Partner claim statistics are available on
+        the{" "}
+        <Link href="/admin/fees" className="underline underline-offset-2">
+          fees page
+        </Link>{" "}
+        when Bags is configured.
+      </p>
 
       <section className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <HeartbeatsCard rows={heartbeats} />
@@ -268,16 +287,12 @@ function FailedPayoutsCard({
           <AlertCircle className="size-4 text-fg-muted" /> Recent failed payouts
         </CardTitle>
         <CardDescription>
-          Last 10 by scheduled time. Retry inline from{" "}
-          <Link href="/admin/payouts" className="underline underline-offset-2">
-            /admin/payouts
-          </Link>
-          .
+          Last 10 by scheduled time. Open a project for details.
         </CardDescription>
       </CardHeader>
       {rows.length === 0 ? (
         <p className="px-1.5 py-3 text-body-sm text-fg-muted">
-          No failed payouts. Healthy.
+          No failed payouts recorded.
         </p>
       ) : (
         <table className="mt-2 w-full text-left text-body-sm">

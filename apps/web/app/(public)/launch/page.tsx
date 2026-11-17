@@ -8,6 +8,8 @@ import { projects } from "@/db/schema";
 import { requirePermission, PermissionError } from "@/lib/auth/permissions";
 import { WizardShell, type DraftHydration } from "./_components/WizardShell";
 import { SolanaWalletProvider } from "@/components/providers/SolanaWalletProvider";
+import { platformFeeBps } from "@/lib/platform-fee";
+import { DEFAULT_PLATFORM_FEE_BPS } from "@repo/shared";
 
 export const metadata = {
   title: "Launch a token",
@@ -38,9 +40,10 @@ async function LaunchPageContent({ searchParams }: LaunchPageProps) {
   const params = await searchParams;
   const draftId = params.draftId?.trim() ?? null;
 
-  const [session, config] = await Promise.all([
+  const [session, config, feeBps] = await Promise.all([
     getAuthSession(),
     getLaunchWizardConfig(),
+    hasCredentials.db() ? platformFeeBps() : Promise.resolve(DEFAULT_PLATFORM_FEE_BPS),
   ]);
   const signedIn = Boolean(session?.user);
   const userId = session?.user?.id ?? null;
@@ -56,6 +59,7 @@ async function LaunchPageContent({ searchParams }: LaunchPageProps) {
         signedIn={signedIn}
         isStubMode={config.isStubMode}
         initialBuyLamports={config.initialBuyLamports}
+        platformFeeBps={feeBps}
         draft={draft}
       />
     </SolanaWalletProvider>

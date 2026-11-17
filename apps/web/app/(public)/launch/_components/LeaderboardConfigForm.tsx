@@ -36,7 +36,7 @@ export function LeaderboardConfigForm({
   const [thresholdSol, setThresholdSol] = useState(
     initial.claimThresholdLamports / LAMPORTS_PER_SOL_NUMBER,
   );
-  const platformFeeBps = 0;
+  const platformFeeBps = initial.platformFeeBps;
   const [steadyStateCadenceHours, setSteadyStateCadenceHours] =
     useState<SteadyStateCadenceHours>(initial.steadyStateCadenceHours);
   const [maxClaimers, setMaxClaimers] = useState(initial.maxClaimers);
@@ -208,29 +208,40 @@ export function LeaderboardConfigForm({
         </div>
 
         <aside className="space-y-3 rounded-lg border border-border bg-surface-elevated/40 p-3 lg:sticky lg:top-4">
-          <FormField
-            label="Bags partner rate"
-            hint="GitShipt revenue is configured through Bags, separately from the contributor BPS allocation."
-          >
-            <span className="text-mono-md text-fg">25%</span>
-          </FormField>
+          <p className="text-body-sm text-fg-secondary">
+            GitShipt receives the mandatory deployer share of the gross creator
+            pool, plus a separate Bags partner share. The normal claimer
+            allocation is split as shown below.
+          </p>
 
           <div className="space-y-2 border-t border-border pt-3">
             <div className="flex items-center justify-between gap-3">
               <span className="text-body-sm text-fg-muted">
-                Contributor pool
+                Contributor normal allocation
               </span>
               <span className="text-mono-sm text-fg">
                 {contributorPoolPercent}%
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-body-sm text-fg-muted">GitShipt fee</span>
-              <span className="text-mono-sm text-fg">25.00%</span>
+              <span className="text-body-sm text-fg-muted">
+                GitShipt normal allocation
+              </span>
+              <span className="text-mono-sm text-fg">
+                {(platformFeeBps / 100).toFixed(2)}%
+              </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-body-sm text-fg-muted">Partner rail</span>
-              <span className="text-label-sm text-fg">Bags config</span>
+              <span className="text-body-sm text-fg-muted">
+                GitShipt deployer share
+              </span>
+              <span className="text-mono-sm text-fg">25% of gross</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-body-sm text-fg-muted">
+                Bags partner share
+              </span>
+              <span className="text-label-sm text-fg">Per Bags config</span>
             </div>
             <div className="flex items-center justify-between gap-3 pt-2">
               <span className="text-body-sm text-fg-muted">Agents/bots</span>

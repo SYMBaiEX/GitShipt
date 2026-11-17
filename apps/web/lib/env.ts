@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const DEFAULT_BAGS_PARTNER_WALLET =
-  "HXs58Qa6YtgJfWVkQVnpFmw6WoEdFEL4LLD1ArZjMvTH";
+  "4ZNjNq4HsBXBPDi3DoegtZj4X5x6yesx5Efb8ZnzbeJc";
 export const DEFAULT_BAGS_REF_CODE = "symbiex";
 
 const optionalUrl = z.preprocess(

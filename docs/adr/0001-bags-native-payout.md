@@ -5,6 +5,11 @@
 **Last Updated:** 2026-05-09 (corrected fee-share capabilities)
 **Research backing:** [docs/architecture/bags-native/RESEARCH.md](../architecture/bags-native/RESEARCH.md)
 
+> Historical architecture record. [ADR 0002](0002-platform-revenue.md) supersedes
+> the partner-only economics, percentage denominators, launch limits, and
+> unverified manager-authority claims below. Do not use this record to quote
+> current revenue or assert that the deployed manager can never change claimers.
+
 ---
 
 ## Context

@@ -18,14 +18,30 @@ the product model.
   re-implement, mirror, or wrap any of it. Contributors claim fees through
   Bags' GitHub-OAuth UI, signing transactions with their own wallet. GitShipt
   never holds, dispatches, or routes contributor SOL.
-- **Bags-native payouts via manager-keypair BPS rebalance and admin-keypair claimer updates.** GitShipt is the
-  on-chain manager (delegated by Bags admin via `update_fee_config_manager`
-  immediately after launch). Manager authority is bounded to BPS rebalance
-  within the existing claimer set. The project owner (admin) can update claimers
-  post-launch via `bags config update` or the Bags API, enabling dynamic contributor
-  inclusion. Manager authority never custody, never dispatch SOL to
-  recipients. The product flow is: GitHub activity → ranked contributors → daily
-  snapshot → manager BPS rebalance → periodic admin claimer updates.
+- **Bags-native payouts with explicitly authorized management.** The desired
+  flow is GitHub activity -> ranked contributors -> daily snapshot -> on-chain
+  BPS rebalance. However, owner-only `update_fee_config_manager` was proven to
+  fail on mainnet with Unauthorized on November 17, 2026. The token admin
+  recognized by Bags' API is not the Bags program administrator. Obtain and
+  verify Bags-authorized manager delegation before enabling general creation
+  or promising automated rebalances for new launches. The app must not prepare
+  the unsupported owner-only transaction or mark delegation complete manually.
+  Existing correctly delegated configurations may continue. The app constructs
+  rebalances against recorded recipient slots; the IDL alone does not prove
+  the deployed manager cannot replace recipients. Post-launch recipient/BPS
+  changes use Bags' token-admin update API, owner review/signing, and manifest
+  reconciliation. Never custody or dispatch contributor SOL. Evidence and
+  remaining integration limits are in `docs/debut-launch.md`.
+- **Three separate platform revenue streams.** GitShipt is the fee-config
+  payer/deployer, receives its Bags partner share, and receives a configurable
+  normal-recipient treasury allocation (default 1,000 BPS / 10%). Partner fees
+  must come from Bags' platform pool, not an additional creator-pool deduction.
+  The deployer cut applies to the gross claimers pool; normal recipient BPS
+  divide the remainder and total 10,000 including the platform slot. Do not
+  advertise their combined result as 10% of trading volume. Server-owned global
+  fee changes affect new configs only; existing prepared/live configs retain
+  their snapshot. Rebalances preserve the explicit platform slot. See
+  `docs/adr/0002-platform-revenue.md` for exact denominators and rounding.
 - **Cadence is per-project, configurable.** 24h initial → 3d second → 3/5/7d
   configurable thereafter. Stored in `payout_schedules` per project. The
   leaderboard UI updates daily regardless; the on-chain rebalance follows

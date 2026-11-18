@@ -35,6 +35,9 @@ import shipDark from "../../public/ship-dark.png";
 import shipLight from "../../public/ship-light.png";
 const FEATURED_OWNER = "SYMBaiEX";
 const FEATURED_REPO = "gitshipt";
+const MOBILE_HERO_MEDIA = "(max-width: 639px)";
+const MOBILE_HERO_LIGHT = "/hero/mia-light-2257f503a983.avif";
+const MOBILE_HERO_DARK = "/hero/mia-dark-117d6301a4c3.avif";
 
 type ThemeAwareImageProps = Omit<ImageProps, "src" | "loading" | "preload"> & {
   srcDark: StaticImageData;
@@ -196,16 +199,17 @@ function TokenLaunchCarousel({ launches }: { launches: LandingLaunchToken[] }) {
 function HeroArtwork() {
   return (
     <div className="gitshipt-mia-stage pointer-events-none relative order-2 mx-auto aspect-square w-full max-w-[420px] overflow-visible sm:max-w-[540px] lg:order-none lg:h-[min(68vh,660px)] lg:w-full lg:max-w-none lg:shrink-0 2xl:h-[min(70vh,720px)] 2xl:w-full">
-      <HeroMiaImage
-        theme="light"
-        src={miaLight}
-        mobile="/hero/mia-light-2257f503a983.avif"
+      {/* React hoists the async script so it can select one hero before CSS lays out the pictures. */}
+      <script
+        async
+        src="/hero/preload-3aa265dda38b.js"
+        fetchPriority="high"
+        data-media={MOBILE_HERO_MEDIA}
+        data-light={MOBILE_HERO_LIGHT}
+        data-dark={MOBILE_HERO_DARK}
       />
-      <HeroMiaImage
-        theme="dark"
-        src={miaDark}
-        mobile="/hero/mia-dark-117d6301a4c3.avif"
-      />
+      <HeroMiaImage theme="light" src={miaLight} mobile={MOBILE_HERO_LIGHT} />
+      <HeroMiaImage theme="dark" src={miaDark} mobile={MOBILE_HERO_DARK} />
       <HeroFlag />
       <HeroShip />
     </div>
@@ -235,7 +239,7 @@ function HeroMiaImage({
 
   return (
     <picture className={`gitshipt-theme-image-${theme}`}>
-      <source media="(max-width: 639px)" type="image/avif" srcSet={mobile} />
+      <source media={MOBILE_HERO_MEDIA} type="image/avif" srcSet={mobile} />
       <img {...props} />
     </picture>
   );

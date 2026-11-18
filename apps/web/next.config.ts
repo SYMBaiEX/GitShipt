@@ -123,8 +123,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // The suffix is the SHA-256 of the encoded bytes, not the source PNG.
-        source: "/hero/:asset(mia-[a-z]+-[a-f0-9]{12}\\.avif)",
+        // The suffix is the SHA-256 of the served bytes.
+        source: "/hero/:asset([a-z-]+-[a-f0-9]{12}\\.(?:avif|js))",
         headers: [
           {
             key: "Cache-Control",

@@ -1,6 +1,10 @@
 import { Github } from "@repo/ui";
 import { Suspense } from "react";
-import Image, { type ImageProps, type StaticImageData } from "next/image";
+import Image, {
+  getImageProps,
+  type ImageProps,
+  type StaticImageData,
+} from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Trophy } from "lucide-react";
 import { Badge } from "@repo/ui";
@@ -181,12 +185,8 @@ function TokenLaunchCarousel({ launches }: { launches: LandingLaunchToken[] }) {
       className="mx-auto w-full max-w-[1340px] overflow-x-auto"
     >
       <div className="flex w-max gap-2 py-1">
-        {launches.map((launch, index) => (
-          <TokenLaunchCard
-            key={launch.id}
-            launch={launch}
-            priorityImage={index < 5}
-          />
+        {launches.map((launch) => (
+          <TokenLaunchCard key={launch.id} launch={launch} />
         ))}
       </div>
     </section>
@@ -196,19 +196,48 @@ function TokenLaunchCarousel({ launches }: { launches: LandingLaunchToken[] }) {
 function HeroArtwork() {
   return (
     <div className="gitshipt-mia-stage pointer-events-none relative order-2 mx-auto aspect-square w-full max-w-[420px] overflow-visible sm:max-w-[540px] lg:order-none lg:h-[min(68vh,660px)] lg:w-full lg:max-w-none lg:shrink-0 2xl:h-[min(70vh,720px)] 2xl:w-full">
-      <ThemeAwareImage
-        srcDark={miaDark}
-        srcLight={miaLight}
-        alt=""
-        fill
-        fetchPriority="high"
-        quality={50}
-        sizes="(max-width: 452px) calc(100vw - 32px), (max-width: 639px) 420px, (max-width: 1023px) 540px, (max-width: 1536px) 700px, min(64vw, 860px)"
-        className="gitshipt-mia-art z-[1] object-contain object-bottom p-[clamp(6px,2vw,24px)]"
+      <HeroMiaImage
+        theme="light"
+        src={miaLight}
+        mobile="/hero/mia-light-2257f503a983.avif"
+      />
+      <HeroMiaImage
+        theme="dark"
+        src={miaDark}
+        mobile="/hero/mia-dark-117d6301a4c3.avif"
       />
       <HeroFlag />
       <HeroShip />
     </div>
+  );
+}
+
+function HeroMiaImage({
+  theme,
+  src,
+  mobile,
+}: {
+  theme: "light" | "dark";
+  src: StaticImageData;
+  mobile: string;
+}) {
+  const { props } = getImageProps({
+    src,
+    alt: "",
+    fill: true,
+    fetchPriority: "high",
+    quality: 50,
+    sizes:
+      "(max-width: 452px) calc(100vw - 32px), (max-width: 639px) 420px, (max-width: 1023px) 540px, (max-width: 1536px) 700px, min(64vw, 860px)",
+    className:
+      "gitshipt-mia-art z-[1] object-contain object-bottom p-[clamp(6px,2vw,24px)]",
+  });
+
+  return (
+    <picture className={`gitshipt-theme-image-${theme}`}>
+      <source media="(max-width: 639px)" type="image/avif" srcSet={mobile} />
+      <img {...props} />
+    </picture>
   );
 }
 
@@ -224,6 +253,7 @@ function HeroFlag() {
         alt=""
         width={480}
         height={640}
+        quality={50}
         fetchPriority="low"
         sizes="(max-width: 640px) 23vw, (max-width: 1024px) 156px, 164px"
         className="gitshipt-flag-art h-auto w-full select-none object-contain"
@@ -244,6 +274,7 @@ function HeroShip() {
         alt=""
         width={440}
         height={440}
+        quality={50}
         fetchPriority="low"
         sizes="(max-width: 640px) 24vw, (max-width: 1024px) 164px, 172px"
         className="gitshipt-ship-art h-auto w-full select-none object-contain"
@@ -252,13 +283,7 @@ function HeroShip() {
   );
 }
 
-function TokenLaunchCard({
-  launch,
-  priorityImage,
-}: {
-  launch: LandingLaunchToken;
-  priorityImage: boolean;
-}) {
+function TokenLaunchCard({ launch }: { launch: LandingLaunchToken }) {
   const avatar = launch.imageUrl ?? `https://github.com/${launch.ghOwner}.png`;
   const symbol = launch.symbol ? `$${launch.symbol}` : "TOKEN";
 
@@ -272,8 +297,7 @@ function TokenLaunchCard({
           src={avatar}
           alt=""
           fill
-          loading={priorityImage ? "eager" : "lazy"}
-          fetchPriority={priorityImage ? "high" : "low"}
+          fetchPriority="low"
           sizes="32px"
           className="object-cover"
         />
@@ -361,7 +385,7 @@ function FeaturedProjectCard({
             src={avatar}
             alt=""
             fill
-            loading="eager"
+            fetchPriority="low"
             sizes="40px"
             className="object-cover"
           />

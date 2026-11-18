@@ -168,18 +168,18 @@ test.describe("audit regression coverage", () => {
       await page.setViewportSize({ width: 390, height: 844 });
       await requireOkPage(page, DEMO_PROJECT_PATH);
       const share = page.getByRole("button", { name: "Share", exact: true });
+      await expect(share).toBeEnabled();
       await share.focus();
       await page.keyboard.press("ArrowDown");
       const menu = page.getByRole("menu");
       await expect(menu).toBeVisible();
-      await page.keyboard.press("Home");
-      await expect(
-        menu.getByRole("menuitem", { name: "Copy embed code" }),
-      ).toBeFocused();
+      const firstItem = menu.getByRole("menuitem", { name: "Copy embed code" });
+      const lastItem = menu.getByRole("menuitem", { name: "GitHub repository" });
+      await expect(firstItem).toBeFocused();
       await page.keyboard.press("End");
-      await expect(
-        menu.getByRole("menuitem", { name: "GitHub repository" }),
-      ).toBeFocused();
+      await expect(lastItem).toBeFocused();
+      await page.keyboard.press("Home");
+      await expect(firstItem).toBeFocused();
       await page.keyboard.press("Escape");
       await expect(menu).not.toBeVisible();
       await expect(share).toBeFocused();

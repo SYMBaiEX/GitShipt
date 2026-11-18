@@ -122,6 +122,16 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
+      {
+        // The suffix is the SHA-256 of the encoded bytes, not the source PNG.
+        source: "/hero/:asset(mia-[a-z]+-[a-f0-9]{12}\\.avif)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
       // Default — X-Frame-Options DENY for everything except /embed/*.
       // Negative lookahead in the path matcher excludes /embed paths so the
       // dedicated embed entry below isn't shadowed.

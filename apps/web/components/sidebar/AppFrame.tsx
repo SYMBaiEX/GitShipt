@@ -1,4 +1,5 @@
 import { Github, Twitter } from "@repo/ui";
+import { Suspense } from "react";
 import Link from "next/link";
 import { cn } from "@repo/lib";
 import { MobileSidebarTrigger } from "./MobileSidebarTrigger";
@@ -23,7 +24,7 @@ export function AppFrame({
   return (
     <div className="gb-app-frame flex overflow-hidden bg-bg text-fg">
       <div className="contents lg:block lg:shrink-0 lg:p-3 lg:pr-0">
-        {sidebar}
+        <Suspense fallback={null}>{sidebar}</Suspense>
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="gb-mobile-header flex shrink-0 items-center gap-3 border-b border-border bg-surface shadow-card-elevated lg:hidden">
@@ -50,7 +51,9 @@ export function AppFrame({
         >
           {children}
         </RouteViewport>
-        <MobileDock surface={surface} />
+        <Suspense fallback={null}>
+          <MobileDock surface={surface} />
+        </Suspense>
         <footer className="glass surface-highlight ml-3 hidden shrink-0 items-center justify-between gap-3 rounded-tl-2xl border-t border-l border-border/60 px-4 py-1.5 shadow-card-elevated lg:flex">
           <span className="truncate text-caption text-fg-muted">{footer}</span>
           <div className="flex items-center gap-1">

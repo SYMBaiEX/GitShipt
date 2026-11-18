@@ -87,6 +87,10 @@ export function MobileDock({ surface }: { surface: MobileDockSurface }) {
             <Link
               key={href}
               href={href}
+              onNavigate={current ? undefined : interruptPreviousTransition}
+              prefetch={
+                path === "/leaderboard" && href === "/explore" ? true : undefined
+              }
               aria-current={current ? "page" : undefined}
               transitionTypes={
                 current
@@ -111,6 +115,11 @@ export function MobileDock({ surface }: { surface: MobileDockSurface }) {
       </div>
     </nav>
   );
+}
+
+function interruptPreviousTransition() {
+  // A second tap should not wait for the outgoing route animation to finish.
+  document.activeViewTransition?.skipTransition();
 }
 
 function DockPending() {

@@ -5,11 +5,17 @@ const samples = Number(process.argv[3] ?? 3);
 if (!Number.isInteger(samples) || samples < 1 || samples > 10) {
   throw new Error("Sample count must be an integer between 1 and 10.");
 }
+const colorScheme = process.env.PERF_COLOR_SCHEME ?? "light";
+if (colorScheme !== "light" && colorScheme !== "dark") {
+  throw new Error("PERF_COLOR_SCHEME must be light or dark.");
+}
 
 const browser = await chromium.launch();
 const report = {
   origin: base.origin,
   runAt: new Date().toISOString(),
+  colorScheme,
+  samples,
   cold: {},
   navigation: [],
   cache: {},
@@ -25,6 +31,7 @@ async function mobilePage() {
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
+    colorScheme,
   });
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
@@ -39,8 +46,16 @@ async function mobilePage() {
   await page.addInitScript(() => {
     window.gitshiptMetrics = { lcp: null, shift: 0 };
     new PerformanceObserver((list) => {
-      for (const entry of list.getEntries())
-        window.gitshiptMetrics.lcp = entry.startTime;
+      for (const entry of list.getEntries()) {
+        const image = entry.url && new URL(entry.url, location.href);
+        window.gitshiptMetrics.lcp = {
+          time: entry.startTime,
+          element: entry.element?.tagName ?? null,
+          image: image
+            ? (image.searchParams.get("url") ?? image.pathname)
+            : null,
+        };
+      }
     }).observe({ type: "largest-contentful-paint", buffered: true });
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries()) {
@@ -57,7 +72,7 @@ async function mobilePage() {
         ? "document"
         : url.pathname.startsWith("/_next/static/")
           ? "static"
-          : url.pathname === "/_next/image"
+          : response.request().resourceType() === "image"
             ? "image"
             : headers["content-type"]?.includes("text/x-component")
               ? "rsc"
@@ -81,11 +96,98 @@ async function documentTiming(page) {
       lcpMs:
         window.gitshiptMetrics.lcp === null
           ? null
-          : Math.round(window.gitshiptMetrics.lcp),
+          : Math.round(window.gitshiptMetrics.lcp.time),
+      lcpElement: window.gitshiptMetrics.lcp?.element ?? null,
+      lcpImage: window.gitshiptMetrics.lcp?.image ?? null,
       loadMs: nav.loadEventEnd ? Math.round(nav.loadEventEnd) : null,
       clsApprox: Number(window.gitshiptMetrics.shift.toFixed(3)),
     };
   });
+}
+
+async function measureNavigation(page, dock, { label, path, title, results }) {
+  const from = new URL(page.url()).pathname;
+  const origin = await page.evaluate(() => performance.timeOrigin);
+  await page.evaluate(
+    ({ path, title, results }) => {
+      window.gitshiptNavigation = { headingMs: null, resultsMs: null };
+      document.addEventListener(
+        "click",
+        () => {
+          const startedAt = performance.now();
+          const until = startedAt + 10_000;
+          const measure = (now) => {
+            if (location.pathname === path) {
+              const elapsed = Math.round(now - startedAt);
+              const content = document.querySelector("main");
+              const heading = content?.querySelector("h1");
+              if (
+                heading?.textContent?.trim() === title &&
+                heading.getClientRects().length
+              ) {
+                window.gitshiptNavigation.headingMs ??= elapsed;
+              }
+              if (
+                results &&
+                [...(content?.querySelectorAll('[role="status"]') ?? [])].some(
+                  (element) =>
+                    /^[\d,]+ projects?$/.test(
+                      element.textContent?.trim() ?? "",
+                    ) && element.getClientRects().length,
+                )
+              ) {
+                window.gitshiptNavigation.resultsMs ??= elapsed;
+              }
+            }
+            const { headingMs, resultsMs } = window.gitshiptNavigation;
+            if (
+              now < until &&
+              (headingMs === null || (results && resultsMs === null))
+            ) {
+              requestAnimationFrame(measure);
+            }
+          };
+          requestAnimationFrame(measure);
+        },
+        { once: true, capture: true },
+      );
+    },
+    { path, title, results },
+  );
+  await dock.getByRole("link", { name: label, exact: true }).click();
+  await page.waitForURL((url) => url.pathname === path);
+  await page
+    .getByRole("heading", { level: 1, name: title, exact: true })
+    .waitFor();
+  if (results) {
+    await page
+      .locator('main [role="status"]')
+      .filter({ hasText: /^[\d,]+ projects?$/ })
+      .waitFor();
+  }
+  await page.waitForFunction(
+    ({ origin, results }) => {
+      if (performance.timeOrigin !== origin) return true;
+      const sample = window.gitshiptNavigation;
+      return (
+        sample?.headingMs != null && (!results || sample.resultsMs != null)
+      );
+    },
+    { origin, results },
+    { timeout: 10_000 },
+  );
+  return {
+    from,
+    destination: path,
+    ...(await page.evaluate(
+      (previousOrigin) => ({
+        sameDocument: performance.timeOrigin === previousOrigin,
+        headingMs: window.gitshiptNavigation?.headingMs ?? null,
+        resultsMs: window.gitshiptNavigation?.resultsMs ?? null,
+      }),
+      origin,
+    )),
+  };
 }
 
 try {
@@ -103,45 +205,33 @@ try {
       }
     }
   }
-  const { context, page } = await mobilePage();
-  try {
-    await page.goto(base.href, { waitUntil: "networkidle" });
-    const dock = page.getByRole("navigation", { name: "Quick navigation" });
-    for (const [label, path, title] of [
-      ["Explore", "/explore", "Explore projects"],
-      ["Ranks", "/leaderboard", "Global leaderboard"],
-      ["Explore", "/explore", "Explore projects"],
-    ]) {
-      const origin = await page.evaluate(() => performance.timeOrigin);
-      await page.evaluate(() => {
-        document.addEventListener(
-          "click",
-          () => {
-            window.gitshiptClick = performance.now();
-          },
-          { once: true, capture: true },
-        );
-      });
-      await dock.getByRole("link", { name: label, exact: true }).click();
-      await page.waitForURL((url) => url.pathname === path);
-      await page.getByRole("heading", { level: 1, name: title, exact: true }).waitFor();
-      report.navigation.push({
-        destination: path,
-        ...(await page.evaluate(
-          (previousOrigin) => ({
-            sameDocument: performance.timeOrigin === previousOrigin,
-            headingMs:
-              window.gitshiptClick === undefined
-                ? null
-                : Math.round(performance.now() - window.gitshiptClick),
-          }),
-          origin,
-        )),
-      });
-      await page.waitForLoadState("networkidle");
+  const explore = {
+    label: "Explore",
+    path: "/explore",
+    title: "Explore projects",
+    results: true,
+  };
+  const ranks = {
+    label: "Ranks",
+    path: "/leaderboard",
+    title: "Global leaderboard",
+    results: false,
+  };
+  for (let sample = 1; sample <= samples; sample++) {
+    const { context, page } = await mobilePage();
+    try {
+      await page.goto(base.href, { waitUntil: "networkidle" });
+      const dock = page.getByRole("navigation", { name: "Quick navigation" });
+      for (const link of [explore, ranks, explore]) {
+        report.navigation.push({
+          sample,
+          ...(await measureNavigation(page, dock, link)),
+        });
+        await page.waitForLoadState("networkidle");
+      }
+    } finally {
+      await context.close();
     }
-  } finally {
-    await context.close();
   }
   console.log(JSON.stringify(report, null, 2));
 } finally {

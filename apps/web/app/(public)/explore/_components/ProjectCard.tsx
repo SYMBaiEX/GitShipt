@@ -63,9 +63,12 @@ export function ProjectCard({ project }: { project: PublicProjectRow }) {
           ) : null}
           <Chip>
             <span className="text-fg-muted">Age</span>
-            <span className="text-mono-sm text-fg-secondary">
-              {timeAgo(project.createdAt)}
-            </span>
+            <time
+              dateTime={project.createdAt.toISOString()}
+              className="text-mono-sm text-fg-secondary"
+            >
+              {formatAge(project.ageMinutes)}
+            </time>
           </Chip>
         </div>
 
@@ -204,16 +207,13 @@ function shortenMint(mint: string): string {
   return `${mint.slice(0, 4)}…${mint.slice(-4)}`;
 }
 
-function timeAgo(date: Date): string {
-  const ms = Date.now() - date.getTime();
-  const min = Math.max(0, Math.floor(ms / 60_000));
+function formatAge(min: number): string {
   if (min < 60) return `${min}m`;
   const h = Math.floor(min / 60);
   if (h < 24) return `${h}h`;
   const d = Math.floor(h / 24);
   if (d < 30) return `${d}d`;
-  const mo = Math.floor(d / 30);
-  if (mo < 12) return `${mo}mo`;
+  if (d < 365) return `${Math.min(11, Math.floor(d / 30))}mo`;
   const y = Math.floor(d / 365);
   return `${y}y`;
 }

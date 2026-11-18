@@ -26,7 +26,7 @@ import { Sheet, SheetContent, SheetTitle } from "./sheet";
  *
  * State:
  *  - `collapsed` — desktop (lg+) collapse to a 68px icon rail. Persisted to
- *    localStorage["gitshipt:sidebar:collapsed"] after mount.
+ *    a cookie and localStorage["gitshipt:sidebar:collapsed"].
  *  - `mobileOpen` — controls the slide-over drawer on small (< lg) viewports.
  *    Defaults to false; opened by `<MobileSidebarTrigger>` outside the sidebar
  *    (rendered in each app shell). Closes on backdrop click, Escape, or any
@@ -47,6 +47,23 @@ function persistCollapsedPreference(v: boolean) {
     document.cookie = `${SIDEBAR_COLLAPSED_COOKIE}=${value}; Path=/; Max-Age=31536000; SameSite=Lax`;
   } catch {
     // Cookies may be unavailable in some embedded/browser contexts.
+  }
+}
+
+function readCollapsedPreference(): boolean {
+  try {
+    const cookie = document.cookie
+      .split(";")
+      .map((entry) => entry.trim())
+      .find((entry) => entry.startsWith(`${SIDEBAR_COLLAPSED_COOKIE}=`));
+    if (cookie) return cookie === `${SIDEBAR_COLLAPSED_COOKIE}=1`;
+  } catch {
+    // Try localStorage if cookies are unavailable.
+  }
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) === "1";
+  } catch {
+    return false;
   }
 }
 
@@ -128,7 +145,7 @@ export function useSidebar(): SidebarContextValue {
 }
 
 export function SidebarProvider({
-  defaultCollapsed = false,
+  defaultCollapsed,
   children,
 }: {
   defaultCollapsed?: boolean;
@@ -139,6 +156,13 @@ export function SidebarProvider({
     storeRef.current = createUiStore({ collapsed: defaultCollapsed });
   }
   const store = storeRef.current;
+  React.useEffect(() => {
+    if (defaultCollapsed !== undefined) return;
+    const state = store.getState();
+    const persisted = readCollapsedPreference();
+    if (persisted !== state.sidebar.collapsed) state.setSidebarCollapsed(persisted);
+  }, [defaultCollapsed, store]);
+
   const mobileOpen = useUiStoreValue(
     store,
     (state) => state.sidebar.mobileOpen,

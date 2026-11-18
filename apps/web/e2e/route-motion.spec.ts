@@ -128,3 +128,60 @@ test("Explore paints a prefetched heading before filtered results arrive", async
     page.getByRole("status").filter({ hasText: "Loading projects" }),
   ).toHaveCount(0);
 });
+
+test("Ranks to Explore can interrupt unfinished motion and does not wait on a new server response", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  await page.addStyleTag({
+    content: "::view-transition-new(.gb-route-next) { animation-duration: 10s !important; }",
+  });
+
+  const dock = page.getByRole("navigation", { name: "Quick navigation" });
+  await dock.getByRole("link", { name: "Ranks", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Global leaderboard", exact: true }),
+  ).toBeVisible();
+  await page.waitForFunction(() => document.activeViewTransition !== null);
+
+  let release: () => void = () => {};
+  const untilReleased = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(/\/explore(?:\?.*)?$/, async (route) => {
+    const headers = route.request().headers();
+    if (headers.rsc === "1" && !headers["next-router-prefetch"])
+      await untilReleased;
+    await route.continue();
+  });
+
+  try {
+    await dock.getByRole("link", { name: "Explore", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Explore projects", exact: true }),
+    ).toBeVisible();
+    await expect(dock.getByRole("link", { name: "Explore" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  } finally {
+    release();
+  }
+});
+
+test("the public desktop sidebar keeps its saved preference across reloads", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/leaderboard");
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+
+  await page.goto("/explore");
+  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+});

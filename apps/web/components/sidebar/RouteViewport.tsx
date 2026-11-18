@@ -1,6 +1,13 @@
 "use client";
 
-import { useLayoutEffect, useRef, ViewTransition, type ReactNode } from "react";
+import {
+  Suspense,
+  useLayoutEffect,
+  useRef,
+  ViewTransition,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { usePathname } from "next/navigation";
 
 const routeMotion = {
@@ -22,8 +29,28 @@ export function RouteViewport({
   className: string;
   steady: boolean;
 }) {
-  const pathname = usePathname();
   const main = useRef<HTMLElement>(null);
+  return (
+    <ViewTransition
+      name="gitshipt-page"
+      default="none"
+      enter={routeMotion}
+      exit={routeMotion}
+      update={steady ? consoleMotion : routeMotion}
+      share={routeMotion}
+    >
+      <main ref={main} id="main-content" tabIndex={-1} className={className}>
+        <Suspense fallback={null}>
+          <LegacyRouteMotion main={main} />
+        </Suspense>
+        {children}
+      </main>
+    </ViewTransition>
+  );
+}
+
+function LegacyRouteMotion({ main }: { main: RefObject<HTMLElement | null> }) {
+  const pathname = usePathname();
   const previousPath = useRef(pathname);
 
   useLayoutEffect(() => {
@@ -45,20 +72,7 @@ export function RouteViewport({
       { duration: 180, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
     );
     return () => animation?.cancel();
-  }, [pathname]);
+  }, [main, pathname]);
 
-  return (
-    <ViewTransition
-      name="gitshipt-page"
-      default="none"
-      enter={routeMotion}
-      exit={routeMotion}
-      update={steady ? consoleMotion : routeMotion}
-      share={routeMotion}
-    >
-      <main ref={main} id="main-content" tabIndex={-1} className={className}>
-        {children}
-      </main>
-    </ViewTransition>
-  );
+  return null;
 }

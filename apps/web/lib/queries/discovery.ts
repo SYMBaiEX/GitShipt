@@ -53,6 +53,7 @@ export interface PublicProjectRow {
   dailyFeeLamports: bigint;
   tokenMint: string | null;
   createdAt: Date;
+  ageMinutes: number;
 }
 
 export interface ExploreFilters {
@@ -151,6 +152,7 @@ async function getAllPublicProjectsUncached(
       status: projects.status,
       tokenMint: projects.tokenMint,
       createdAt: projects.createdAt,
+      ageMinutes: sql<number>`greatest(0, floor(extract(epoch from (now() - ${projects.createdAt})) / 60))::int`,
       lifetimeFeesLamports: lifetimeAgg,
       contributorsCount: contributorsAgg,
     })
@@ -161,13 +163,9 @@ async function getAllPublicProjectsUncached(
     .orderBy(orderBy)
     .limit(limit);
 
-  const now = Date.now();
   return rows.map((r) => {
     const lifetime = BigInt(r.lifetimeFeesLamports ?? 0n);
-    const daysLive = Math.max(
-      1,
-      Math.floor((now - r.createdAt.getTime()) / 86_400_000),
-    );
+    const daysLive = Math.max(1, Math.floor(r.ageMinutes / 1_440));
     return {
       id: r.id,
       slug: `${r.ghOwner}/${r.ghRepo}`,
@@ -182,6 +180,7 @@ async function getAllPublicProjectsUncached(
       lifetimeFeesLamports: lifetime,
       dailyFeeLamports: lifetime / BigInt(daysLive),
       createdAt: r.createdAt,
+      ageMinutes: r.ageMinutes,
     };
   });
 }

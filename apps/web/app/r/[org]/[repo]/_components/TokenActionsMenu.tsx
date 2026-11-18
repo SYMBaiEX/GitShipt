@@ -10,7 +10,10 @@ import {
   Github,
 } from "@repo/ui";
 import { ChevronDown, Code2, Copy, ExternalLink } from "lucide-react";
+import { useSyncExternalStore } from "react";
 import { toast } from "sonner";
+
+const subscribeToHydration = () => () => undefined;
 
 export function TokenActionsMenu({
   tokenMint,
@@ -23,6 +26,9 @@ export function TokenActionsMenu({
   ghRepo: string;
   className?: string;
 }) {
+  // The HTML can reach the browser before Radix's keyboard handlers are ready.
+  const ready = useSyncExternalStore(subscribeToHydration, () => true, () => false);
+
   async function copy(value: string, success: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -45,7 +51,7 @@ export function TokenActionsMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger asChild disabled={!ready}>
         <Button
           type="button"
           variant="secondary"

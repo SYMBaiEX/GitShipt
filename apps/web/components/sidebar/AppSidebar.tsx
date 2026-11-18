@@ -52,7 +52,6 @@ import { Button } from "@repo/ui";
 import { SidebarUserCard } from "./SidebarUserCard";
 import { useSessionChrome } from "@/components/auth/SessionChromeProvider";
 import { resolveOrigin } from "@/lib/nav/origins";
-import { useAuthenticatedRouteStore } from "@/lib/state/authenticated-route-store";
 import { cn } from "@repo/lib";
 import logo from "../../public/logo.png";
 
@@ -501,7 +500,6 @@ function adminGroups(): NavGroup[] {
 
 interface ResolvedComposition {
   brand: { title: string; subtitle?: string; href: string; logo?: boolean };
-  returnTo: { label: string; href: string } | null;
   groups: NavGroup[];
 }
 
@@ -509,7 +507,6 @@ function compose(
   surface: AppSidebarSurface,
   signedIn: boolean,
   isPlatformAdmin: boolean,
-  fromOrigin: string | null,
 ): ResolvedComposition {
   switch (surface.kind) {
     case "public": {
@@ -524,7 +521,6 @@ function compose(
           href: "/",
           logo: true,
         },
-        returnTo: null,
         groups,
       };
     }
@@ -535,7 +531,6 @@ function compose(
           subtitle: surface.slug,
           href: "/dashboard",
         },
-        returnTo: resolveOrigin(fromOrigin),
         groups: ownerProjectGroups(surface.projectId, surface.slug),
       };
     case "public-project":
@@ -545,7 +540,6 @@ function compose(
           subtitle: surface.slug,
           href: `/r/${surface.slug}`,
         },
-        returnTo: resolveOrigin(fromOrigin),
         groups: publicProjectGroups(
           surface.slug,
           surface.projectId,
@@ -559,7 +553,6 @@ function compose(
           subtitle: "GitShipt platform",
           href: "/admin",
         },
-        returnTo: resolveOrigin(fromOrigin),
         groups: adminGroups(),
       };
   }
@@ -570,23 +563,14 @@ function compose(
 export function AppSidebar(props: AppSidebarProps) {
   return (
     <React.Suspense
-      fallback={<AppSidebarContent {...props} fromOrigin={null} chromeUser={null} sessionPending />}
+      fallback={<AppSidebarContent {...props} chromeUser={null} sessionPending />}
     >
-      {props.surface.kind === "public" ? (
-        <AppSidebarWithSession {...props} fromOrigin={null} />
-      ) : (
-        <AppSidebarWithSearchParams {...props} />
-      )}
+      <AppSidebarWithSession {...props} />
     </React.Suspense>
   );
 }
 
-function AppSidebarWithSearchParams(props: AppSidebarProps) {
-  const searchParams = useSearchParams();
-  return <AppSidebarWithSession {...props} fromOrigin={searchParams.get("from")} />;
-}
-
-function AppSidebarWithSession(props: AppSidebarProps & { fromOrigin: string | null }) {
+function AppSidebarWithSession(props: AppSidebarProps) {
   const chromeUser = useSessionChrome();
   return <AppSidebarContent {...props} chromeUser={chromeUser} />;
 }
@@ -595,19 +579,14 @@ function AppSidebarContent({
   surface,
   footerSlot,
   activeKey,
-  fromOrigin,
   chromeUser,
   sessionPending = false,
 }: AppSidebarProps & {
-  fromOrigin: string | null;
   chromeUser: ReturnType<typeof useSessionChrome>;
   sessionPending?: boolean;
 }) {
   const pathname = usePathname() ?? "/";
   const { collapsed, closeMobile } = useSidebar();
-  const setRouteChrome = useAuthenticatedRouteStore(
-    (state) => state.setRouteChrome,
-  );
   const resolvedUser = chromeUser;
   const resolvedIsPlatformAdmin = Boolean(chromeUser?.isPlatformAdmin);
 
@@ -623,9 +602,8 @@ function AppSidebarContent({
     surface,
     signedIn,
     resolvedIsPlatformAdmin,
-    fromOrigin,
   );
-  const { brand, returnTo } = composition;
+  const { brand } = composition;
   const groups = sessionPending && surface.kind === "public"
     ? composition.groups.slice(0, 1)
     : composition.groups;
@@ -648,15 +626,6 @@ function AppSidebarContent({
     }
     return best?.key ?? null;
   }, [activeKey, groups, pathname]);
-
-  React.useEffect(() => {
-    if (!signedIn && surface.kind === "public") return;
-    setRouteChrome({
-      pathname,
-      surface: surface.kind,
-      activeKey: resolvedActiveKey,
-    });
-  }, [pathname, resolvedActiveKey, setRouteChrome, signedIn, surface.kind]);
 
   const isItemActive = (key: string) => {
     return resolvedActiveKey === key;
@@ -683,15 +652,17 @@ function AppSidebarContent({
       </SidebarHeader>
 
       <SidebarContent>
-        {returnTo ? (
+        {surface.kind !== "public" ? (
           <SidebarSection>
-            <ReturnToLink href={returnTo.href} label={returnTo.label} />
+            <React.Suspense fallback={<ReturnToLink href="/explore" label="Explore" />}>
+              <SidebarOriginLink />
+            </React.Suspense>
           </SidebarSection>
         ) : null}
 
         {groups.map((group, gi) => (
           <React.Fragment key={`${group.title ?? "section"}-${gi}`}>
-            {(returnTo || gi > 0) && <SidebarDivider />}
+            {(surface.kind !== "public" || gi > 0) && <SidebarDivider />}
             <SidebarSection title={group.title}>
               {group.items.map((it) => (
                 <SidebarItem
@@ -767,6 +738,11 @@ function ReturnToLink({ href, label }: { href: string; label: string }) {
       </span>
     </Link>
   );
+}
+
+function SidebarOriginLink() {
+  const { label, href } = resolveOrigin(useSearchParams().get("from"));
+  return <ReturnToLink href={href} label={label} />;
 }
 
 function FooterLegalRow({ isActive }: { isActive: (href: string) => boolean }) {

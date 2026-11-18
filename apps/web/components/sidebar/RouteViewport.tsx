@@ -4,18 +4,23 @@ import { useLayoutEffect, useRef, ViewTransition, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 
 const routeMotion = {
+  "gb-navigation": "gb-route-swap",
   "dock-next": "gb-route-next",
   "dock-prev": "gb-route-prev",
   "filter-results": "none",
   default: "gb-route-swap",
 };
 
+const consoleMotion = { ...routeMotion, default: "none" };
+
 export function RouteViewport({
   children,
   className,
+  steady,
 }: {
   children: ReactNode;
   className: string;
+  steady: boolean;
 }) {
   const pathname = usePathname();
   const main = useRef<HTMLElement>(null);
@@ -48,7 +53,7 @@ export function RouteViewport({
       default="none"
       enter={routeMotion}
       exit={routeMotion}
-      update={routeMotion}
+      update={steady ? consoleMotion : routeMotion}
       share={routeMotion}
     >
       <main ref={main} id="main-content" tabIndex={-1} className={className}>

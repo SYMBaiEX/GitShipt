@@ -404,6 +404,7 @@ export function SidebarItem({
         className={className}
         title={collapsed ? label : undefined}
         onNavigate={handleClick}
+        transitionTypes={active ? undefined : ["gb-navigation"]}
       >
         {inner}
         {active ? null : <SidebarLinkPending />}

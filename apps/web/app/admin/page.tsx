@@ -24,9 +24,10 @@ import { payoutSignerPublicKey } from "@/lib/solana/signer";
 import { hasCredentials } from "@/lib/env";
 import { cacheLife, cacheTag } from "next/cache";
 import { bags } from "@/lib/bags/client";
-import { formatRelativeTime, formatSol } from "@repo/lib";
+import { formatSol } from "@repo/lib";
 import { RelativeTime } from "@/components/shared/RelativeTime";
 import { cn } from "@repo/lib";
+import { ConsoleLoading } from "@/components/sidebar/ConsoleLoading";
 
 /**
  * Ops dashboard. Top stat row + 2x2 bento (heartbeats / failed payouts /
@@ -34,9 +35,15 @@ import { cn } from "@repo/lib";
  */
 export default function AdminOpsPage() {
   return (
-    <Suspense fallback={null}>
-      <AdminOpsPageContent />
-    </Suspense>
+    <div className="space-y-4">
+      <header>
+        <h1 className="text-headline-md">Ops dashboard</h1>
+        <p className="text-body-sm text-fg-secondary">System snapshot</p>
+      </header>
+      <Suspense fallback={<ConsoleLoading label="system metrics" />}>
+        <AdminOpsPageContent />
+      </Suspense>
+    </div>
   );
 }
 
@@ -45,34 +52,15 @@ async function AdminOpsPageContent() {
   // so a layout regression cannot silently expose the route.
   await requireAdminPage("admin.access", "/admin");
 
-  // Hot-wallet balance (fire-and-forget; null on failure).
-  const [hotPubkey, hotLamports] = await Promise.all([
-    Promise.resolve(payoutSignerPublicKey()),
-    fetchHotWalletLamports(),
+  const [kpis, heartbeats, failed, recentAudit] = await Promise.all([
+    getOpsKpis(),
+    getHeartbeats(),
+    getRecentFailedPayouts(10),
+    getAuditLogs({ sinceHours: 1, limit: 20 }),
   ]);
 
-  // eslint-disable-next-line react-hooks/purity -- Server Component needs a rolling ops window.
-  const recentAuditSinceMs = Date.now() - 60 * 60 * 1000;
-  const [kpis, heartbeats, failed, recentAudit, healthSummary] =
-    await Promise.all([
-      getOpsKpis(hotLamports),
-      getHeartbeats(),
-      getRecentFailedPayouts(10),
-      getAuditLogs({ sinceMs: recentAuditSinceMs, limit: 20 }),
-      fetchHealthSummary(),
-    ]);
-
   return (
-    <div className="space-y-4">
-      <header className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-headline-md">Ops dashboard</h1>
-          <p className="text-body-sm text-fg-secondary">
-            Live system snapshot · {formatRelativeTime(new Date())}
-          </p>
-        </div>
-      </header>
-
+    <>
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatTile
           label="Active projects"
@@ -91,18 +79,11 @@ async function AdminOpsPageContent() {
           icon={AlertCircle}
           accent={kpis.failedPayouts > 0 ? "danger" : "neutral"}
         />
-        <StatTile
-          label="Hot wallet"
-          value={
-            kpis.hotWalletSol == null ? (
-              <span className="text-fg-muted">—</span>
-            ) : (
-              `${kpis.hotWalletSol.toFixed(4)} SOL`
-            )
-          }
-          sub={hotPubkey ?? "no signer configured"}
-          icon={Wallet}
-        />
+        <Suspense
+          fallback={<StatTile label="Hot wallet" value="…" icon={Wallet} />}
+        >
+          <HotWalletStat />
+        </Suspense>
       </section>
 
       <section
@@ -141,10 +122,29 @@ async function AdminOpsPageContent() {
         <HeartbeatsCard rows={heartbeats} />
         <FailedPayoutsCard rows={failed} />
         <RecentAuditCard rows={recentAudit} />
-        <HealthCard summary={healthSummary} />
+        <Suspense fallback={<ConsoleLoading label="integrations" tiles={1} />}>
+          <IntegrationHealth />
+        </Suspense>
       </section>
-    </div>
+    </>
   );
+}
+
+async function HotWalletStat() {
+  const hotPubkey = payoutSignerPublicKey();
+  const lamports = await fetchHotWalletLamports();
+  return (
+    <StatTile
+      label="Hot wallet"
+      icon={Wallet}
+      sub={hotPubkey ?? "no signer configured"}
+      value={lamports === null ? "Unavailable" : formatSol(BigInt(lamports), 4)}
+    />
+  );
+}
+
+async function IntegrationHealth() {
+  return <HealthCard summary={await fetchHealthSummary()} />;
 }
 
 async function fetchHotWalletLamports(): Promise<number | null> {
@@ -212,6 +212,7 @@ async function pingGitHub(): Promise<{
   try {
     const res = await fetch("https://api.github.com/octocat", {
       method: "HEAD",
+      signal: AbortSignal.timeout(2_000),
     });
     return {
       ok: res.ok || res.status === 404,

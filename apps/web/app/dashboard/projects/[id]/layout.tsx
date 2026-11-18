@@ -1,13 +1,11 @@
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
 import { hasCredentials } from "@/lib/env";
-import { hasPermission } from "@/lib/auth/permissions";
-import { getProjectRecord } from "@/lib/queries/dashboard";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { AppShell } from "../../_components/AppShell";
-import { requireAuthSession } from "@/lib/auth/session";
 import { clusterLabel } from "@/lib/solana/explorer";
 import { SolanaWalletProvider } from "@/components/providers/SolanaWalletProvider";
+import { loadProjectFor } from "../../_components/loadProject";
+import { ConsoleFrameLoading } from "@/components/sidebar/ConsoleLoading";
 
 /**
  * Per-project gate. We re-validate the session here AND check
@@ -26,7 +24,7 @@ export default function ProjectLayout({
   params: Promise<{ id: string }>;
 }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ConsoleFrameLoading title="Project console" />}>
       <ProjectLayoutContent params={params}>{children}</ProjectLayoutContent>
     </Suspense>
   );
@@ -59,16 +57,7 @@ async function ProjectLayoutContent({
   }
 
   const { id } = await params;
-  const session = await requireAuthSession(`/dashboard/projects/${id}`);
-
-  const project = await getProjectRecord(id);
-  if (!project) notFound();
-
-  const canRead = await hasPermission("project.read", {
-    userId: session.user.id,
-    projectId: id,
-  });
-  if (!canRead) notFound();
+  const { project } = await loadProjectFor(id, "project.read");
 
   return (
     <AppShell

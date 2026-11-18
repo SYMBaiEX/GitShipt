@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 vi.mock("@/lib/env", () => {
   const fakeEnv: { CRON_SECRET?: string; NODE_ENV: string } = {
     CRON_SECRET: "x".repeat(40),

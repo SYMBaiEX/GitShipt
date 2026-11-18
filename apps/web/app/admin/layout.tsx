@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { hasCredentials } from "@/lib/env";
-import { requireAuthSession } from "@/lib/auth/session";
-import { hasPermission } from "@/lib/auth/permissions";
+import { requireAdminPage } from "@/lib/auth/page-guards";
 import { SidebarProvider } from "@repo/ui";
 import { AppSidebar } from "@/components/sidebar/AppSidebar";
 import { AppFrame } from "@/components/sidebar/AppFrame";
 import { getDefaultSidebarCollapsed } from "@/lib/sidebar-state";
 import { clusterLabel } from "@/lib/solana/explorer";
+import { ConsoleFrameLoading } from "@/components/sidebar/ConsoleLoading";
 
 /**
  * `/admin/**` shell. Mirrors the project-page app shell exactly so the visual
@@ -26,7 +26,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ConsoleFrameLoading title="Admin console" />}>
       <AdminLayoutContent>{children}</AdminLayoutContent>
     </Suspense>
   );
@@ -36,13 +36,10 @@ async function AdminLayoutContent({ children }: { children: React.ReactNode }) {
     notFound();
   }
 
-  const session = await requireAuthSession("/admin");
-
-  const ok = await hasPermission("admin.access", { userId: session.user.id });
-  if (!ok) {
-    notFound();
-  }
-  const defaultSidebarCollapsed = await getDefaultSidebarCollapsed();
+  const [defaultSidebarCollapsed] = await Promise.all([
+    getDefaultSidebarCollapsed(),
+    requireAdminPage(),
+  ]);
 
   return (
     <SidebarProvider defaultCollapsed={defaultSidebarCollapsed}>

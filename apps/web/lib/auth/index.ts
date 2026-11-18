@@ -1,15 +1,10 @@
-// Side-effect import: registers the global AsyncLocalStorage instance the
-// RLS context layer reads from. Auth is loaded by every server-side path
-// that needs user-mode context propagation (Server Components, route
-// handlers, server actions), so importing it here is the most reliable
-// place to ensure storage is ready before `enterRlsContext` runs.
+// Session callers scope their own database work to the verified principal.
 import "@/db/rls-storage-init";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { dbPool } from "@/db";
 import * as schema from "@/db/schema";
 import { serverEnv, hasCredentials } from "@/lib/env";
-import { establishDbUserContext, enterDbAnonymousContext } from "@/lib/db-rls";
 
 /**
  * better-auth instance. Boots lazily so the app can render in stub mode
@@ -22,19 +17,13 @@ import { establishDbUserContext, enterDbAnonymousContext } from "@/lib/db-rls";
  *  - GitHub access tokens are persisted in `accounts.access_token` for use
  *    by Octokit when the user-context API surface is needed.
  *
- * Type holes: `_authCache` is loosely typed because better-auth's return
- * type narrows on `additionalFields`, which is awkward to express in a
- * cache slot. We cast on read; the runtime shape is unchanged.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _authCache: any = null;
-
-function buildOptions(): BetterAuthOptions {
+function makeAuth() {
   const env = serverEnv();
   // Skip strict validation during build time - the fallback secret handles missing values
   // Runtime checks in production will catch actual misconfiguration
-  return {
+  return betterAuth({
     database: drizzleAdapter(dbPool(), {
       provider: "pg",
       schema: {
@@ -61,9 +50,14 @@ function buildOptions(): BetterAuthOptions {
       : {},
     user: {
       additionalFields: {
-        githubId: { type: "string", required: false },
-        githubUsername: { type: "string", required: false },
-        role: { type: "string", required: true, defaultValue: "user" },
+        githubId: { type: "string", required: false, input: false },
+        githubUsername: { type: "string", required: false, input: false },
+        role: {
+          type: "string",
+          required: true,
+          defaultValue: "user",
+          input: false,
+        },
       },
     },
     advanced: {
@@ -73,26 +67,13 @@ function buildOptions(): BetterAuthOptions {
         },
       },
     },
-  } satisfies BetterAuthOptions;
+  } satisfies BetterAuthOptions);
 }
 
-export function auth(): ReturnType<typeof betterAuth> {
-  if (_authCache) return _authCache;
-  const instance = betterAuth(buildOptions());
-  const originalGetSession = instance.api.getSession.bind(instance.api);
-  instance.api.getSession = (async (
-    ...args: Parameters<typeof originalGetSession>
-  ) => {
-    const session = await originalGetSession(...args);
-    if (session?.user?.id) {
-      await establishDbUserContext(session.user.id, "better-auth-session");
-    } else {
-      enterDbAnonymousContext("better-auth-empty-session");
-    }
-    return session;
-  }) as typeof originalGetSession;
-  _authCache = instance;
-  return _authCache;
+let authInstance: ReturnType<typeof makeAuth> | undefined;
+
+export function auth() {
+  return (authInstance ??= makeAuth());
 }
 
 export type Auth = ReturnType<typeof auth>;

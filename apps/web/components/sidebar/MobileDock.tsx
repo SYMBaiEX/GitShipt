@@ -89,9 +89,11 @@ export function MobileDock({ surface }: { surface: MobileDockSurface }) {
               href={href}
               aria-current={current ? "page" : undefined}
               transitionTypes={
-                activeIndex < 0 || current
+                current
                   ? undefined
-                  : [index > activeIndex ? "dock-next" : "dock-prev"]
+                  : activeIndex < 0
+                    ? ["gb-navigation"]
+                    : [index > activeIndex ? "dock-next" : "dock-prev"]
               }
               className={cn(
                 "gb-mobile-tab gb-route-link relative flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-center text-label-sm",

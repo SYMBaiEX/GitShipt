@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { serverEnv } from "@/lib/env";
 import { enterDbServiceContext } from "@/lib/db-rls";
+import "@/db/rls-storage-init";
 
 /**
  * Vercel Cron sets `Authorization: Bearer ${CRON_SECRET}` on every cron

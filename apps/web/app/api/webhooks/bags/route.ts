@@ -1,3 +1,4 @@
+import "@/db/rls-storage-init";
 import { NextResponse } from "next/server";
 import { and, eq, or, type SQL } from "drizzle-orm";
 import { dbHttp } from "@/db";

@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { dbHttp } from "@/db";
 import {
   projects,
@@ -14,12 +15,12 @@ import {
   type ScoringConfig,
   type PayoutConfig,
 } from "@/db/schema";
-import type { ProjectRole } from "@/lib/auth/permissions";
+import type { GlobalRole, ProjectRole } from "@/lib/auth/permissions";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { cacheTags } from "@/lib/cache";
-import { withRlsContext } from "@/lib/db-rls";
-import { and, desc, eq, sql, isNotNull, or, inArray } from "drizzle-orm";
+import { withRlsContext, withUserDb } from "@/lib/db-rls";
+import { and, desc, eq, exists, sql, isNotNull, or, inArray } from "drizzle-orm";
 import { PayoutConfigSchema, ScoringConfigSchema } from "@repo/shared";
 import { z } from "zod";
 
@@ -79,81 +80,52 @@ export interface MyProjectRow {
   createdAt: Date;
 }
 
-/**
- * List every project the user owns OR has a project_membership in.
- * Counts contributors and sums confirmed payout lamports per project in two
- * follow-up queries (avoids N+1 by batching with `inArray`).
- */
+/** Load authorized projects and their row summaries in one Neon round trip. */
 async function getMyProjectsUncached(userId: string): Promise<MyProjectRow[]> {
-  // 1. Find project IDs the user is owner or member of.
-  const ownedRows = await dbHttp
-    .select({ id: projects.id })
-    .from(projects)
-    .where(eq(projects.ownerUserId, userId));
-
-  const memberRows = await dbHttp
-    .select({ id: projectMemberships.projectId })
+  const membership = dbHttp
+    .select({ value: sql`1` })
     .from(projectMemberships)
-    .where(eq(projectMemberships.userId, userId));
-
-  const ids = Array.from(
-    new Set([...ownedRows.map((r) => r.id), ...memberRows.map((r) => r.id)]),
-  );
-  if (ids.length === 0) return [];
-
-  const rows = await dbHttp
-    .select()
-    .from(projects)
-    .where(inArray(projects.id, ids));
-
-  // 2. Per-project contributor count (single grouped query).
-  const counts = await dbHttp
+    .where(and(
+      eq(projectMemberships.userId, userId),
+      eq(projectMemberships.projectId, projects.id),
+    ));
+  const totals = dbHttp
     .select({
-      projectId: contributors.projectId,
-      n: sql<number>`count(*)::int`,
-    })
-    .from(contributors)
-    .where(inArray(contributors.projectId, ids))
-    .groupBy(contributors.projectId);
-  const countMap = new Map(counts.map((r) => [r.projectId, r.n]));
-
-  // 3. Per-project lifetime fees + last completed payout.
-  const payoutAgg = await dbHttp
-    .select({
-      projectId: payouts.projectId,
-      lifetime: sql<string>`coalesce(sum(${payouts.totalAmountLamports}), 0)::text`,
-      lastAt: sql<Date | null>`max(${payouts.executedAt})`,
+      lifetime: sql<string>`coalesce(sum(${payouts.totalAmountLamports}), 0)::text`.as("lifetime"),
+      lastPayoutAt: sql<Date | null>`max(${payouts.executedAt})`.mapWith(payouts.executedAt).as("last_payout_at"),
     })
     .from(payouts)
-    .where(
-      and(inArray(payouts.projectId, ids), eq(payouts.status, "completed")),
-    )
-    .groupBy(payouts.projectId);
-  const payoutMap = new Map(
-    payoutAgg.map((r) => [
-      r.projectId,
-      { lifetime: BigInt(r.lifetime ?? "0"), lastAt: r.lastAt },
-    ]),
+    .where(and(eq(payouts.projectId, projects.id), eq(payouts.status, "completed")))
+    .as("project_totals");
+
+  const rows = await withUserDb(userId, "dashboard:my-projects", () =>
+    dbHttp
+      .select({
+        id: projects.id,
+        ghOwner: projects.ghOwner,
+        ghRepo: projects.ghRepo,
+        name: projects.name,
+        description: projects.description,
+        imageUrl: projects.imageUrl,
+        status: projects.status,
+        tokenMint: projects.tokenMint,
+        createdAt: projects.createdAt,
+        contributorsCount: sql<number>`(select count(*)::int from ${contributors} where ${contributors.projectId} = ${projects.id})`,
+        lifetime: totals.lifetime,
+        lastPayoutAt: totals.lastPayoutAt,
+      })
+      .from(projects)
+      .leftJoinLateral(totals, sql`true`)
+      .where(or(eq(projects.ownerUserId, userId), exists(membership)))
+      .orderBy(desc(projects.createdAt), desc(projects.id)),
   );
 
-  return rows.map((r) => {
-    const agg = payoutMap.get(r.id);
-    return {
-      id: r.id,
-      slug: `${r.ghOwner}/${r.ghRepo}`,
-      ghOwner: r.ghOwner,
-      ghRepo: r.ghRepo,
-      name: r.name,
-      description: r.description,
-      imageUrl: r.imageUrl,
-      status: parseProjectStatus(r.status),
-      tokenMint: r.tokenMint,
-      contributorsCount: countMap.get(r.id) ?? 0,
-      lifetimeFeesLamports: agg?.lifetime ?? 0n,
-      lastPayoutAt: agg?.lastAt ?? null,
-      createdAt: r.createdAt,
-    };
-  });
+  return rows.map(({ lifetime, ...row }) => ({
+    ...row,
+    slug: `${row.ghOwner}/${row.ghRepo}`,
+    status: parseProjectStatus(row.status),
+    lifetimeFeesLamports: BigInt(lifetime ?? 0),
+  }));
 }
 
 export async function getMyProjects(userId: string): Promise<MyProjectRow[]> {
@@ -409,7 +381,7 @@ export async function getMyEarnings(userId: string): Promise<MyEarnings> {
   cacheTag(cacheTags.dashboard);
   cacheTag(cacheTags.user(userId));
   cacheTag(cacheTags.dashboardUser(userId));
-  return await getMyEarningsUncached(userId);
+  return withUserDb(userId, "dashboard:my-earnings", () => getMyEarningsUncached(userId));
 }
 
 export interface LinkedWallet {
@@ -517,21 +489,21 @@ export interface ProjectRecord {
 async function getProjectRecordUncached(
   projectId: string,
 ): Promise<ProjectRecord | null> {
-  const [r] = await dbHttp
-    .select()
+  const [row] = await dbHttp
+    .select({
+      project: projects,
+      config: {
+        id: bagsFeeShareConfigs.id,
+        managerPubkey: bagsFeeShareConfigs.managerPubkey,
+        managerDelegatedAt: bagsFeeShareConfigs.managerDelegatedAt,
+      },
+    })
     .from(projects)
+    .leftJoin(bagsFeeShareConfigs, eq(bagsFeeShareConfigs.projectId, projects.id))
     .where(eq(projects.id, projectId))
     .limit(1);
-  if (!r) return null;
-  const [config] = await dbHttp
-    .select({
-      id: bagsFeeShareConfigs.id,
-      managerPubkey: bagsFeeShareConfigs.managerPubkey,
-      managerDelegatedAt: bagsFeeShareConfigs.managerDelegatedAt,
-    })
-    .from(bagsFeeShareConfigs)
-    .where(eq(bagsFeeShareConfigs.projectId, projectId))
-    .limit(1);
+  if (!row) return null;
+  const { project: r, config } = row;
   return {
     id: r.id,
     slug: `${r.ghOwner}/${r.ghRepo}`,
@@ -568,6 +540,11 @@ export async function getProjectRecord(
   cacheTag(cacheTags.project(projectId));
   return await getProjectRecordUncached(projectId);
 }
+
+export const getProjectRecordForUser = cache(
+  (projectId: string, userId: string, role: GlobalRole) =>
+    withUserDb(userId, "dashboard:project", () => getProjectRecordUncached(projectId), role),
+);
 
 export interface RecentAuditEntry {
   id: string;

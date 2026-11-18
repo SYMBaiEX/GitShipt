@@ -7,6 +7,8 @@ import { accounts, sessions, userSettings, users } from "@/db/schema";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { cacheTags } from "@/lib/cache";
+import { withUserDb } from "@/lib/db-rls";
+import "@/db/rls-storage-init";
 
 const UserRoleSchema = z.enum(["user", "moderator", "admin", "super_admin"]);
 const GitHubViewerSchema = z.object({
@@ -227,7 +229,7 @@ export async function getAccountProfile(
   cacheTag(cacheTags.dashboard);
   cacheTag(cacheTags.user(userId));
   cacheTag(cacheTags.dashboardUser(userId));
-  return await getAccountProfileUncached(userId);
+  return withUserDb(userId, "account:profile", () => getAccountProfileUncached(userId));
 }
 
 async function getAccountSecurityStateUncached(
@@ -272,7 +274,7 @@ export async function getAccountSecurityState(
   cacheTag(cacheTags.dashboard);
   cacheTag(cacheTags.user(userId));
   cacheTag(cacheTags.dashboardUser(userId));
-  return await getAccountSecurityStateUncached(userId);
+  return withUserDb(userId, "account:security", () => getAccountSecurityStateUncached(userId));
 }
 
 async function getAccountSettingsUncached(
@@ -313,5 +315,5 @@ export async function getAccountSettings(userId: string): Promise<AccountSetting
   cacheTag(cacheTags.dashboard);
   cacheTag(cacheTags.user(userId));
   cacheTag(cacheTags.dashboardUser(userId));
-  return await getAccountSettingsUncached(userId);
+  return withUserDb(userId, "account:settings", () => getAccountSettingsUncached(userId));
 }

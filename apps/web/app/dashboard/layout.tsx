@@ -3,6 +3,7 @@ import { SidebarProvider } from "@repo/ui";
 import { hasCredentials } from "@/lib/env";
 import { requireAuthSession } from "@/lib/auth/session";
 import { getDefaultSidebarCollapsed } from "@/lib/sidebar-state";
+import { ConsoleFrameLoading } from "@/components/sidebar/ConsoleLoading";
 
 /**
  * `/dashboard/**` shell. Wraps every dashboard route in a SidebarProvider
@@ -22,7 +23,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ConsoleFrameLoading title="Dashboard" />}>
       <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </Suspense>
   );
@@ -33,19 +34,10 @@ async function DashboardLayoutContent({
 }: {
   children: React.ReactNode;
 }) {
-  // Stub mode (no DB configured) — defer to the page to render its own
-  // explanation. We can't call auth() reliably without a DB.
-  if (!hasCredentials.db()) {
-    const defaultSidebarCollapsed = await getDefaultSidebarCollapsed();
-    return (
-      <SidebarProvider defaultCollapsed={defaultSidebarCollapsed}>
-        {children}
-      </SidebarProvider>
-    );
-  }
-
-  await requireAuthSession("/dashboard");
-  const defaultSidebarCollapsed = await getDefaultSidebarCollapsed();
+  const [defaultSidebarCollapsed] = await Promise.all([
+    getDefaultSidebarCollapsed(),
+    hasCredentials.db() ? requireAuthSession("/dashboard") : null,
+  ]);
 
   return (
     <SidebarProvider defaultCollapsed={defaultSidebarCollapsed}>

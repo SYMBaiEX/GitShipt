@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 const TEST_AUTH_TOKEN = "test-helius-token-1234567890";
 
 interface ConfigRow {

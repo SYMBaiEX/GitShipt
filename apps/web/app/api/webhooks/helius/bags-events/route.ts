@@ -1,3 +1,4 @@
+import "@/db/rls-storage-init";
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { inArray } from "drizzle-orm";

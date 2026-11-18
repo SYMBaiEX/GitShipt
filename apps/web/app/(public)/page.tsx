@@ -202,7 +202,8 @@ function HeroArtwork() {
         alt=""
         fill
         fetchPriority="high"
-        sizes="(max-width: 640px) 420px, (max-width: 1024px) 540px, (max-width: 1536px) 700px, min(64vw, 860px)"
+        quality={50}
+        sizes="(max-width: 452px) calc(100vw - 32px), (max-width: 639px) 420px, (max-width: 1023px) 540px, (max-width: 1536px) 700px, min(64vw, 860px)"
         className="gitshipt-mia-art z-[1] object-contain object-bottom p-[clamp(6px,2vw,24px)]"
       />
       <HeroFlag />
@@ -223,8 +224,8 @@ function HeroFlag() {
         alt=""
         width={480}
         height={640}
-        fetchPriority="high"
-        sizes="(max-width: 640px) 126px, (max-width: 1024px) 156px, 164px"
+        fetchPriority="low"
+        sizes="(max-width: 640px) 23vw, (max-width: 1024px) 156px, 164px"
         className="gitshipt-flag-art h-auto w-full select-none object-contain"
       />
     </div>
@@ -243,7 +244,8 @@ function HeroShip() {
         alt=""
         width={440}
         height={440}
-        sizes="(max-width: 640px) 132px, (max-width: 1024px) 164px, 172px"
+        fetchPriority="low"
+        sizes="(max-width: 640px) 24vw, (max-width: 1024px) 164px, 172px"
         className="gitshipt-ship-art h-auto w-full select-none object-contain"
       />
     </div>

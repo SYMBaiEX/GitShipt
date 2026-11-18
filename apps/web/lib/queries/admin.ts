@@ -22,14 +22,13 @@ import {
   eq,
   gte,
   isNull,
-  isNotNull,
   like,
   or,
   sql,
   count,
   inArray,
 } from "drizzle-orm";
-import { applyDbRlsContext } from "@/lib/db-rls";
+import { applyDbRlsContext, withDbServiceContext } from "@/lib/db-rls";
 import { cacheLife, cacheTag } from "next/cache";
 
 import { cacheTags } from "@/lib/cache";
@@ -122,81 +121,37 @@ export interface OpsKpis {
   users: number;
   frozenAwaitingPayout: number;
   failedPayouts: number;
-  hotWalletSol: number | null;
-  pendingEscrowSol: number;
 }
 
-async function getOpsKpisUncached(
-  hotWalletLamports: number | null,
-): Promise<OpsKpis> {
-  const [
-    activeRows,
-    totalRows,
-    launchedRows,
-    contributorRows,
-    userRows,
-    frozenRows,
-    failedRows,
-    escrowRows,
-  ] = await Promise.all([
-    dbHttp
-      .select({ c: count() })
-      .from(projects)
-      .where(eq(projects.status, "live")),
-    dbHttp.select({ c: count() }).from(projects),
-    dbHttp
-      .select({ c: count() })
-      .from(projects)
-      .where(
-        and(
-          inArray(projects.status, ["live", "paused", "killed"]),
-          isNotNull(projects.tokenMint),
-          isNull(projects.simulatedAt),
-        ),
-      ),
-    dbHttp.select({ c: count() }).from(contributors),
-    dbHttp.select({ c: count() }).from(users),
-    dbHttp
-      .select({ c: count() })
-      .from(snapshots)
-      .innerJoin(projects, eq(projects.id, snapshots.projectId))
-      .where(and(
-        eq(snapshots.status, "frozen"),
-        sql`${projects.payoutConfig}->>'rewardMode' IS DISTINCT FROM 'owner'`,
-      )),
-    dbHttp
-      .select({ c: count() })
-      .from(payouts)
-      .where(eq(payouts.status, "failed")),
-    // Bags-native: no off-chain escrow surface, always zero.
-    Promise.resolve([{ total: "0" }] as const),
-  ]);
-
-  const escrowLamports = BigInt(escrowRows[0]?.total ?? "0");
-  const escrowSol = Number(escrowLamports) / 1_000_000_000;
-  const hotWalletSol =
-    hotWalletLamports == null ? null : hotWalletLamports / 1_000_000_000;
-
-  return {
-    activeProjects: activeRows[0]?.c ?? 0,
-    totalProjects: totalRows[0]?.c ?? 0,
-    launchedProjects: launchedRows[0]?.c ?? 0,
-    contributors: contributorRows[0]?.c ?? 0,
-    users: userRows[0]?.c ?? 0,
-    frozenAwaitingPayout: frozenRows[0]?.c ?? 0,
-    failedPayouts: failedRows[0]?.c ?? 0,
-    hotWalletSol,
-    pendingEscrowSol: escrowSol,
-  };
-}
-
-export async function getOpsKpis(
-  hotWalletLamports: number | null,
-): Promise<OpsKpis> {
+export async function getOpsKpis(): Promise<OpsKpis> {
   "use cache";
   cacheLife("admin");
   cacheTag(cacheTags.admin);
-  return await getOpsKpisUncached(hotWalletLamports);
+  const frozen = dbHttp
+    .select({ total: sql<number>`count(*)::int` })
+    .from(snapshots)
+    .innerJoin(projects, eq(projects.id, snapshots.projectId))
+    .where(
+      and(
+        eq(snapshots.status, "frozen"),
+        sql`${projects.payoutConfig}->>'rewardMode' is distinct from 'owner'`,
+      ),
+    );
+  const [row] = await withDbServiceContext("admin:overview-metrics", () =>
+    dbHttp.select({
+      activeProjects: sql<number>`(select count(*)::int from ${projects} where ${projects.status} = 'live')`,
+      totalProjects: sql<number>`(select count(*)::int from ${projects})`,
+      launchedProjects: sql<number>`(select count(*)::int from ${projects}
+        where ${projects.status} in ('live', 'paused', 'killed') and ${projects.tokenMint} is not null
+        and ${projects.simulatedAt} is null)`,
+      contributors: sql<number>`(select count(*)::int from ${contributors})`,
+      users: sql<number>`(select count(*)::int from ${users})`,
+      frozenAwaitingPayout: sql<number>`(${frozen})`,
+      failedPayouts: sql<number>`(select count(*)::int from ${payouts} where ${payouts.status} = 'failed')`,
+    }).from(sql`(select 1) as metrics`),
+  );
+  if (!row) throw new Error("Admin metric query did not return a row.");
+  return row;
 }
 
 export interface HeartbeatRow {
@@ -401,7 +356,9 @@ export async function getAuditLogs(
   cacheLife("admin");
   cacheTag(cacheTags.admin);
   cacheTag(cacheTags.adminAudit);
-  return await getAuditLogsUncached(AuditFilterSchema.parse(filter));
+  return withDbServiceContext("admin:audit-log", () =>
+    getAuditLogsUncached(AuditFilterSchema.parse(filter)),
+  );
 }
 
 export interface AdminProjectRow {

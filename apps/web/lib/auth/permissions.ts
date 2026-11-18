@@ -1,7 +1,10 @@
+import "server-only";
+import { cache } from "react";
 import { dbHttp } from "@/db";
 import { projectMemberships, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
-import { establishDbUserContext, withDbServiceContext } from "@/lib/db-rls";
+import { withUserDb } from "@/lib/db-rls";
+import "@/db/rls-storage-init";
 
 export type GlobalRole = "user" | "moderator" | "admin" | "super_admin";
 export type ProjectRole = "project_owner" | "project_moderator";
@@ -120,33 +123,24 @@ export interface PermissionContext {
  * Throws `PermissionError` if the user (and optional project membership)
  * lacks the requested permission.
  *
- * Always re-resolves the global role from DB on each call — never trust a
- * client-supplied role. Project-scoped permissions also check
+ * Resolve the global role from Postgres once per render, not once per guard.
+ * Direct mutations and API requests still read the database. Project-scoped permissions also check
  * `project_memberships(user_id, project_id)`.
  */
 export async function requirePermission(
   permission: Permission,
   ctx: PermissionContext,
-): Promise<void> {
+): Promise<GlobalRole> {
   const allowed = PERMISSIONS[permission];
 
-  const [user] = await withDbServiceContext(
-    "require-permission:user-role",
-    () =>
-      dbHttp
-        .select({ role: users.role })
-        .from(users)
-        .where(eq(users.id, ctx.userId))
-        .limit(1),
-  );
+  const user = await getPermissionRole(ctx.userId);
   if (!user) throw new PermissionError(permission, ctx.userId, ctx.projectId);
-  await establishDbUserContext(ctx.userId, `permission:${permission}`);
-
-  if (allowed.includes(user.role)) return;
+  if (allowed.includes(user.role)) return user.role;
 
   const projectId = ctx.projectId;
   if (projectId) {
-    const [membership] = await withDbServiceContext(
+    const [membership] = await withUserDb(
+      ctx.userId,
       "require-permission:project-membership",
       () =>
         dbHttp
@@ -160,11 +154,22 @@ export async function requirePermission(
           )
           .limit(1),
     );
-    if (membership && allowed.includes(membership.role)) return;
+    if (membership && allowed.includes(membership.role)) return user.role;
   }
 
   throw new PermissionError(permission, ctx.userId, ctx.projectId);
 }
+
+const getPermissionRole = cache(async (userId: string) => {
+  const [user] = await withUserDb(userId, "permission:user-role", () =>
+    dbHttp
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1),
+  );
+  return user;
+});
 
 /** Non-throwing variant. */
 export async function hasPermission(

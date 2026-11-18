@@ -1,5 +1,5 @@
 import { Card } from "@repo/ui";
-import { Skeleton, SkeletonText } from "@repo/ui";
+import { Skeleton } from "@repo/ui";
 
 /**
  * Streaming skeleton for /leaderboard. Mirrors the page shape:
@@ -9,19 +9,24 @@ import { Skeleton, SkeletonText } from "@repo/ui";
  */
 export default function LeaderboardLoading() {
   return (
-    <>
-      <div className="flex flex-col gap-3">
-        <Skeleton className="h-8 w-72" />
-        <SkeletonText lines={2} lastLineWidth="w-1/2" className="max-w-2xl" />
-      </div>
+    <div className="flex flex-col gap-6 lg:gap-8">
+      <h1 className="text-headline-lg">Global leaderboard</h1>
+      <LeaderboardLoadingBody />
+    </div>
+  );
+}
 
-      <div className="mt-6 flex gap-2">
+export function LeaderboardLoadingBody() {
+  return (
+    <>
+      <span role="status" className="sr-only">Loading rankings</span>
+      <div aria-hidden className="flex flex-wrap gap-2">
         {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-9 w-24 rounded-md" />
         ))}
       </div>
 
-      <Card depth="flat" padding="none" className="mt-6 overflow-hidden">
+      <Card depth="flat" padding="none" className="overflow-hidden">
         <div className="grid grid-cols-[40px_1fr_120px_120px] gap-3 border-b border-border px-4 py-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-3" />

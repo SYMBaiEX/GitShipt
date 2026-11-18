@@ -7,6 +7,7 @@ import {
 import { GlobalLeaderboardTable } from "./_components/GlobalLeaderboardTable";
 import { LeaderboardFilters } from "./_components/LeaderboardFilters";
 import { LiveIndicator } from "@/components/shared/LiveIndicator";
+import { LeaderboardLoadingBody } from "./loading";
 import type {
   GlobalLeaderboardEntry,
   GlobalProjectEntry,
@@ -43,9 +44,12 @@ export default function LeaderboardPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   return (
-    <Suspense fallback={null}>
-      <LeaderboardPageContent searchParams={searchParams} />
-    </Suspense>
+    <div className="flex flex-col gap-6 lg:gap-8">
+      <h1 className="text-headline-lg">Global leaderboard</h1>
+      <Suspense fallback={<LeaderboardLoadingBody />}>
+        <LeaderboardPageContent searchParams={searchParams} />
+      </Suspense>
+    </div>
   );
 }
 
@@ -68,8 +72,7 @@ async function LeaderboardPageContent({
     : "No payouts have been confirmed yet.";
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8">
-      <h1 className="text-headline-lg">Global leaderboard</h1>
+    <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <LeaderboardFilters mode={mode} />
         <LiveIndicator lastSyncAt={indexerHeartbeat} label="Indexer" />
@@ -88,7 +91,7 @@ async function LeaderboardPageContent({
           emptyMessage={emptyMessage}
         />
       )}
-    </div>
+    </>
   );
 }
 

@@ -12,6 +12,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { audit } from "@/lib/audit";
 import { updateUserCaches } from "@/lib/cache-actions";
 import { withIdempotency } from "@/lib/idempotency";
+import { withUserDb } from "@/lib/db-rls";
 import { check } from "@/lib/rate-limit";
 import { syncGitHubIdentityForUser } from "@/lib/queries/account";
 
@@ -96,28 +97,29 @@ export async function updateAccountProfile(
 
   await withIdempotency(
     data.idempotencyKey ?? `profile:${ctx.userId}:${Date.now()}`,
-    async () => {
-      await dbHttp
-        .update(users)
-        .set({
-          name: data.name,
-          image: data.imageUrl,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, ctx.userId));
+    () =>
+      withUserDb(ctx.userId, "account:update-profile", async () => {
+        await dbHttp
+          .update(users)
+          .set({
+            name: data.name,
+            image: data.imageUrl,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, ctx.userId));
 
-      await audit({
-        actorUserId: ctx.userId,
-        action: "user.profile_update",
-        targetType: "user",
-        targetId: ctx.userId,
-        metadata: { changed: ["name", "image"] },
-        ip: ctx.ip,
-        userAgent: ctx.userAgent,
-      });
+        await audit({
+          actorUserId: ctx.userId,
+          action: "user.profile_update",
+          targetType: "user",
+          targetId: ctx.userId,
+          metadata: { changed: ["name", "image"] },
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
 
-      return { ok: true } as const;
-    },
+        return { ok: true } as const;
+      }),
     { scope: `account:profile:${ctx.userId}` },
   );
 
@@ -137,50 +139,51 @@ export async function updateAccountSettings(
 
   await withIdempotency(
     data.idempotencyKey ?? `settings:${ctx.userId}:${Date.now()}`,
-    async () => {
-      const now = new Date();
-      await dbHttp
-        .insert(userSettings)
-        .values({
-          userId: ctx.userId,
-          payoutEmails: data.payoutEmails,
-          securityEmails: data.securityEmails,
-          productEmails: data.productEmails,
-          compactMode: data.compactMode,
-          defaultDashboardRoute: data.defaultDashboardRoute,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: userSettings.userId,
-          set: {
+    () =>
+      withUserDb(ctx.userId, "account:update-settings", async () => {
+        const now = new Date();
+        await dbHttp
+          .insert(userSettings)
+          .values({
+            userId: ctx.userId,
             payoutEmails: data.payoutEmails,
             securityEmails: data.securityEmails,
             productEmails: data.productEmails,
             compactMode: data.compactMode,
             defaultDashboardRoute: data.defaultDashboardRoute,
+            createdAt: now,
             updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: userSettings.userId,
+            set: {
+              payoutEmails: data.payoutEmails,
+              securityEmails: data.securityEmails,
+              productEmails: data.productEmails,
+              compactMode: data.compactMode,
+              defaultDashboardRoute: data.defaultDashboardRoute,
+              updatedAt: now,
+            },
+          });
+
+        await audit({
+          actorUserId: ctx.userId,
+          action: "user.settings_update",
+          targetType: "user",
+          targetId: ctx.userId,
+          metadata: {
+            payoutEmails: data.payoutEmails,
+            securityEmails: data.securityEmails,
+            productEmails: data.productEmails,
+            compactMode: data.compactMode,
+            defaultDashboardRoute: data.defaultDashboardRoute,
           },
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
         });
 
-      await audit({
-        actorUserId: ctx.userId,
-        action: "user.settings_update",
-        targetType: "user",
-        targetId: ctx.userId,
-        metadata: {
-          payoutEmails: data.payoutEmails,
-          securityEmails: data.securityEmails,
-          productEmails: data.productEmails,
-          compactMode: data.compactMode,
-          defaultDashboardRoute: data.defaultDashboardRoute,
-        },
-        ip: ctx.ip,
-        userAgent: ctx.userAgent,
-      });
-
-      return { ok: true } as const;
-    },
+        return { ok: true } as const;
+      }),
     { scope: `account:settings:${ctx.userId}` },
   );
 
@@ -200,24 +203,25 @@ export async function refreshGithubIdentity(
 
   const result = await withIdempotency(
     data.idempotencyKey ?? `github-sync:${ctx.userId}:${Date.now()}`,
-    async () => {
-      const identity = await syncGitHubIdentityForUser(ctx.userId);
+    () =>
+      withUserDb(ctx.userId, "account:sync-github", async () => {
+        const identity = await syncGitHubIdentityForUser(ctx.userId);
 
-      await audit({
-        actorUserId: ctx.userId,
-        action: "user.github_sync",
-        targetType: "user",
-        targetId: ctx.userId,
-        metadata: { githubUsername: identity.githubUsername },
-        ip: ctx.ip,
-        userAgent: ctx.userAgent,
-      });
+        await audit({
+          actorUserId: ctx.userId,
+          action: "user.github_sync",
+          targetType: "user",
+          targetId: ctx.userId,
+          metadata: { githubUsername: identity.githubUsername },
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
 
-      return {
-        ok: true,
-        githubUsername: identity.githubUsername,
-      } as const;
-    },
+        return {
+          ok: true,
+          githubUsername: identity.githubUsername,
+        } as const;
+      }),
     { scope: `account:github-sync:${ctx.userId}` },
   );
 

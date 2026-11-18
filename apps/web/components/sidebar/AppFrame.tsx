@@ -42,6 +42,7 @@ export function AppFrame({
           ) : null}
         </header>
         <RouteViewport
+          steady={surface === "dashboard" || surface === "admin"}
           className={cn(
             "gb-app-content min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 outline-none lg:pb-3",
             contentClassName,

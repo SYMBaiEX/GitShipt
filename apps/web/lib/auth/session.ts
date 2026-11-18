@@ -3,12 +3,8 @@ import { cache } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "./index";
-import { isPlatformAdmin } from "./admin-check";
 import { hasCredentials } from "@/lib/env";
-import {
-  getAccountProfile,
-  getAccountSettings,
-} from "@/lib/queries/account";
+import { getAccountSettings } from "@/lib/queries/account";
 
 type BetterAuthSession = Awaited<
   ReturnType<ReturnType<typeof auth>["api"]["getSession"]>
@@ -46,32 +42,18 @@ export interface SessionUserChrome {
   isPlatformAdmin: boolean;
 }
 
-async function readAuthSession({
-  catchErrors,
-}: {
-  catchErrors: boolean;
-}): Promise<AuthSessionWithUser | null> {
+// Request-local deduplication across layouts, chrome and page guards.
+const readAuthSession = cache(async (): Promise<AuthSessionWithUser | null> => {
   if (!hasCredentials.db()) return null;
+  const session = await auth().api.getSession({ headers: await headers() });
+  return session?.user?.id ? session : null;
+});
 
-  let session: BetterAuthSession;
-  try {
-    session = await auth().api.getSession({ headers: await headers() });
-  } catch (error) {
-    if (catchErrors) return null;
-    throw error;
-  }
-
-  if (!session?.user?.id) return null;
-  return session as AuthSessionWithUser;
-}
-
-export const getAuthSession = cache(async () =>
-  readAuthSession({ catchErrors: true }),
-);
+export const getAuthSession = cache(() => readAuthSession().catch(() => null));
 
 export const requireAuthSession = cache(
   async (next = "/dashboard"): Promise<AuthSessionWithUser> => {
-    const session = await readAuthSession({ catchErrors: false });
+    const session = await readAuthSession();
     if (!session?.user?.id) {
       redirect(`/auth/signin?next=${encodeURIComponent(next)}`);
     }
@@ -79,42 +61,21 @@ export const requireAuthSession = cache(
   },
 );
 
-export function toSessionUserChrome(
-  session: AuthSessionWithUser,
-  isAdmin: boolean,
-  profile?: {
-    githubUsername: string | null;
-    image: string | null;
-  } | null,
-  settings?: {
-    defaultDashboardRoute: string;
-  } | null,
-): SessionUserChrome {
-  return {
-    id: session.user.id,
-    name: session.user.name ?? null,
-    email: session.user.email ?? null,
-    username:
-      profile?.githubUsername ??
-      (session.user as { githubUsername?: string | null }).githubUsername ??
-      null,
-    imageUrl: profile?.image ?? session.user.image ?? null,
-    defaultDashboardRoute: settings?.defaultDashboardRoute ?? "/dashboard",
-    isPlatformAdmin: isAdmin,
-  };
-}
-
 export const getSessionUser = cache(
   async (): Promise<SessionUserChrome | null> => {
     const session = await getAuthSession();
     if (!session?.user?.id) return null;
 
-    const [isAdmin, profile, settings] = await Promise.all([
-      isPlatformAdmin(session.user.id),
-      getAccountProfile(session.user.id),
-      getAccountSettings(session.user.id),
-    ]);
-
-    return toSessionUserChrome(session, isAdmin, profile, settings);
+    const { id, role, name, email, image, githubUsername } = session.user;
+    const settings = await getAccountSettings(id);
+    return {
+      id,
+      name,
+      email,
+      imageUrl: image ?? null,
+      username: githubUsername ?? null,
+      defaultDashboardRoute: settings.defaultDashboardRoute,
+      isPlatformAdmin: role === "admin" || role === "super_admin",
+    };
   },
 );

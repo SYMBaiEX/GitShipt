@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { verifyApiKey } from "@/lib/queries/api-keys";
 import type { ApiKeyRow } from "@/db/schema";
 import type { ProjectApiKeyScope } from "@repo/shared";
-import { enterDbServiceContext, withDbServiceContext } from "@/lib/db-rls";
+import { withDbServiceContext } from "@/lib/db-rls";
+import "@/db/rls-storage-init";
 
 type StoredApiKeyScope = ProjectApiKeyScope | "read" | "*";
 
@@ -74,6 +75,5 @@ export async function verifyProjectApiKey(
     };
   }
 
-  enterDbServiceContext(`api-key:${apiKey.projectId}`);
   return { ok: true, apiKey };
 }

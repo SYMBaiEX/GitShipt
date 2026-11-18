@@ -24,7 +24,7 @@ export async function GET(
 
   const { id } = await params;
   const project = await getProjectRecord(id);
-  if (!project) {
+  if (!project || !["live", "paused", "simulated_live", "tracked"].includes(project.status)) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
 

@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { z } from "zod";
 import { serverEnv } from "@/lib/env";
+import { readThroughCache } from "@/lib/read-through-cache";
 
 const address = z.string().refine((value) => {
   try {
@@ -76,6 +77,7 @@ export type DeployerBalances = z.infer<typeof DeployerBalancesSchema>;
 /** Dedicated SOL deployer rail; never add the aggregate vault to token totals again. */
 export async function getDeployerBalances(
   wallet: string,
+  timeoutMs = 12_000,
 ): Promise<DeployerBalances> {
   address.parse(wallet);
   const env = serverEnv();
@@ -89,7 +91,7 @@ export async function getDeployerBalances(
   const response = await fetch(url, {
     headers: { "x-api-key": env.BAGS_API_KEY },
     cache: "no-store",
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!response.ok)
     throw new Error(
@@ -101,4 +103,13 @@ export async function getDeployerBalances(
   if (envelope.response.wallet !== wallet)
     throw new Error("Bags deployer wallet mismatch.");
   return envelope.response;
+}
+
+// Presentation only. Claims and reconciliation must use the uncached read.
+export function getDisplayedDeployerBalances(wallet: string): Promise<DeployerBalances> {
+  return readThroughCache({
+    key: `bags:deployer-display:${wallet}`,
+    ttlSeconds: 30,
+    loader: () => getDeployerBalances(wallet, 2_500),
+  });
 }

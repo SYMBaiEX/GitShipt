@@ -1,3 +1,4 @@
+import "@/db/rls-storage-init";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { start } from "workflow/api";

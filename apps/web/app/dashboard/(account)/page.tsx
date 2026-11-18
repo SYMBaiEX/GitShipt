@@ -21,6 +21,7 @@ import {
   CardContent,
 } from "@repo/ui";
 import { Button } from "@repo/ui";
+import { ConsoleLoading } from "@/components/sidebar/ConsoleLoading";
 
 /**
  * Dashboard root — overview of all projects the user owns or admins.
@@ -30,9 +31,12 @@ import { Button } from "@repo/ui";
  */
 export default function DashboardPage() {
   return (
-    <Suspense fallback={null}>
-      <DashboardPageContent />
-    </Suspense>
+    <div className="mx-auto w-full max-w-content space-y-4">
+      <h1 className="text-headline-md">Dashboard</h1>
+      <Suspense fallback={<ConsoleLoading label="dashboard" />}>
+        <DashboardPageContent />
+      </Suspense>
+    </div>
   );
 }
 

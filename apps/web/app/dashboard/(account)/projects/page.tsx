@@ -13,6 +13,7 @@ import {
 } from "@repo/ui";
 import { ProjectList } from "../../_components/ProjectList";
 import { DraftRow } from "../../_components/DraftRow";
+import { ConsoleLoading } from "@/components/sidebar/ConsoleLoading";
 
 
 /**
@@ -23,9 +24,12 @@ import { DraftRow } from "../../_components/DraftRow";
  */
 export default function ProjectsPage() {
   return (
-    <Suspense fallback={null}>
-      <ProjectsPageContent />
-    </Suspense>
+    <div className="mx-auto w-full max-w-content space-y-4">
+      <h1 className="text-headline-md">My projects</h1>
+      <Suspense fallback={<ConsoleLoading label="projects" tiles={2} />}>
+        <ProjectsPageContent />
+      </Suspense>
+    </div>
   );
 }
 

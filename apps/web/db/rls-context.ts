@@ -15,9 +15,8 @@ export type RlsContext =
 //      real `AsyncLocalStorage` instance under `STORE_KEY` on globalThis.
 //      `getRlsContext` reads from that storage when present.
 //
-//   2. Sequential / single-shot callers (workflow steps, webhooks, cron
-//      handlers) don't need cross-async propagation — each runs in its own
-//      isolated request/process. Those use the lightweight `_override`
+//   2. Standalone workflow bundles without a Node storage initializer
+//      use the lightweight `_override`
 //      mechanism (settable via `enterDbServiceContext` / `enterDbWorkflowContext`
 //      in `@/lib/db-rls`) so they never have to import `node:async_hooks`.
 //      The Workflow DevKit's build analyzer rejects any reachable static
@@ -41,6 +40,10 @@ function getStorage(): AsyncLocalStorageLike<RlsContext> | null {
     }
   )[STORE_KEY];
   return slot ?? null;
+}
+
+export function hasRlsStorage(): boolean {
+  return getStorage() !== null;
 }
 
 let _override: RlsContext | null = null;
@@ -78,9 +81,10 @@ export function enterRlsContext(ctx: RlsContext): void {
 
 export function withRlsContext<T>(
   ctx: RlsContext,
-  fn: () => Promise<T>,
+  fn: () => PromiseLike<T>,
 ): Promise<T> {
-  return requireStorage().run(ctx, fn) as Promise<T>;
+  // Drizzle starts query work when its thenable is awaited, not when it is built.
+  return requireStorage().run(ctx, async () => await fn());
 }
 
 /**

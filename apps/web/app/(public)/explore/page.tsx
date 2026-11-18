@@ -3,18 +3,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Compass } from "lucide-react";
 import { Button } from "@repo/ui";
-import { Card } from "@repo/ui";
+import { Card, Skeleton } from "@repo/ui";
 import {
   getAllPublicProjects,
   type ExploreFilters,
 } from "@/lib/queries/discovery";
 import { ExploreFilters as FiltersBar } from "./_components/ExploreFilters";
 import { ProjectCard } from "./_components/ProjectCard";
+import { ExploreResultsLoading } from "./_components/ExploreResultsLoading";
 
 export const metadata: Metadata = {
   title: "Explore projects",
-  description:
-    "Explore repositories and tokens launched through GitShipt.",
+  description: "Explore repositories and tokens launched through GitShipt.",
 };
 
 type SearchParams = Promise<{
@@ -51,9 +51,15 @@ export default function ExplorePage({
   searchParams: SearchParams;
 }) {
   return (
-    <Suspense fallback={null}>
-      <ExplorePageContent searchParams={searchParams} />
-    </Suspense>
+    <div className="flex flex-col gap-6 lg:gap-8">
+      <h1 className="text-headline-lg">Explore projects</h1>
+      <Suspense fallback={<Skeleton className="h-[52px] w-full rounded-md" />}>
+        <FiltersBar />
+      </Suspense>
+      <Suspense fallback={<ExploreResultsLoading />}>
+        <ExplorePageContent searchParams={searchParams} />
+      </Suspense>
+    </div>
   );
 }
 
@@ -68,10 +74,7 @@ async function ExplorePageContent({
   const hasFilters = Boolean(params.q || params.status || params.sort);
 
   return (
-    <div className="flex flex-col gap-6 lg:gap-8">
-      <h1 className="text-headline-lg">Explore projects</h1>
-      <FiltersBar />
-
+    <>
       <div className="flex items-center justify-between">
         <span role="status" className="text-caption text-fg-muted">
           {projects.length === 0
@@ -93,7 +96,7 @@ async function ExplorePageContent({
           ))}
         </ul>
       )}
-    </div>
+    </>
   );
 }
 

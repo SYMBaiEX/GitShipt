@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BookOpen, ExternalLink } from "lucide-react";
-import { getProjectPageData } from "@/lib/queries/project-page";
+import { getProjectBySlug } from "@/lib/queries/project-page";
 import { getProjectDocs } from "@/lib/queries/project-docs";
 import { Card, CardHeader, CardTitle, CardContent } from "@repo/ui";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
@@ -19,11 +19,11 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) return { title: `${org}/${repo} · Docs` };
+  const header = await getProjectBySlug(org, repo);
+  if (!header) return { title: `${org}/${repo} · Docs` };
   return {
-    title: `${data.header.name} · Docs`,
-    description: `How rewards work for ${data.header.slug}.`,
+    title: `${header.name} · Docs`,
+    description: `How rewards work for ${header.slug}.`,
   };
 }
 
@@ -37,10 +37,9 @@ export default function ProjectDocsPage({ params }: { params: Params }) {
 
 async function ProjectDocsPageContent({ params }: { params: Params }) {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) notFound();
+  const header = await getProjectBySlug(org, repo);
+  if (!header) notFound();
 
-  const { header } = data;
   const customDocs = await getProjectDocs(header.id);
   const repoUrl = `https://github.com/${header.ghOwner}/${header.ghRepo}`;
   const platformFeePct = (header.platformFeeBps / 100).toFixed(1);

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { cn } from "@repo/lib";
 import { createUiStore, useUiStoreValue, type UiStore } from "./ui-store";
 import { Sheet, SheetContent, SheetTitle } from "./sheet";
@@ -366,7 +366,7 @@ export function SidebarItem({
   );
 
   const className = cn(
-    "group flex h-11 items-center gap-3 rounded-md border px-2.5 lg:h-9",
+    "group relative flex h-11 items-center gap-3 rounded-md border px-2.5 lg:h-9",
     "transition-[background-color,border-color,color,box-shadow,transform] duration-150",
     active
       ? "gb-control gb-control-secondary border-border-strong bg-surface-elevated text-fg"
@@ -406,6 +406,7 @@ export function SidebarItem({
         onNavigate={handleClick}
       >
         {inner}
+        {active ? null : <SidebarLinkPending />}
       </Link>
     );
   }
@@ -421,6 +422,11 @@ export function SidebarItem({
       {inner}
     </button>
   );
+}
+
+function SidebarLinkPending() {
+  const { pending } = useLinkStatus();
+  return <span aria-hidden className="gb-sidebar-pending" data-pending={pending} />;
 }
 
 // ----------------------------------------------------------------------------

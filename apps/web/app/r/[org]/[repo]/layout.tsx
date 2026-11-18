@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { ProjectShell } from "./_components/ProjectShell";
 import { getProjectShellChrome } from "@/lib/auth/project-chrome";
-import { getProjectPageData } from "@/lib/queries/project-page";
+import { getProjectShellIdentity } from "@/lib/queries/project-page";
 import { getDefaultSidebarCollapsed } from "@/lib/sidebar-state";
 
 type Params = Promise<{ org: string; repo: string }>;
@@ -38,12 +38,13 @@ async function PublicProjectLayoutContent({
   params: Params;
 }) {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) notFound();
+  const header = await getProjectShellIdentity(org, repo);
+  if (!header) notFound();
 
-  const { header } = data;
-  const { canAdmin } = await getProjectShellChrome(header.id);
-  const defaultSidebarCollapsed = await getDefaultSidebarCollapsed();
+  const [{ canAdmin }, defaultSidebarCollapsed] = await Promise.all([
+    getProjectShellChrome(header.id),
+    getDefaultSidebarCollapsed(),
+  ]);
 
   return (
     <ProjectShell

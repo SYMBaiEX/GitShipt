@@ -7,7 +7,8 @@ import { projects } from "@/db/schema";
 /**
  * Cache tags + revalidation helpers.
  *
- * Read-side caching uses the Next 16 `'use cache'` directive (see
+ * Read-side caching uses Next Cache Components, including remote caching
+ * for shared public catalog aggregates (see
  * lib/queries/* call sites). Tags emitted from inside those cached
  * functions match the names in `cacheTags` here, so the helpers below
  * (revalidatePublicCaches, revalidateProjectCaches, etc.) are the single

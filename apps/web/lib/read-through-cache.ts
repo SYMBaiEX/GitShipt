@@ -11,55 +11,46 @@ type CachePayload =
 
 const CACHE_TYPE_KEY = "__gitshipt_cache_type";
 const CACHE_VALUE_KEY = "value";
+const CACHE_IO_BUDGET_MS = 150;
+const pendingReads = new Map<string, Promise<unknown>>();
 
 export interface ReadThroughCacheOptions<T> {
   key: string;
   ttlSeconds: number;
   loader: () => Promise<T>;
-  allowStaleOnError?: boolean;
 }
 
 export async function readThroughCache<T>(
   options: ReadThroughCacheOptions<T>,
 ): Promise<T> {
-  const r = safeRedis();
-  if (!r) return options.loader();
-
-  const cacheKey = `gitshipt:read-through:${options.key}`;
-  const cached = await r.get(cacheKey);
-  if (cached) {
-    try {
-      return fromCachePayload<T>(JSON.parse(cached) as CachePayload);
-    } catch {
-      // Corrupt cache entry. Fall through and refresh it.
-    }
-  }
-
-  try {
+  const pending = pendingReads.get(options.key);
+  // Callers use an endpoint-specific cache key with a single payload type.
+  if (pending) return pending as Promise<T>;
+  const request = (async () => {
+    const cached = await getReadThroughPayload<T>(options.key);
+    if (cached !== null) return cached;
     const value = await options.loader();
-    await r.set(
-      cacheKey,
-      JSON.stringify(toCachePayload(value)),
-      "EX",
-      Math.max(1, options.ttlSeconds),
-    );
+    await setReadThroughPayload(options.key, value, options.ttlSeconds);
     return value;
-  } catch (error) {
-    if (options.allowStaleOnError && cached) {
-      return fromCachePayload<T>(JSON.parse(cached) as CachePayload);
-    }
-    throw error;
-  }
+  })().finally(() => pendingReads.delete(options.key));
+  pendingReads.set(options.key, request);
+  return request;
 }
 
-export async function getReadThroughPayload<T>(
-  key: string,
-): Promise<T | null> {
+export async function getReadThroughPayload<T>(key: string): Promise<T | null> {
   const r = safeRedis();
   if (!r) return null;
-  const cached = await r.get(`gitshipt:read-through:${key}`);
-  if (!cached) return null;
-  return fromCachePayload<T>(JSON.parse(cached) as CachePayload);
+  try {
+    const cached = await withinCacheBudget(
+      r.get(`gitshipt:read-through:${key}`),
+    );
+    return cached
+      ? fromCachePayload<T>(JSON.parse(cached) as CachePayload)
+      : null;
+  } catch {
+    // An optional cache read must not mask an available origin.
+    return null;
+  }
 }
 
 export async function setReadThroughPayload<T>(
@@ -69,20 +60,39 @@ export async function setReadThroughPayload<T>(
 ): Promise<void> {
   const r = safeRedis();
   if (!r) return;
-  await r.set(
-    `gitshipt:read-through:${key}`,
-    JSON.stringify(toCachePayload(value)),
-    "EX",
-    Math.max(1, ttlSeconds),
-  );
+  try {
+    await withinCacheBudget(
+      r.set(
+        `gitshipt:read-through:${key}`,
+        JSON.stringify(toCachePayload(value)),
+        "EX",
+        Math.max(1, ttlSeconds),
+      ),
+    );
+  } catch {
+    // The caller already has a valid response from the origin.
+  }
 }
 
 function safeRedis(): IORedisClient | null {
   try {
     return redis();
-  } catch (error) {
-    if (process.env.NODE_ENV === "test") return null;
-    throw error;
+  } catch {
+    return null;
+  }
+}
+
+async function withinCacheBudget<T>(request: Promise<T>): Promise<T | null> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      request,
+      new Promise<null>((resolve) => {
+        timeout = setTimeout(() => resolve(null), CACHE_IO_BUDGET_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
 }
 

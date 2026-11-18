@@ -7,7 +7,7 @@ import { History } from "lucide-react";
 import { Card } from "@repo/ui";
 import { Button } from "@repo/ui";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-import { getProjectPageData } from "@/lib/queries/project-page";
+import { getProjectBySlug } from "@/lib/queries/project-page";
 import { getProjectSnapshots } from "@/lib/queries/discovery";
 import { formatSol } from "@repo/lib";
 import { SnapshotRow } from "./_components/SnapshotRow";
@@ -25,11 +25,11 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) return { title: `${org}/${repo} · Snapshots` };
+  const header = await getProjectBySlug(org, repo);
+  if (!header) return { title: `${org}/${repo} · Snapshots` };
   return {
-    title: `${data.header.name} · Snapshots`,
-    description: `Historical leaderboard snapshots and Merkle roots for ${data.header.slug}.`,
+    title: `${header.name} · Snapshots`,
+    description: `Historical leaderboard snapshots and Merkle roots for ${header.slug}.`,
   };
 }
 
@@ -60,10 +60,9 @@ async function ProjectSnapshotsPageContent({
   searchParams: Promise<{ page?: string }>;
 }) {
   const [{ org, repo }, sp] = await Promise.all([params, searchParams]);
-  const data = await getProjectPageData(org, repo);
-  if (!data) notFound();
+  const header = await getProjectBySlug(org, repo);
+  if (!header) notFound();
 
-  const { header } = data;
   const ownerRewards = rewardModeOf(header.payoutConfig) === "owner";
   const columns = SNAPSHOT_COLUMNS[ownerRewards ? "owner" : "contributor"];
   const slug = `${header.ghOwner}/${header.ghRepo}`;

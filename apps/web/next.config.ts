@@ -45,7 +45,7 @@ const nextConfig: NextConfig = {
   // (function, args) tuple; their tags participate in revalidateTag. Without
   // this flag the directive is a no-op.
   cacheComponents: true,
-  partialPrefetching: false,
+  partialPrefetching: true,
 
   // Named cacheLife profiles consumed by `cacheLife("<name>")`. We name them
   // after the read pattern, not the duration, so call sites read clearly:

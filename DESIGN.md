@@ -516,6 +516,10 @@ Density is a feature. Information per square inch should beat any traditional Sa
 
 This is **not** a playful product. No rounded illustrations, no mascot pages, no springy bounce animations. Motion is restricted to subtle transitions (opacity, transform), countdown timers, sparklines, and live indicators.
 
+Route changes settle in about 215ms while the header, sidebar, and dock stay
+fixed. Mobile tabs move in their visible order; wizard steps follow progress.
+Reduced motion removes travel and fades without delaying the navigation.
+
 ## Colors
 
 The palette is built around a single signature accent (GitShipt logo bone) over a deep neutral substrate biased slightly toward cool. Every other color is utility. **Dark is the default and the canonical aesthetic**; a mirrored light palette ships for accessibility, preference parity, and presenters who demo on bright projectors.

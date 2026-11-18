@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -114,11 +120,22 @@ export function WizardShell({
   >({ status: "idle" });
   const step = useLaunchWizardStore((state) => state.step);
   const stageRef = useRef<HTMLElement>(null);
+  const stageBody = useRef<HTMLDivElement>(null);
   const previousStep = useRef(step);
-  useEffect(() => {
-    if (previousStep.current === step) return;
+  useLayoutEffect(() => {
+    const from = previousStep.current;
+    if (from === step) return;
     previousStep.current = step;
     stageRef.current?.focus();
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const animation = stageBody.current?.animate(
+      [
+        { opacity: 0.55, transform: `translateX(${step > from ? 10 : -10}px)` },
+        { opacity: 1, transform: "none" },
+      ],
+      { duration: 190, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+    );
+    return () => animation?.cancel();
   }, [step]);
   const repo = useLaunchWizardStore((state) => state.repo);
   const metadata = useLaunchWizardStore((state) => state.metadata);
@@ -493,110 +510,112 @@ export function WizardShell({
         aria-busy={status === "submitting"}
         className="relative mt-3 rounded-md border border-border bg-surface p-4 shadow-card-elevated outline-none focus-visible:outline-2 focus-visible:outline-primary-readable sm:p-6"
       >
-        {!signedIn ? (
-          <SignedOutPrompt />
-        ) : status === "submitting" ? (
-          <SubmittingState />
-        ) : step === 1 ? (
-          <RepoPicker onSelect={selectRepo} selectedId={repo?.id ?? null} />
-        ) : step === 2 && repo ? (
-          <>
-            {errorMessage ? (
-              <div className="mb-4 space-y-3">
-                <FormError message={errorMessage} onDismiss={handleRetry} />
-                {draftProjectId && errorMessage.includes("GitHub App") ? (
-                  <Button asChild variant="secondary" size="sm">
-                    <Link
-                      href={`/api/projects/${draftProjectId}/install-github`}
-                    >
-                      Install GitHub App
-                      <ArrowUpRight className="size-3.5" />
-                    </Link>
+        <div ref={stageBody}>
+          {!signedIn ? (
+            <SignedOutPrompt />
+          ) : status === "submitting" ? (
+            <SubmittingState />
+          ) : step === 1 ? (
+            <RepoPicker onSelect={selectRepo} selectedId={repo?.id ?? null} />
+          ) : step === 2 && repo ? (
+            <>
+              {errorMessage ? (
+                <div className="mb-4 space-y-3">
+                  <FormError message={errorMessage} onDismiss={handleRetry} />
+                  {draftProjectId && errorMessage.includes("GitHub App") ? (
+                    <Button asChild variant="secondary" size="sm">
+                      <Link
+                        href={`/api/projects/${draftProjectId}/install-github`}
+                      >
+                        Install GitHub App
+                        <ArrowUpRight className="size-3.5" />
+                      </Link>
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+              <TokenMetadataForm
+                repo={repo}
+                initial={metadata}
+                onBack={() => goToStep(1)}
+                onSubmit={setMetadata}
+              />
+            </>
+          ) : step === 3 ? (
+            <>
+              {errorMessage ? (
+                <FormError
+                  message={errorMessage}
+                  onDismiss={handleRetry}
+                  className="mb-4"
+                />
+              ) : null}
+              {rewardMode === "contributors" ? (
+                <div className="space-y-4">
+                  <p className="text-body-md text-fg-secondary">
+                    Automatic contributor rewards are unavailable for new
+                    launches. This legacy draft retains its original mode until
+                    you choose to convert it.
+                  </p>
+                  <Button type="button" onClick={() => setRewardMode("owner")}>
+                    Use owner rewards
                   </Button>
-                ) : null}
-              </div>
-            ) : null}
-            <TokenMetadataForm
-              repo={repo}
-              initial={metadata}
-              onBack={() => goToStep(1)}
-              onSubmit={setMetadata}
-            />
-          </>
-        ) : step === 3 ? (
-          <>
-            {errorMessage ? (
-              <FormError
-                message={errorMessage}
-                onDismiss={handleRetry}
-                className="mb-4"
+                </div>
+              ) : (
+                <OwnerRewardsConfig
+                  platformFeeBps={platformFeeBps}
+                  onBack={() => goToStep(2)}
+                  onContinue={() => setLeaderboard(leaderboard)}
+                />
+              )}
+            </>
+          ) : step === 4 && repo && metadata ? (
+            <>
+              {isStubMode ? <TestModeBanner className="mb-4" /> : null}
+              {errorMessage ? (
+                <FormError
+                  message={errorMessage}
+                  onDismiss={handleRetry}
+                  className="mb-4"
+                />
+              ) : null}
+              <ReviewAndSign
+                rewardMode={rewardMode}
+                repo={repo}
+                metadata={metadata}
+                leaderboard={{ ...leaderboard, platformFeeBps }}
+                launchWalletAddress={launchWalletAddress}
+                walletConnected={connected}
+                walletLinked={launchWalletLinked}
+                walletLinkChecking={walletLinkChecking}
+                walletLinkError={
+                  walletLinkCheck.status === "error" &&
+                  walletLinkCheck.address === launchWalletAddress
+                    ? walletLinkCheck.message
+                    : null
+                }
+                onWalletLinked={(address) => {
+                  setNewlyLinkedWallets((current) =>
+                    current.includes(address) ? current : [...current, address],
+                  );
+                  clearError();
+                }}
+                initialBuyLamports={initialBuyLamports}
+                onBack={() => goToStep(3)}
+                onEditRepo={() => goToStep(1)}
+                onEditToken={() => goToStep(2)}
+                onEditLeaderboard={() => goToStep(3)}
+                onLaunch={handleLaunch}
+                isPending={false}
+                isStubMode={isStubMode}
               />
-            ) : null}
-            {rewardMode === "contributors" ? (
-              <div className="space-y-4">
-                <p className="text-body-md text-fg-secondary">
-                  Automatic contributor rewards are unavailable for new
-                  launches. This legacy draft retains its original mode until
-                  you choose to convert it.
-                </p>
-                <Button type="button" onClick={() => setRewardMode("owner")}>
-                  Use owner rewards
-                </Button>
-              </div>
-            ) : (
-              <OwnerRewardsConfig
-                platformFeeBps={platformFeeBps}
-                onBack={() => goToStep(2)}
-                onContinue={() => setLeaderboard(leaderboard)}
-              />
-            )}
-          </>
-        ) : step === 4 && repo && metadata ? (
-          <>
-            {isStubMode ? <TestModeBanner className="mb-4" /> : null}
-            {errorMessage ? (
-              <FormError
-                message={errorMessage}
-                onDismiss={handleRetry}
-                className="mb-4"
-              />
-            ) : null}
-            <ReviewAndSign
-              rewardMode={rewardMode}
-              repo={repo}
-              metadata={metadata}
-              leaderboard={{ ...leaderboard, platformFeeBps }}
-              launchWalletAddress={launchWalletAddress}
-              walletConnected={connected}
-              walletLinked={launchWalletLinked}
-              walletLinkChecking={walletLinkChecking}
-              walletLinkError={
-                walletLinkCheck.status === "error" &&
-                walletLinkCheck.address === launchWalletAddress
-                  ? walletLinkCheck.message
-                  : null
-              }
-              onWalletLinked={(address) => {
-                setNewlyLinkedWallets((current) =>
-                  current.includes(address) ? current : [...current, address],
-                );
-                clearError();
-              }}
-              initialBuyLamports={initialBuyLamports}
-              onBack={() => goToStep(3)}
-              onEditRepo={() => goToStep(1)}
-              onEditToken={() => goToStep(2)}
-              onEditLeaderboard={() => goToStep(3)}
-              onLaunch={handleLaunch}
-              isPending={false}
-              isStubMode={isStubMode}
-            />
-          </>
-        ) : (
-          <p className="text-body-md text-fg-muted">
-            Pick a repo first to continue.
-          </p>
-        )}
+            </>
+          ) : (
+            <p className="text-body-md text-fg-muted">
+              Pick a repo first to continue.
+            </p>
+          )}
+        </div>
       </section>
 
       {signedIn && step >= 2 && repo && metadata ? (

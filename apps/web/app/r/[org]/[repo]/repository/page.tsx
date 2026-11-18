@@ -11,7 +11,7 @@ import {
   RefreshCw,
   Star,
 } from "lucide-react";
-import { getProjectPageData } from "@/lib/queries/project-page";
+import { getProjectBySlug } from "@/lib/queries/project-page";
 import { getIndexerState } from "@/lib/queries/dashboard";
 import { Card, CardHeader, CardTitle, CardContent } from "@repo/ui";
 import { Badge } from "@repo/ui";
@@ -30,11 +30,11 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) return { title: `${org}/${repo} · Repository` };
+  const header = await getProjectBySlug(org, repo);
+  if (!header) return { title: `${org}/${repo} · Repository` };
   return {
-    title: `${data.header.name} · Repository`,
-    description: `Repository info and indexer state for ${data.header.slug}.`,
+    title: `${header.name} · Repository`,
+    description: `Repository info and indexer state for ${header.slug}.`,
   };
 }
 
@@ -48,10 +48,9 @@ export default function ProjectRepositoryPage({ params }: { params: Params }) {
 
 async function ProjectRepositoryPageContent({ params }: { params: Params }) {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) notFound();
+  const header = await getProjectBySlug(org, repo);
+  if (!header) notFound();
 
-  const { header } = data;
 
   const indexerRow = await getIndexerState(header.id);
 

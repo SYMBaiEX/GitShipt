@@ -11,7 +11,7 @@ import {
 } from "@/db/schema";
 import { eq, and, desc, sql, asc, isNotNull } from "drizzle-orm";
 import { bags } from "@/lib/bags/client";
-import { redis } from "@/lib/redis";
+import { fetchGitHubJsonWithEtag } from "@/lib/github/http-cache";
 import { hasCredentials } from "@/lib/env";
 import { cacheLife, cacheTag } from "next/cache";
 
@@ -114,70 +114,76 @@ const GitHubRepoApiMetaSchema = z.object({
 });
 
 /**
- * Fetch lightweight GitHub repo metadata (language, stars, forks) with a
- * 5-minute Redis cache. Uses the unauthenticated public API (60 req/hr per
- * IP) — fine for the demo project. When the indexer-grade GitHub App is
- * installed, this could be swapped to use installationOctokit() for higher
- * rate limits.
+ * Reuse GitHub's ETag after the five-minute display cache expires.
  */
 async function fetchGitHubRepoMeta(
   ghOwner: string,
   ghRepo: string,
 ): Promise<GitHubRepoMeta> {
-  const cacheKey = `gitshipt:gh:repo:${ghOwner}/${ghRepo}`;
-  const r = redis();
-  if (r) {
-    const cached = await r.get(cacheKey);
-    if (cached) {
-      try {
-        return GitHubRepoMetaSchema.parse(JSON.parse(cached));
-      } catch {
-        // fall through to refetch
-      }
-    }
-  }
-
-  let meta: GitHubRepoMeta = { language: null, stars: 0, forks: 0 };
   try {
-    const res = await fetch(
-      `https://api.github.com/repos/${ghOwner}/${ghRepo}`,
-      {
-        headers: { accept: "application/vnd.github+json" },
-        // Tag for Next's dedup; this also caches per request inside an RSC tree.
-        next: { revalidate: 300 },
-      },
+    const data = await fetchGitHubJsonWithEtag(
+      `public-repo:${ghOwner.toLowerCase()}/${ghRepo.toLowerCase()}`,
+      `https://api.github.com/repos/${encodeURIComponent(ghOwner)}/${encodeURIComponent(ghRepo)}`,
+      GitHubRepoApiMetaSchema,
+      { ttlSeconds: 300, timeoutMs: 1_500 },
     );
-    if (res.ok) {
-      const data = GitHubRepoApiMetaSchema.parse(await res.json());
-      meta = GitHubRepoMetaSchema.parse({
-        language: data.language ?? null,
-        stars: data.stargazers_count ?? 0,
-        forks: data.forks_count ?? 0,
-      });
-    }
+    return GitHubRepoMetaSchema.parse({
+      language: data.language ?? null,
+      stars: data.stargazers_count ?? 0,
+      forks: data.forks_count ?? 0,
+    });
   } catch {
-    // network/parse failure → return zero defaults
+    return { language: null, stars: 0, forks: 0 };
   }
+}
 
-  if (r) {
-    await r.set(cacheKey, JSON.stringify(meta), "EX", 300);
-  }
-  return meta;
+async function getProjectRecordBySlug(ghOwner: string, ghRepo: string) {
+  "use cache";
+  cacheLife("live");
+  cacheTag(cacheTags.public);
+  cacheTag(cacheTags.projectSlug(`${ghOwner}/${ghRepo}`));
+  // CI builds (no DATABASE_URL secret) prerender public pages and would
+  // otherwise hit the dbHttp Proxy throw. Match the lib/redis.ts +
+  // getLandingDataUncached idiom and short-circuit gracefully.
+  if (!hasCredentials.db()) return null;
+  const [row] = await dbHttp
+    .select({
+      id: projects.id,
+      ghOwner: projects.ghOwner,
+      ghRepo: projects.ghRepo,
+      name: projects.name,
+      description: projects.description,
+      imageUrl: projects.imageUrl,
+      tokenMint: projects.tokenMint,
+      bagsLaunchId: projects.bagsLaunchId,
+      status: projects.status,
+      platformFeeBps: projects.platformFeeBps,
+      scoringConfig: projects.scoringConfig,
+      payoutConfig: projects.payoutConfig,
+      createdAt: projects.createdAt,
+    })
+    .from(projects)
+    .where(and(eq(projects.ghOwner, ghOwner), eq(projects.ghRepo, ghRepo)))
+    .limit(1);
+  return row ?? null;
+}
+
+export type ProjectShellIdentity = Pick<ProjectHeader, "id" | "name" | "ghOwner" | "ghRepo">;
+
+export async function getProjectShellIdentity(
+  ghOwner: string,
+  ghRepo: string,
+): Promise<ProjectShellIdentity | null> {
+  const row = await getProjectRecordBySlug(ghOwner, ghRepo);
+  if (!row) return null;
+  return { id: row.id, name: row.name, ghOwner: row.ghOwner, ghRepo: row.ghRepo };
 }
 
 async function getProjectBySlugUncached(
   ghOwner: string,
   ghRepo: string,
 ): Promise<ProjectHeader | null> {
-  // CI builds (no DATABASE_URL secret) prerender public pages and would
-  // otherwise hit the dbHttp Proxy throw. Match the lib/redis.ts +
-  // getLandingDataUncached idiom and short-circuit gracefully.
-  if (!hasCredentials.db()) return null;
-  const [row] = await dbHttp
-    .select()
-    .from(projects)
-    .where(and(eq(projects.ghOwner, ghOwner), eq(projects.ghRepo, ghRepo)))
-    .limit(1);
+  const row = await getProjectRecordBySlug(ghOwner, ghRepo);
   if (!row) return null;
 
   const [countRows, ghMeta] = await Promise.all([

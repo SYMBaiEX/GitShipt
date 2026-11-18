@@ -98,7 +98,7 @@ import { decodePartnerConfig } from "./partner-config";
  * Bags shape across version drift.
  */
 
-let _sdk: BagsSDK | null = null;
+let _sdk: Promise<BagsSDK> | null = null;
 
 const DEMO_TOKEN_MINT = "GShiptDemoMint111111111111111111111111111111";
 const STUB_TOKEN_SUFFIX = "ags1111111111111111111111111111111111111";
@@ -116,7 +116,6 @@ function bagsReadCache<T>(
     key: `bags:${key}`,
     ttlSeconds,
     loader,
-    allowStaleOnError: true,
   });
 }
 
@@ -133,12 +132,13 @@ async function getSdk(): Promise<BagsSDK> {
   if (!env.HELIUS_RPC_URL) {
     throw new Error("HELIUS_RPC_URL is required for Bags SDK.");
   }
-  const [{ BagsSDK }, { Connection }] = await Promise.all([
-    import("@bagsfm/bags-sdk"),
-    import("@solana/web3.js"),
-  ]);
-  const conn = new Connection(env.HELIUS_RPC_URL, "processed");
-  _sdk = new BagsSDK(env.BAGS_API_KEY, conn, "processed");
+  const apiKey = env.BAGS_API_KEY;
+  _sdk = import("@bagsfm/bags-sdk")
+    .then(({ BagsSDK }) => new BagsSDK(apiKey, solanaConnection("processed"), "processed"))
+    .catch((error: unknown) => {
+      _sdk = null;
+      throw error;
+    });
   return _sdk;
 }
 

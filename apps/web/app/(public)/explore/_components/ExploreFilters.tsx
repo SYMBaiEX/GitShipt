@@ -53,7 +53,10 @@ export function ExploreFilters() {
       mutate(next);
       const qs = next.toString();
       startTransition(() => {
-        router.replace(qs ? `/explore?${qs}` : "/explore", { scroll: false });
+        router.replace(qs ? `/explore?${qs}` : "/explore", {
+          scroll: false,
+          transitionTypes: ["filter-results"],
+        });
       });
     },
     [params, router],

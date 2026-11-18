@@ -1,6 +1,6 @@
 import { SidebarProvider } from "@repo/ui";
 import { AppFrame } from "@/components/sidebar/AppFrame";
-import type { ProjectHeader } from "@/lib/queries/project-page";
+import type { ProjectShellIdentity } from "@/lib/queries/project-page";
 import { clusterLabel } from "@/lib/solana/explorer";
 import { ProjectShellSidebar } from "./ProjectShellClient";
 
@@ -23,7 +23,7 @@ export function ProjectShell({
   defaultSidebarCollapsed = false,
   children,
 }: {
-  header: ProjectHeader;
+  header: ProjectShellIdentity;
   active?: ProjectSidebarActive;
   canAdmin?: boolean;
   defaultSidebarCollapsed?: boolean;

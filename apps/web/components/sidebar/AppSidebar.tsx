@@ -568,21 +568,27 @@ function compose(
 // ─── The component ────────────────────────────────────────────────────────
 
 export function AppSidebar(props: AppSidebarProps) {
-  if (props.surface.kind === "public") {
-    return <AppSidebarContent {...props} fromOrigin={null} />;
-  }
   return (
     <React.Suspense
-      fallback={<AppSidebarContent {...props} fromOrigin={null} />}
+      fallback={<AppSidebarContent {...props} fromOrigin={null} chromeUser={null} sessionPending />}
     >
-      <AppSidebarWithSearchParams {...props} />
+      {props.surface.kind === "public" ? (
+        <AppSidebarWithSession {...props} fromOrigin={null} />
+      ) : (
+        <AppSidebarWithSearchParams {...props} />
+      )}
     </React.Suspense>
   );
 }
 
 function AppSidebarWithSearchParams(props: AppSidebarProps) {
   const searchParams = useSearchParams();
-  return <AppSidebarContent {...props} fromOrigin={searchParams.get("from")} />;
+  return <AppSidebarWithSession {...props} fromOrigin={searchParams.get("from")} />;
+}
+
+function AppSidebarWithSession(props: AppSidebarProps & { fromOrigin: string | null }) {
+  const chromeUser = useSessionChrome();
+  return <AppSidebarContent {...props} chromeUser={chromeUser} />;
 }
 
 function AppSidebarContent({
@@ -590,9 +596,14 @@ function AppSidebarContent({
   footerSlot,
   activeKey,
   fromOrigin,
-}: AppSidebarProps & { fromOrigin: string | null }) {
+  chromeUser,
+  sessionPending = false,
+}: AppSidebarProps & {
+  fromOrigin: string | null;
+  chromeUser: ReturnType<typeof useSessionChrome>;
+  sessionPending?: boolean;
+}) {
   const pathname = usePathname() ?? "/";
-  const chromeUser = useSessionChrome();
   const { collapsed, closeMobile } = useSidebar();
   const setRouteChrome = useAuthenticatedRouteStore(
     (state) => state.setRouteChrome,
@@ -608,12 +619,16 @@ function AppSidebarContent({
       resolvedUser.username ||
       resolvedUser.imageUrl),
   );
-  const { brand, returnTo, groups } = compose(
+  const composition = compose(
     surface,
     signedIn,
     resolvedIsPlatformAdmin,
     fromOrigin,
   );
+  const { brand, returnTo } = composition;
+  const groups = sessionPending && surface.kind === "public"
+    ? composition.groups.slice(0, 1)
+    : composition.groups;
 
   const resolvedActiveKey = React.useMemo(() => {
     if (activeKey !== undefined) return activeKey;
@@ -705,7 +720,7 @@ function AppSidebarContent({
             imageUrl={resolvedUser.imageUrl ?? null}
             defaultDashboardHref={resolvedUser.defaultDashboardRoute ?? null}
           />
-        ) : surface.kind === "public" ? (
+        ) : surface.kind === "public" && !sessionPending ? (
           <CollapsibleSignInCta />
         ) : null}
         <SidebarFooterControls />

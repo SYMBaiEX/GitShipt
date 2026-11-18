@@ -74,31 +74,7 @@ function ThemeAwareImage({
 
 export default function LandingPage() {
   return (
-    <Suspense fallback={null}>
-      <LandingPageContent />
-    </Suspense>
-  );
-}
-
-async function LandingPageContent() {
-  const [{ ticker, latestLaunches }, featuredHeader, indexerHeartbeat] =
-    await Promise.all([
-      getLandingData(),
-      getProjectBySlug(FEATURED_OWNER, FEATURED_REPO),
-      getPlatformIndexerHeartbeat(),
-    ]);
-  const featuredContribs: LeaderboardRow[] = featuredHeader
-    ? await getProjectLeaderboard(
-        featuredHeader.id,
-        featuredHeader.payoutConfig,
-      )
-    : [];
-  const tickerCellKeys = getLandingTickerCellKeys(ticker);
-
-  return (
     <div className="gitshipt-landing-page flex min-w-0 flex-col gap-5 lg:gap-6 lg:py-7">
-      <TokenLaunchCarousel launches={latestLaunches} />
-
       <div className="mx-auto grid w-full max-w-[1340px] grid-cols-[minmax(0,1fr)] items-center gap-5 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] xl:gap-x-8">
         <section className="flex min-w-0 flex-col items-start gap-4 xl:col-start-1 xl:row-start-1 xl:self-end">
           <h1 className="text-display text-fg">
@@ -122,7 +98,9 @@ async function LandingPageContent() {
               SYMBaiEX/gitshipt
               <ArrowUpRight className="size-3" />
             </Link>
-            <LiveIndicator lastSyncAt={indexerHeartbeat} label="Indexer" />
+            <Suspense fallback={null}>
+              <LandingIndexer />
+            </Suspense>
           </div>
           <div className="flex flex-wrap items-center gap-2.5">
             <Button asChild variant="primary" size="lg">
@@ -141,28 +119,55 @@ async function LandingPageContent() {
           <HeroArtwork />
         </div>
         <div className="min-w-0 xl:col-start-1 xl:row-start-2 xl:self-start">
-          <FeaturedProjectCard
-            header={featuredHeader}
-            contributors={featuredContribs}
-          />
+          <Suspense fallback={null}>
+            <LandingFeaturedProject />
+          </Suspense>
         </div>
       </div>
 
-      {/* ── Row 2: live KPI strip (above footer) ────────────────── */}
-      <div className="relative mx-auto mt-auto w-full lg:max-w-[1088px] lg:shrink-0 2xl:max-w-[1340px]">
-        <section
-          aria-label="Live platform metrics"
-          className={
-            tickerCellKeys.length === 4
-              ? "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 lg:gap-3"
-              : "grid grid-cols-1 gap-2 sm:grid-cols-3 lg:gap-3"
-          }
-        >
-          {tickerCellKeys.map((cellKey) => (
-            <BentoTickerCell key={cellKey} initial={ticker} cellKey={cellKey} />
-          ))}
-        </section>
-      </div>
+      <Suspense fallback={null}>
+        <LandingActivity />
+      </Suspense>
+    </div>
+  );
+}
+
+async function LandingIndexer() {
+  return (
+    <LiveIndicator
+      lastSyncAt={await getPlatformIndexerHeartbeat()}
+      label="Indexer"
+    />
+  );
+}
+
+async function LandingFeaturedProject() {
+  const header = await getProjectBySlug(FEATURED_OWNER, FEATURED_REPO);
+  const contributors = header
+    ? await getProjectLeaderboard(header.id, header.payoutConfig)
+    : [];
+  return <FeaturedProjectCard header={header} contributors={contributors} />;
+}
+
+async function LandingActivity() {
+  const { ticker, latestLaunches } = await getLandingData();
+  const tickerCellKeys = getLandingTickerCellKeys(ticker);
+
+  return (
+    <div className="relative mx-auto mt-auto flex w-full flex-col gap-4 lg:max-w-[1088px] lg:shrink-0 2xl:max-w-[1340px]">
+      <TokenLaunchCarousel launches={latestLaunches} />
+      <section
+        aria-label="Live platform metrics"
+        className={
+          tickerCellKeys.length === 4
+            ? "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 lg:gap-3"
+            : "grid grid-cols-1 gap-2 sm:grid-cols-3 lg:gap-3"
+        }
+      >
+        {tickerCellKeys.map((cellKey) => (
+          <BentoTickerCell key={cellKey} initial={ticker} cellKey={cellKey} />
+        ))}
+      </section>
     </div>
   );
 }

@@ -192,16 +192,20 @@ export async function getAllPublicProjects(
   const normalized: ExploreFilters = {
     status: filters.status ?? "all",
     sort: filters.sort ?? "trending",
-    search: filters.search?.trim() || undefined,
+    search: filters.search?.trim().slice(0, 160) || undefined,
     limit: filters.limit ?? 60,
   };
-  return getAllPublicProjectsCached(normalized);
+  // Free-text inputs are effectively unbounded cache keys. Cache the
+  // frequently revisited status/sort views, not individual search terms.
+  return normalized.search
+    ? getAllPublicProjectsUncached(normalized)
+    : getAllPublicProjectsCached(normalized);
 }
 
 async function getAllPublicProjectsCached(
   normalized: ExploreFilters,
 ): Promise<PublicProjectRow[]> {
-  "use cache";
+  "use cache: remote";
   cacheLife("browse");
   cacheTag(cacheTags.public);
   cacheTag(cacheTags.explore);

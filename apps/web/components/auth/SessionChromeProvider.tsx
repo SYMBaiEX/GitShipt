@@ -4,37 +4,40 @@ import * as React from "react";
 import type { SessionUserChrome } from "@/lib/auth/session";
 import { useAuthStore } from "@/lib/state/auth-store";
 
-const SessionChromeContext = React.createContext<SessionUserChrome | null>(
-  null,
-);
+type ChromeSession = Promise<SessionUserChrome | null>;
+
+const SessionChromeContext = React.createContext<ChromeSession | null>(null);
 
 export function SessionChromeProvider({
   user,
   children,
 }: {
-  user: SessionUserChrome | null;
+  user: ChromeSession;
   children: React.ReactNode;
 }) {
-  const storeUser = useAuthStore((state) => state.user);
-  const status = useAuthStore((state) => state.status);
-  const setAuth = useAuthStore((state) => state.setAuth);
-
-  React.useEffect(() => {
-    setAuth(user);
-  }, [setAuth, user]);
-
-  const value = React.useMemo(() => {
-    if (status === "signed-out") return null;
-    return storeUser ?? user;
-  }, [status, storeUser, user]);
-
   return (
-    <SessionChromeContext.Provider value={value}>
+    <SessionChromeContext.Provider value={user}>
+      <React.Suspense fallback={null}>
+        <SyncSession user={user} />
+      </React.Suspense>
       {children}
     </SessionChromeContext.Provider>
   );
 }
 
+function SyncSession({ user }: { user: ChromeSession }) {
+  const resolvedUser = React.use(user);
+  const setAuth = useAuthStore((state) => state.setAuth);
+
+  React.useEffect(() => {
+    setAuth(resolvedUser);
+  }, [setAuth, resolvedUser]);
+  return null;
+}
+
 export function useSessionChrome(): SessionUserChrome | null {
-  return React.useContext(SessionChromeContext);
+  const session = React.useContext(SessionChromeContext);
+  const user = session ? React.use(session) : null;
+  const status = useAuthStore((state) => state.status);
+  return status === "signed-out" ? null : user;
 }

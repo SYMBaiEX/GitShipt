@@ -7,6 +7,7 @@ import { dbHttp } from "@/db";
 import { projects } from "@/db/schema";
 import { requirePermission, PermissionError } from "@/lib/auth/permissions";
 import { WizardShell, type DraftHydration } from "./_components/WizardShell";
+import LaunchLoading from "./loading";
 import { SolanaWalletProvider } from "@/components/providers/SolanaWalletProvider";
 import { platformFeeBps } from "@/lib/platform-fee";
 import { DEFAULT_PLATFORM_FEE_BPS } from "@repo/shared";
@@ -30,7 +31,7 @@ interface LaunchPageProps {
  */
 export default function LaunchPage({ searchParams }: LaunchPageProps) {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<LaunchLoading />}>
       <LaunchPageContent searchParams={searchParams} />
     </Suspense>
   );

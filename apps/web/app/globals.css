@@ -41,10 +41,109 @@
     0 -8px 20px color-mix(in oklab, var(--bg) 38%, transparent);
 }
 
-.gb-mobile-tab[aria-current="page"] {
+.gb-dock-selection {
+  --dock-cell-width: calc((100% - (var(--dock-count) - 1) * 0.25rem) / var(--dock-count));
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--dock-cell-width);
+  border-radius: 0.375rem;
+  background: var(--primary-soft);
+  transform: translateX(calc(var(--dock-index) * (100% + 0.25rem)));
+  opacity: 0;
+  pointer-events: none;
   box-shadow:
     inset 0 1px 0 color-mix(in oklab, var(--fg) 14%, transparent),
     var(--shadow-press);
+}
+
+.gb-dock-selection[data-active="true"] {
+  opacity: 1;
+}
+
+.gb-dock-pending,
+.gb-sidebar-pending {
+  position: absolute;
+  inset: auto 34% 0.175rem;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--primary-readable);
+  opacity: 0;
+}
+
+.gb-sidebar-pending {
+  inset: 25% auto 25% 0;
+  height: auto;
+  width: 2px;
+}
+
+:is(.gb-dock-pending, .gb-sidebar-pending)[data-pending="true"] {
+  opacity: 1;
+}
+
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-group(root) {
+  animation: none;
+}
+::view-transition-old(root) {
+  display: none;
+}
+::view-transition-new(root) {
+  animation: none;
+}
+::view-transition-group(gitshipt-page) {
+  animation: none;
+}
+::view-transition-image-pair(gitshipt-page) {
+  overflow: clip;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .gb-dock-selection {
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), opacity 120ms ease-out;
+  }
+  :is(.gb-dock-pending, .gb-sidebar-pending) {
+    transition: opacity 100ms ease-out;
+  }
+  :is(.gb-dock-pending, .gb-sidebar-pending)[data-pending="true"] {
+    transition-delay: 100ms;
+  }
+  ::view-transition-old(.gb-route-swap),
+  ::view-transition-old(.gb-route-next),
+  ::view-transition-old(.gb-route-prev) {
+    mix-blend-mode: normal;
+    animation: gb-route-out 125ms cubic-bezier(0.25, 0.65, 0.55, 1) both;
+  }
+  ::view-transition-new(.gb-route-swap),
+  ::view-transition-new(.gb-route-next),
+  ::view-transition-new(.gb-route-prev) {
+    mix-blend-mode: normal;
+    animation: gb-route-in 215ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  ::view-transition-old(.gb-route-swap) { --route-y: -4px; }
+  ::view-transition-new(.gb-route-swap) { --route-y: 7px; }
+  ::view-transition-old(.gb-route-next),
+  ::view-transition-new(.gb-route-prev) { --route-x: -14px; }
+  ::view-transition-new(.gb-route-next),
+  ::view-transition-old(.gb-route-prev) { --route-x: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+@keyframes gb-route-out {
+  to { opacity: 0; transform: translate(var(--route-x, 0px), var(--route-y, 0px)); }
+}
+
+@keyframes gb-route-in {
+  from { opacity: 0; transform: translate(var(--route-x, 0px), var(--route-y, 0px)); }
+  to { opacity: 1; transform: none; }
 }
 
 .gb-navigation-sheet {
@@ -1191,24 +1290,11 @@
  * Pair with `glass-strong` for popovers/modals where contrast is critical.
  * ============================================================ */
 /* ============================================================
- * Smooth scrolling — applied globally for anchor jumps + programmatic
- * scrollTo / scrollIntoView. Respects prefers-reduced-motion. Internal
- * scroll containers (sidebar nav, project page right rail, leaderboard
- * list) inherit the smooth behavior because we apply it to every
- * scrollable region via the broad selector below.
+ * Keep deliberate document anchor scrolling smooth. Internal viewport
+ * resets and focus changes should settle immediately during navigation.
  * ============================================================ */
 @media (prefers-reduced-motion: no-preference) {
   html {
-    scroll-behavior: smooth;
-  }
-  /* Apply to internal scroll containers too. Tailwind generates classes
-     containing 'overflow-y-auto' / 'overflow-y-scroll' / 'overflow-auto' /
-     'overflow-scroll' — we match them all with attribute substring selectors
-     so any consumer of those utilities gets smooth scroll for free. */
-  [class*="overflow-y-auto"],
-  [class*="overflow-y-scroll"],
-  [class*="overflow-auto"],
-  [class*="overflow-scroll"] {
     scroll-behavior: smooth;
   }
 }

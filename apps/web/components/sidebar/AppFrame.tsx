@@ -3,6 +3,7 @@ import Link from "next/link";
 import { cn } from "@repo/lib";
 import { MobileSidebarTrigger } from "./MobileSidebarTrigger";
 import { MobileDock, type MobileDockSurface } from "./MobileDock";
+import { RouteViewport } from "./RouteViewport";
 
 export function AppFrame({
   sidebar,
@@ -40,16 +41,14 @@ export function AppFrame({
             </span>
           ) : null}
         </header>
-        <main
-          id="main-content"
-          tabIndex={-1}
+        <RouteViewport
           className={cn(
             "gb-app-content min-h-0 min-w-0 flex-1 overflow-y-auto px-4 py-4 outline-none lg:pb-3",
             contentClassName,
           )}
         >
           {children}
-        </main>
+        </RouteViewport>
         <MobileDock surface={surface} />
         <footer className="glass surface-highlight ml-3 hidden shrink-0 items-center justify-between gap-3 rounded-tl-2xl border-t border-l border-border/60 px-4 py-1.5 shadow-card-elevated lg:flex">
           <span className="truncate text-caption text-fg-muted">{footer}</span>

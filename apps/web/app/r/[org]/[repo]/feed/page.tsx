@@ -6,7 +6,7 @@ import { Newspaper, Rss } from "lucide-react";
 import { Button } from "@repo/ui";
 import { Card } from "@repo/ui";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-import { getProjectPageData } from "@/lib/queries/project-page";
+import { getProjectBySlug } from "@/lib/queries/project-page";
 import { getProjectFeed } from "@/lib/queries/project-feed";
 import type { PeriodDigestSubjects } from "@/db/schema";
 import { PeriodDigestCard } from "./_components/PeriodDigestCard";
@@ -19,14 +19,14 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) return { title: `${org}/${repo} · Feed` };
+  const header = await getProjectBySlug(org, repo);
+  if (!header) return { title: `${org}/${repo} · Feed` };
   return {
-    title: `${data.header.name} · Feed`,
-    description: `Daily digests + milestones for ${data.header.slug}. Synthesized from the leaderboard and git history.`,
+    title: `${header.name} · Feed`,
+    description: `Daily digests + milestones for ${header.slug}. Synthesized from the leaderboard and git history.`,
     alternates: {
       types: {
-        "application/atom+xml": `/r/${data.header.slug}/feed.atom`,
+        "application/atom+xml": `/r/${header.slug}/feed.atom`,
       },
     },
   };
@@ -42,10 +42,9 @@ export default function ProjectFeedPage({ params }: { params: Params }) {
 
 async function ProjectFeedPageContent({ params }: { params: Params }) {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) notFound();
+  const header = await getProjectBySlug(org, repo);
+  if (!header) notFound();
 
-  const { header } = data;
   const slug = `${header.ghOwner}/${header.ghRepo}`;
   const entries = await getProjectFeed(header.id, 50);
 

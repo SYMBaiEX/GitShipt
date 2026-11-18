@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Coins } from "lucide-react";
-import { getProjectPageData } from "@/lib/queries/project-page";
+import { getProjectBySlug, getPoolOverview, getRecentPayouts } from "@/lib/queries/project-page";
 import {
   getTokenClaimEvents,
   getTokenCreators,
@@ -36,14 +36,14 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) return { title: `${org}/${repo} · Token` };
-  const symbol = data.header.tokenMint
-    ? data.header.ghRepo.toUpperCase().slice(0, 8)
+  const header = await getProjectBySlug(org, repo);
+  if (!header) return { title: `${org}/${repo} · Token` };
+  const symbol = header.tokenMint
+    ? header.ghRepo.toUpperCase().slice(0, 8)
     : null;
   return {
-    title: `${data.header.name}${symbol ? ` · $${symbol}` : ""} · Token`,
-    description: `Token detail page for ${data.header.slug} on Bags.fm.`,
+    title: `${header.name}${symbol ? ` · $${symbol}` : ""} · Token`,
+    description: `Token detail page for ${header.slug} on Bags.fm.`,
   };
 }
 
@@ -57,20 +57,20 @@ export default function ProjectTokenPage({ params }: { params: Params }) {
 
 async function ProjectTokenPageContent({ params }: { params: Params }) {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) notFound();
-
-  const { header } = data;
-  const stats = await getTokenStats(header);
-  const hasLiveToken =
-    header.tokenMint &&
-    (header.status === "live" || header.status === "tracked");
-  const [creators, claimEvents] = hasLiveToken
+  const header = await getProjectBySlug(org, repo);
+  if (!header) notFound();
+  const liveMint = header.status === "live" || header.status === "tracked"
+    ? header.tokenMint
+    : null;
+  const [stats, creators, claimEvents, pool, recentPayouts] = liveMint
     ? await Promise.all([
-        getTokenCreators(header.id, header.tokenMint!),
-        getTokenClaimEvents(header.id, header.tokenMint!, 5),
+        getTokenStats(header),
+        getTokenCreators(header.id, liveMint),
+        getTokenClaimEvents(header.id, liveMint, 5),
+        getPoolOverview(header),
+        getRecentPayouts(header.id),
       ])
-    : [[], []];
+    : [null, [], [], null, []];
   const platformFeePct = (header.platformFeeBps / 100).toFixed(1);
   const contributorPoolPct = ((10_000 - header.platformFeeBps) / 100).toFixed(
     1,
@@ -91,7 +91,7 @@ async function ProjectTokenPageContent({ params }: { params: Params }) {
 
       <h1 className="text-headline-md">Token</h1>
 
-      {!hasLiveToken || !stats || !header.tokenMint ? (
+      {!liveMint || !stats || !pool ? (
         <Card depth="raised" padding="default" className="text-center">
           <Coins className="mx-auto size-10 text-fg-muted" aria-hidden />
           <CardTitle as="h2" className="mt-3 justify-center">
@@ -113,8 +113,8 @@ async function ProjectTokenPageContent({ params }: { params: Params }) {
           <div className="flex min-w-0 flex-col gap-4">
             <BagsAnalyticsCard
               stats={stats}
-              pool={data.pool}
-              recentPayouts={data.recentPayouts}
+              pool={pool}
+              recentPayouts={recentPayouts}
               creatorCount={creators.length}
               claimEvents={claimEvents}
             />
@@ -191,16 +191,16 @@ async function ProjectTokenPageContent({ params }: { params: Params }) {
                   <TokenMeta label="Mint">
                     <span
                       className="truncate text-mono-sm text-fg"
-                      title={header.tokenMint}
+                      title={liveMint}
                     >
-                      {formatAddress(header.tokenMint, 6, 6)}
+                      {formatAddress(liveMint, 6, 6)}
                     </span>
                     <CopyButton
-                      value={header.tokenMint}
+                      value={liveMint}
                       label="Copy contract address"
                     />
                     <Link
-                      href={solscanTokenUrl(header.tokenMint)}
+                      href={solscanTokenUrl(liveMint)}
                       target="_blank"
                       rel="noreferrer noopener"
                       aria-label="View on Solscan"
@@ -240,7 +240,7 @@ async function ProjectTokenPageContent({ params }: { params: Params }) {
               <TradingPanel
                 projectId={header.id}
                 symbol={stats.symbol}
-                tokenMint={header.tokenMint}
+                tokenMint={liveMint}
               />
             </SolanaWalletProvider>
             <TokenInfoCard

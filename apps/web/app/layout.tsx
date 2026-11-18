@@ -110,9 +110,9 @@ export default function RootLayout({
           <RequestMarker />
         </Suspense>
         <ThemeProvider>
-          <Suspense fallback={null}>
-            <SessionShell>{children}</SessionShell>
-          </Suspense>
+          <SessionChromeProvider user={getSessionUser()}>
+            {children}
+          </SessionChromeProvider>
           <Toaster />
         </ThemeProvider>
         <Telemetry />
@@ -125,11 +125,4 @@ async function RequestMarker() {
   // Session chrome depends on the incoming request, even when its shell streams.
   await connection();
   return null;
-}
-
-async function SessionShell({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
-  const user = await getSessionUser();
-  return <SessionChromeProvider user={user}>{children}</SessionChromeProvider>;
 }

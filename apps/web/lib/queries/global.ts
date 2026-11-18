@@ -94,7 +94,6 @@ export interface LandingTicker {
 }
 
 export interface LandingData {
-  topProjects: LandingProject[];
   latestLaunches: LandingLaunchToken[];
   ticker: LandingTicker;
 }
@@ -154,7 +153,6 @@ function dailyFromLifetime(lifetimeLamports: bigint, createdAt: Date): bigint {
  * path until a DB is provisioned.
  */
 const EMPTY_LANDING: LandingData = {
-  topProjects: [],
   latestLaunches: [],
   ticker: {
     volume24hUsd: null,
@@ -165,62 +163,7 @@ const EMPTY_LANDING: LandingData = {
   },
 };
 
-/**
- * Top projects + global ticker for the landing page. Single round-trip
- * to the DB for each piece; ticker aggregates run as a few small COUNTs
- * + SUMs and should be sub-100ms even on a cold pool.
- *
- * Returns EMPTY_LANDING when DB is not configured — the dbHttp proxy
- * would otherwise throw on any property access. Keeps `bun run build`
- * green in CI environments without a DATABASE_URL secret while
- * preserving the rich data path everywhere else.
- */
-async function getLandingDataUncached(): Promise<LandingData> {
-  if (!hasCredentials.db()) return EMPTY_LANDING;
-  // Top 9 live projects, ranked by computed lifetime fees from the payouts
-  // table (the canonical on-chain truth). LEFT JOIN so projects with zero
-  // payouts still surface (they're the freshest launches).
-  const topRows = await dbHttp
-    .select({
-      id: projects.id,
-      ghOwner: projects.ghOwner,
-      ghRepo: projects.ghRepo,
-      name: projects.name,
-      description: projects.description,
-      imageUrl: projects.imageUrl,
-      status: projects.status,
-      createdAt: projects.createdAt,
-      lifetimeFeesLamports: sql<string>`COALESCE(SUM(${payouts.totalAmountLamports}) FILTER (WHERE ${payouts.status} = 'completed'), 0)::text`,
-      contributorsCount: sql<number>`(SELECT COUNT(*)::int FROM ${contributors} WHERE ${contributors.projectId} = ${projects.id})`,
-    })
-    .from(projects)
-    .leftJoin(payouts, eq(payouts.projectId, projects.id))
-    .where(inArray(projects.status, PUBLIC_LIVE_STATUSES))
-    .groupBy(projects.id)
-    .orderBy(
-      desc(
-        sql`COALESCE(SUM(${payouts.totalAmountLamports}) FILTER (WHERE ${payouts.status} = 'completed'), 0)`,
-      ),
-    )
-    .limit(9);
-
-  const topProjects: LandingProject[] = topRows.map((r) => {
-    const lifetime = BigInt(r.lifetimeFeesLamports);
-    return {
-      id: r.id,
-      slug: `${r.ghOwner}/${r.ghRepo}`,
-      ghOwner: r.ghOwner,
-      ghRepo: r.ghRepo,
-      name: r.name,
-      description: r.description,
-      imageUrl: r.imageUrl,
-      status: r.status,
-      contributorsCount: r.contributorsCount ?? 0,
-      lifetimeFeesLamports: lifetime,
-      dailyFeeLamports: dailyFromLifetime(lifetime, r.createdAt),
-    };
-  });
-
+async function getLatestLaunches(): Promise<LandingLaunchToken[]> {
   const launchRows = await dbHttp
     .select({
       id: projects.id,
@@ -238,10 +181,10 @@ async function getLandingDataUncached(): Promise<LandingData> {
     .leftJoin(payouts, eq(payouts.projectId, projects.id))
     .where(inArray(projects.status, PUBLIC_LAUNCH_CAROUSEL_STATUSES))
     .groupBy(projects.id)
-    .orderBy(desc(projects.createdAt), sql`random()`)
+    .orderBy(desc(projects.createdAt), desc(projects.id))
     .limit(12);
 
-  const latestLaunches: LandingLaunchToken[] = launchRows.map((r) => ({
+  return launchRows.map((r) => ({
     id: r.id,
     slug: `${r.ghOwner}/${r.ghRepo}`,
     ghOwner: r.ghOwner,
@@ -254,55 +197,20 @@ async function getLandingDataUncached(): Promise<LandingData> {
     createdAt: r.createdAt,
     lifetimeFeesLamports: BigInt(r.lifetimeFeesLamports),
   }));
-
-  // Ticker aggregates — three small queries in parallel.
-  const [feesRows, activeRows, earningRows] = await Promise.all([
-    dbHttp
-      .select({
-        sum: sql<string>`COALESCE(SUM(${payouts.totalAmountLamports}), 0)::text`,
-      })
-      .from(payouts)
-      .where(eq(payouts.status, "completed")),
-    dbHttp
-      .select({ count: sql<number>`COUNT(*)::int` })
-      .from(projects)
-      .where(inArray(projects.status, PUBLIC_LIVE_STATUSES)),
-    dbHttp
-      .select({
-        count: sql<number>`COUNT(DISTINCT ${contributorClaims.contributorId})::int`,
-      })
-      .from(contributorClaims)
-      .where(isNotNull(contributorClaims.walletAddress)),
-  ]);
-
-  const lifetimeFeesLamports = BigInt(feesRows[0]?.sum ?? "0");
-  const activeProjects = activeRows[0]?.count ?? 0;
-  const contributorsEarning = earningRows[0]?.count ?? 0;
-
-  // Prefer the cron-published Redis snapshot when present so the homepage
-  // numbers match what's being broadcast across surfaces. The DB-derived
-  // values above are the graceful fallback when Redis is empty / down.
-  const cached = await getCachedLandingTicker();
-
-  return {
-    topProjects,
-    latestLaunches,
-    ticker: cached ?? {
-      volume24hUsd: null,
-      volumeSource: "unavailable",
-      lifetimeFeesLamports,
-      activeProjects,
-      contributorsEarning,
-    },
-  };
 }
 
 export async function getLandingData(): Promise<LandingData> {
-  "use cache";
+  "use cache: remote";
   cacheLife("live");
   cacheTag(cacheTags.public);
   cacheTag(cacheTags.landing);
-  return await getLandingDataUncached();
+  cacheTag(cacheTags.liveTicker);
+  if (!hasCredentials.db()) return EMPTY_LANDING;
+  const [latestLaunches, ticker] = await Promise.all([
+    getLatestLaunches(),
+    getCachedTickerOrFresh(),
+  ]);
+  return { latestLaunches, ticker };
 }
 
 /**
@@ -346,7 +254,11 @@ async function getGlobalLeaderboardUncached(): Promise<{
       // contributors keep their lifetime payout history but stop appearing
       // on the public global view.
       .where(
-        and(isNotNull(contributors.rank), eq(contributors.excluded, "false")),
+        and(
+          isNotNull(contributors.rank),
+          eq(contributors.excluded, "false"),
+          inArray(projects.status, PUBLIC_LIVE_STATUSES),
+        ),
       )
       .groupBy(
         contributors.ghUsername,
@@ -469,7 +381,7 @@ export async function getGlobalLeaderboard(): Promise<{
   byContributor: GlobalLeaderboardEntry[];
   byProject: GlobalProjectEntry[];
 }> {
-  "use cache";
+  "use cache: remote";
   cacheLife("browse");
   cacheTag(cacheTags.public);
   cacheTag(cacheTags.globalLeaderboard);

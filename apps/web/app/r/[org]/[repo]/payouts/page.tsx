@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Coins } from "lucide-react";
-import { getProjectPageData } from "@/lib/queries/project-page";
+import { getProjectBySlug } from "@/lib/queries/project-page";
 import { getProjectPayoutHistory } from "@/lib/queries/dashboard";
 import { Card } from "@repo/ui";
 import { Badge } from "@repo/ui";
@@ -22,11 +22,11 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { org, repo } = await params;
-  const data = await getProjectPageData(org, repo);
-  if (!data) return { title: `${org}/${repo} · Payouts` };
+  const header = await getProjectBySlug(org, repo);
+  if (!header) return { title: `${org}/${repo} · Payouts` };
   return {
-    title: `${data.header.name} · Payouts`,
-    description: `Daily payout history for ${data.header.slug} on ${clusterLabel()}.`,
+    title: `${header.name} · Payouts`,
+    description: `Daily payout history for ${header.slug} on ${clusterLabel()}.`,
   };
 }
 
@@ -54,10 +54,9 @@ async function ProjectPayoutsPageContent({
   searchParams: Promise<{ page?: string }>;
 }) {
   const [{ org, repo }, sp] = await Promise.all([params, searchParams]);
-  const data = await getProjectPageData(org, repo);
-  if (!data) notFound();
+  const header = await getProjectBySlug(org, repo);
+  if (!header) notFound();
 
-  const { header } = data;
   if (
     !header.tokenMint ||
     header.status === "simulated_live" ||

@@ -81,7 +81,7 @@ export function ExploreFilters() {
         type="search"
         value={searchValue}
         onChange={(e) => setSearchValue(e.target.value)}
-        placeholder="Search by repo, name, owner, or token mint…"
+        placeholder="Repo, owner, or token"
         leadingIcon={<Search className="size-4" />}
         clearable
         onClear={() => setSearchValue("")}

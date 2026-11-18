@@ -206,6 +206,7 @@ export function Sidebar({
           side="left"
           aria-describedby={undefined}
           className="gb-navigation-sheet gap-0 lg:hidden [&_[data-sidebar-header]]:pr-16"
+          overlayClassName="bg-bg/55 backdrop-blur-none"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
             const trigger = document.querySelector<HTMLElement>(
@@ -218,7 +219,9 @@ export function Sidebar({
           }}
         >
           <SheetTitle className="sr-only">{ariaLabel}</SheetTitle>
-          {children}
+          <div className="gb-navigation-sheet-body flex min-h-0 flex-1 flex-col">
+            {children}
+          </div>
         </SheetContent>
       </Sheet>
       <aside
@@ -275,8 +278,9 @@ export function SidebarContent({
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <nav
+      data-sidebar-content
       className={cn(
-        "flex-1 overflow-y-auto overflow-x-hidden px-2 py-3",
+        "min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-2 py-3",
         "[scrollbar-width:thin] [scrollbar-color:var(--border-strong)_transparent]",
         className,
       )}

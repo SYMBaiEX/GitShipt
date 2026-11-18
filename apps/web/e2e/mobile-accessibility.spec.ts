@@ -79,6 +79,50 @@ test.describe("mobile application shell", () => {
     await expect(page.locator("[data-gitshipt-sidebar]")).toBeVisible();
   });
 
+  test("drawer close stays in the header and the footer can scroll into view", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.setViewportSize({ width: 920, height: 1193 });
+    await page.goto("/docs");
+    const trigger = page.getByRole("button", { name: "Open navigation" });
+    await trigger.click();
+    const drawer = page.getByRole("dialog", { name: "App navigation" });
+    const header = drawer.locator("[data-sidebar-header]");
+    const close = drawer.getByRole("button", { name: "Close", exact: true });
+
+    async function expectCloseInHeader() {
+      await expect(close).toBeInViewport({ ratio: 1 });
+      const headerBox = (await header.boundingBox())!;
+      const closeBox = (await close.boundingBox())!;
+      expect(closeBox.width).toBeGreaterThanOrEqual(44);
+      expect(closeBox.height).toBeGreaterThanOrEqual(44);
+      expect(closeBox.x).toBeGreaterThanOrEqual(headerBox.x);
+      expect(closeBox.y).toBeGreaterThanOrEqual(headerBox.y);
+      expect(closeBox.x + closeBox.width).toBeLessThanOrEqual(
+        headerBox.x + headerBox.width,
+      );
+      expect(closeBox.y + closeBox.height).toBeLessThanOrEqual(
+        headerBox.y + headerBox.height,
+      );
+    }
+
+    await expectCloseInHeader();
+    await expect(drawer).toHaveCSS("background-image", "none");
+    await expect(page.locator('[data-slot="sheet-overlay"]')).toHaveCSS(
+      "backdrop-filter",
+      "none",
+    );
+    await page.setViewportSize({ width: 844, height: 280 });
+    const privacy = drawer.getByRole("link", { name: "Privacy", exact: true });
+    await privacy.scrollIntoViewIfNeeded();
+    await expect(privacy).toBeInViewport({ ratio: 1 });
+    await expectCloseInHeader();
+    await close.click();
+    await expect(drawer).not.toBeVisible();
+    await expect(trigger).toBeFocused();
+  });
+
   test("small screens reflow and the dock does not cover content", async ({
     page,
   }) => {
